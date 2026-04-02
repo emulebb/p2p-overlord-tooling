@@ -54,5 +54,6 @@ if ($FlushWaitSeconds -gt 0) {
     SessionDir = $SessionDir
     CapturePath = $metadata.CapturePath
     AgentLogPath = $metadata.AgentLogPath
+    PacketDumpPath = $metadata.PacketDumpPath
     StoppedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
 }

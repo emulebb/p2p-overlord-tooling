@@ -50,6 +50,7 @@ $logDir = if ($env:OVERLORD_LOG_DIR) {
 }
 
 $agentLogPath = Join-Path $logDir "overlord-agent-emule.log"
+$packetDumpDir = $logDir
 $startScriptPath = Join-Path $projectDir "overlord-agents\scripts\windows\agent_run_debug_direct.cmd"
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 
@@ -71,6 +72,7 @@ $pcapPath = Join-Path $sessionDir ("agent-{0}.pcapng" -f $CapturePort)
 $metadataPath = Join-Path $sessionDir "agent-session.json"
 $dumpcapStdoutPath = Join-Path $sessionDir "dumpcap-stdout.log"
 $dumpcapStderrPath = Join-Path $sessionDir "dumpcap-stderr.log"
+$sessionStartUtc = (Get-Date).ToUniversalTime()
 
 $logLinesBefore = 0
 $logLengthBefore = 0
@@ -117,10 +119,16 @@ if (-not $agentProcess) {
     throw "Agent process overlord-agent-emule.exe did not stay running after launch"
 }
 
+$packetDumpPath = Get-ChildItem -Path $packetDumpDir -Filter 'agent-udp-dump-*.jsonl' -ErrorAction SilentlyContinue |
+    Where-Object { $_.LastWriteTimeUtc -ge $sessionStartUtc.AddSeconds(-5) } |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1 -ExpandProperty FullName
+
 $metadata = [pscustomobject]@{
     SessionDir = $sessionDir
     SessionName = $sessionName
     AgentLogPath = $agentLogPath
+    PacketDumpPath = $packetDumpPath
     LogLinesBefore = $logLinesBefore
     LogLengthBefore = $logLengthBefore
     LogWriteTimeBeforeUtc = if ($logWriteTimeBefore) { $logWriteTimeBefore.ToString("o") } else { $null }
