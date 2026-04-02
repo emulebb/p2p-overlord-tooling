@@ -2,6 +2,7 @@
 
 - This repo contains reusable workspace helper scripts for the Overlord project.
 - Follow the workspace instructions from `../AGENTS.md` in addition to this file.
+- Use `../overlord-be/BACKLOG.md` as the canonical active backlog.
 - Keep helper names in the `helper-<area>-<action>.ps1` format.
 - Add short header comments so purpose and expected inputs are obvious.
 - Prefer helpers that orchestrate existing repo commands instead of re-implementing product logic here.
