@@ -15,6 +15,36 @@ from pathlib import Path
 
 SUMMARY_RE = re.compile(r"(?P<key>[A-Za-z0-9_]+)=(?P<value>\S+)")
 
+OPCODE_NAME_BY_HEX = {
+    "0x01": "KADEMLIA2_BOOTSTRAP_REQ",
+    "0x09": "KADEMLIA2_BOOTSTRAP_RES",
+    "0x11": "KADEMLIA2_HELLO_REQ",
+    "0x19": "KADEMLIA2_HELLO_RES",
+    "0x20": "KADEMLIA2_HELLO_RES_ACK",
+    "0x21": "KADEMLIA2_REQ",
+    "0x29": "KADEMLIA2_RES",
+    "0x33": "KADEMLIA2_SEARCH_KEY_REQ",
+    "0x34": "KADEMLIA2_SEARCH_SOURCE_REQ",
+    "0x35": "KADEMLIA2_SEARCH_NOTES_REQ",
+    "0x3B": "KADEMLIA2_SEARCH_RES",
+    "0x43": "KADEMLIA2_PUBLISH_KEY_REQ",
+    "0x44": "KADEMLIA2_PUBLISH_SOURCE_REQ",
+    "0x45": "KADEMLIA2_PUBLISH_NOTES_REQ",
+    "0x4B": "KADEMLIA2_PUBLISH_RES",
+    "0x4C": "KADEMLIA2_PUBLISH_RES_ACK",
+    "0x50": "KADEMLIA_FIREWALLED_REQ",
+    "0x53": "KADEMLIA2_FIREWALLED2_REQ",
+    "0x58": "KADEMLIA2_FIREWALLED_RES",
+    "0x59": "KADEMLIA2_FIREWALLED_ACK_RES",
+    "0x60": "KADEMLIA2_FIREWALLUDP",
+    "0x61": "KADEMLIA2_FIREWALLUDP",
+    "0x62": "KADEMLIA_FINDBUDDY_REQ",
+    "0x63": "KADEMLIA_FINDBUDDY_RES",
+    "0x64": "KADEMLIA_CALLBACK_REQ",
+    "0x65": "KADEMLIA2_PING",
+    "0x66": "KADEMLIA2_PONG",
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -39,6 +69,8 @@ def normalize_record(source: str, record: dict) -> dict:
     summary = parse_summary(record.get("summary", ""))
     opcode_name = record.get("opcode_name") or summary.get("opcode_name")
     opcode = record.get("opcode") or summary.get("opcode")
+    if opcode_name is None and opcode:
+        opcode_name = OPCODE_NAME_BY_HEX.get(normalize_hex_key(opcode), "UNKNOWN")
     transport_mode = record.get("transport_mode") or summary.get("transport_mode")
     if not transport_mode:
         raw_obfuscated = record.get("raw_obfuscated")
@@ -47,11 +79,15 @@ def normalize_record(source: str, record: dict) -> dict:
         receiver_valid = record.get("receiver_verify_key_valid")
         if receiver_valid is None:
             receiver_valid = summary.get("receiver_verify_key_valid")
+        receiver_verify_key = record.get("receiver_verify_key")
+        if receiver_verify_key is None:
+            receiver_verify_key = summary.get("receiver_verify_key")
         raw_obfuscated = as_bool(raw_obfuscated)
         receiver_valid = as_bool(receiver_valid)
+        receiver_verify_key = as_int(receiver_verify_key)
         if not raw_obfuscated:
             transport_mode = "plaintext"
-        elif receiver_valid:
+        elif receiver_valid or (receiver_verify_key is not None and receiver_verify_key > 0):
             transport_mode = "receiver_verify_key"
         else:
             transport_mode = "node_id"
@@ -79,6 +115,26 @@ def as_bool(value) -> bool | None:
         if lowered in {"no", "false", "0"}:
             return False
     return None
+
+
+def as_int(value) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value, 0)
+        except ValueError:
+            return None
+    return None
+
+
+def normalize_hex_key(value: str) -> str:
+    value = value.strip()
+    if value.lower().startswith("0x"):
+        return "0x" + value[2:].upper()
+    return value.upper()
 
 
 def load_records(path: Path, source: str) -> list[dict]:

@@ -30,6 +30,28 @@ if (-not (Test-Path $stopScriptPath)) {
     throw "Agent stop script not found at $stopScriptPath"
 }
 
+$resolvedPacketDumpPath = $metadata.PacketDumpPath
+if (-not $resolvedPacketDumpPath) {
+    $packetDumpDir = if ($env:OVERLORD_LOG_DIR) {
+        $env:OVERLORD_LOG_DIR
+    } else {
+        Join-Path $env:TEMP "p2p-overlord\\logs"
+    }
+    $startedAtUtc = $null
+    if ($metadata.PSObject.Properties.Name -contains "StartedAtUtc" -and $metadata.StartedAtUtc) {
+        $startedAtUtc = [DateTime]::Parse($metadata.StartedAtUtc).ToUniversalTime()
+    }
+    $resolvedPacketDumpPath = Get-ChildItem -Path $packetDumpDir -Filter 'agent-udp-dump-*.jsonl' -ErrorAction SilentlyContinue |
+        Where-Object {
+            if ($null -eq $startedAtUtc) {
+                return $true
+            }
+            $_.LastWriteTimeUtc -ge $startedAtUtc.AddSeconds(-5)
+        } |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
+}
+
 if ($metadata.PSObject.Properties.Name -contains "DumpcapPid" -and $metadata.DumpcapPid) {
     Stop-Process -Id $metadata.DumpcapPid -Force -ErrorAction SilentlyContinue
 }
@@ -54,6 +76,6 @@ if ($FlushWaitSeconds -gt 0) {
     SessionDir = $SessionDir
     CapturePath = $metadata.CapturePath
     AgentLogPath = $metadata.AgentLogPath
-    PacketDumpPath = $metadata.PacketDumpPath
+    PacketDumpPath = $resolvedPacketDumpPath
     StoppedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
 }
