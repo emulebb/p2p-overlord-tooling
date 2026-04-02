@@ -6,7 +6,7 @@ Starts a fresh oracle parity session using the debug-local oracle executable.
 [CmdletBinding()]
 param(
     [string]$InterfaceAlias = "hide.me",
-    [int]$CapturePort = 46663,
+    [int]$CapturePort = 0,
     [string]$SessionPrefix = "parity-oracle",
     [int]$WaitAfterLaunchSeconds = 0
 )
@@ -66,14 +66,50 @@ function Resolve-DumpcapInterfaceIndex {
     throw "Could not map interface '$AdapterAlias' to a dumpcap device index"
 }
 
+function Resolve-OracleCapturePort {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PreferencesPath,
+        [Parameter(Mandatory = $true)]
+        [int]$RequestedCapturePort
+    )
+
+    if ($RequestedCapturePort -gt 0) {
+        return $RequestedCapturePort
+    }
+
+    if (-not (Test-Path $PreferencesPath)) {
+        throw "Oracle preferences not found at $PreferencesPath"
+    }
+
+    $configuredPortLine = Get-Content $PreferencesPath |
+        Where-Object { $_ -match '^UDPPort=' } |
+        Select-Object -First 1
+    if (-not $configuredPortLine) {
+        throw "Could not find UDPPort in $PreferencesPath"
+    }
+
+    $configuredPort = $configuredPortLine -replace '^UDPPort=', ''
+    $parsedCapturePort = 0
+    if (-not [int]::TryParse($configuredPort, [ref]$parsedCapturePort)) {
+        throw "Configured UDPPort '$configuredPort' in $PreferencesPath is not a valid integer"
+    }
+
+    return $parsedCapturePort
+}
+
 $traceLogPath = Join-Path $env:LOCALAPPDATA "eMule\log\oracle-kad-trace.log"
 $verboseLogPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\logs\eMule_Verbose.log"
+$preferencesPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\config\preferences.ini"
 $oracleExePath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\eMule_debug_loc.exe"
 $oracleWorkDir = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug"
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 
 if (-not (Test-Path $oracleExePath)) {
     throw "Oracle debug executable not found at $oracleExePath"
+}
+if (-not (Test-Path $preferencesPath)) {
+    throw "Oracle preferences not found at $preferencesPath"
 }
 if (-not (Test-Path $dumpcapPath)) {
     throw "dumpcap.exe not found at $dumpcapPath"
@@ -85,6 +121,7 @@ if (-not $env:LOCALAPPDATA) {
 $traceLogDir = Split-Path -Parent $traceLogPath
 New-Item -ItemType Directory -Path $traceLogDir -Force | Out-Null
 
+$CapturePort = Resolve-OracleCapturePort -PreferencesPath $preferencesPath -RequestedCapturePort $CapturePort
 $dumpcapInterfaceIndex = Resolve-DumpcapInterfaceIndex -AdapterAlias $InterfaceAlias -DumpcapPath $dumpcapPath
 
 Get-Process -Name "eMule_debug_loc", "emule" -ErrorAction SilentlyContinue | Stop-Process -Force
