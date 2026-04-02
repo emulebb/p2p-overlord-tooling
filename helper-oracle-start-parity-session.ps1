@@ -100,6 +100,7 @@ function Resolve-OracleCapturePort {
 
 $traceLogPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\logs\oracle-kad-trace.log"
 $verboseLogPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\logs\eMule_Verbose.log"
+$packetDumpDir = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\logs"
 $preferencesPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\config\preferences.ini"
 $oracleExePath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\eMule_debug_loc.exe"
 $oracleWorkDir = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug"
@@ -131,6 +132,7 @@ $pcapPath = Join-Path $sessionDir ("oracle-{0}.pcapng" -f $CapturePort)
 $metadataPath = Join-Path $sessionDir "oracle-session.json"
 $dumpcapStdoutPath = Join-Path $sessionDir "dumpcap-stdout.log"
 $dumpcapStderrPath = Join-Path $sessionDir "dumpcap-stderr.log"
+$sessionStartUtc = (Get-Date).ToUniversalTime()
 
 $traceLinesBefore = 0
 $traceLengthBefore = 0
@@ -184,11 +186,17 @@ if ($WaitAfterLaunchSeconds -gt 0) {
     Start-Sleep -Seconds $WaitAfterLaunchSeconds
 }
 
+$packetDumpPath = Get-ChildItem -Path $packetDumpDir -Filter 'oracle-udp-dump-*.jsonl' -ErrorAction SilentlyContinue |
+    Where-Object { $_.LastWriteTimeUtc -ge $sessionStartUtc.AddSeconds(-5) } |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1 -ExpandProperty FullName
+
 $metadata = [pscustomobject]@{
     SessionDir = $sessionDir
     SessionName = $sessionName
     TraceLogPath = $traceLogPath
     VerboseLogPath = $verboseLogPath
+    PacketDumpPath = $packetDumpPath
     TraceLinesBefore = $traceLinesBefore
     TraceLengthBefore = $traceLengthBefore
     TraceWriteTimeBeforeUtc = if ($traceWriteTimeBefore) { $traceWriteTimeBefore.ToString("o") } else { $null }
