@@ -98,7 +98,7 @@ function Resolve-OracleCapturePort {
     return $parsedCapturePort
 }
 
-$traceLogPath = Join-Path $env:LOCALAPPDATA "eMule\log\oracle-kad-trace.log"
+$traceLogPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\logs\oracle-kad-trace.log"
 $verboseLogPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\logs\eMule_Verbose.log"
 $preferencesPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\config\preferences.ini"
 $oracleExePath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\eMule_debug_loc.exe"
@@ -114,10 +114,6 @@ if (-not (Test-Path $preferencesPath)) {
 if (-not (Test-Path $dumpcapPath)) {
     throw "dumpcap.exe not found at $dumpcapPath"
 }
-if (-not $env:LOCALAPPDATA) {
-    throw "LOCALAPPDATA is not set"
-}
-
 $traceLogDir = Split-Path -Parent $traceLogPath
 New-Item -ItemType Directory -Path $traceLogDir -Force | Out-Null
 
