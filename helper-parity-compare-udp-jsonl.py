@@ -87,6 +87,8 @@ def normalize_record(source: str, record: dict) -> dict:
         receiver_verify_key = as_int(receiver_verify_key)
         if not raw_obfuscated:
             transport_mode = "plaintext"
+        elif source == "oracle":
+            transport_mode = infer_oracle_transport_mode(record.get("wire_hex", ""))
         elif receiver_valid or (receiver_verify_key is not None and receiver_verify_key > 0):
             transport_mode = "receiver_verify_key"
         else:
@@ -135,6 +137,17 @@ def normalize_hex_key(value: str) -> str:
     if value.lower().startswith("0x"):
         return "0x" + value[2:].upper()
     return value.upper()
+
+
+def infer_oracle_transport_mode(wire_hex: str) -> str:
+    if len(wire_hex) < 2:
+        return "node_id"
+    first_byte = int(wire_hex[:2], 16)
+    if first_byte in {0xE3, 0xE4, 0xE5, 0xA3, 0xC5, 0xD4}:
+        return "plaintext"
+    if (first_byte & 0x03) == 0x02:
+        return "receiver_verify_key"
+    return "node_id"
 
 
 def load_records(path: Path, source: str) -> list[dict]:
