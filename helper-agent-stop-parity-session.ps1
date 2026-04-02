@@ -72,6 +72,11 @@ if ($FlushWaitSeconds -gt 0) {
     Start-Sleep -Seconds $FlushWaitSeconds
 }
 
+if ($resolvedPacketDumpPath) {
+    $metadata.PacketDumpPath = $resolvedPacketDumpPath
+    $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8NoBOM $metadataPath
+}
+
 [pscustomobject]@{
     SessionDir = $SessionDir
     CapturePath = $metadata.CapturePath
