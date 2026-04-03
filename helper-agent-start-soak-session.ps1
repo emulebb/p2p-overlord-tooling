@@ -42,7 +42,7 @@ $logDir = if ($env:OVERLORD_LOG_DIR) {
     throw "OVERLORD_LOG_DIR is not set"
 }
 
-$workerScriptPath = Join-Path $projectDir "overlord-helpers\helper-agent-run-soak-worker.ps1"
+$workerScriptPath = Join-Path $PSScriptRoot "helper-agent-run-soak-worker.ps1"
 if (-not (Test-Path $workerScriptPath)) {
     throw "Soak worker script not found at $workerScriptPath"
 }

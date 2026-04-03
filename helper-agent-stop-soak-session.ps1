@@ -39,7 +39,7 @@ function Save-SessionMetadata {
 
 $metadataPath = Join-Path $SessionDir "soak-session.json"
 $metadata = Load-SessionMetadata -Path $metadataPath
-$summaryScriptPath = Join-Path $metadata.ProjectDir "overlord-helpers\helper-agent-summarize-soak-session.ps1"
+$summaryScriptPath = Join-Path $PSScriptRoot "helper-agent-summarize-soak-session.ps1"
 
 $metadata.StopRequested = $true
 $metadata.StopRequestedAtUtc = (Get-Date).ToUniversalTime().ToString("o")

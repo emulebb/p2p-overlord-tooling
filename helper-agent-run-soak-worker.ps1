@@ -238,8 +238,8 @@ function Stop-StartedSessionProcesses {
 
 $metadataPath = Join-Path $SessionDir "soak-session.json"
 $metadata = Load-SessionMetadata -Path $metadataPath
-$refreshScriptPath = Join-Path $metadata.ProjectDir "overlord-helpers\helper-agent-refresh-runtime-networking.ps1"
-$summaryScriptPath = Join-Path $metadata.ProjectDir "overlord-helpers\helper-agent-summarize-soak-session.ps1"
+$refreshScriptPath = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"
+$summaryScriptPath = Join-Path $PSScriptRoot "helper-agent-summarize-soak-session.ps1"
 $startCoordinatorPath = Join-Path $metadata.ProjectDir "overlord-be\overlord-be-coordinator\scripts\windows\coordinator_run_start_direct.cmd"
 $startAgentPath = Join-Path $metadata.ProjectDir "overlord-agents\scripts\windows\agent_run_start_direct.cmd"
 $agentLogPath = Join-Path $metadata.LogDir "overlord-agent-emule.log"

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "overlord-tooling/run-manifest/v1",
+  "title": "Overlord Tooling Run Manifest v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "scenarioId",
+    "runId",
+    "startedAtUtc",
+    "artifactRoot"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "run-manifest/v1"
+    },
+    "scenarioId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "startedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "artifactRoot": {
+      "type": "string",
+      "minLength": 1
+    },
+    "binary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
