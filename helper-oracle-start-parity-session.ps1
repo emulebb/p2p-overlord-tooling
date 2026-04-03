@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Starts a fresh oracle parity session using the debug-local oracle executable.
+Starts a fresh oracle parity session using the rebuilt distinct parity oracle executable.
 #>
 
 [CmdletBinding()]
@@ -8,31 +8,12 @@ param(
     [string]$InterfaceAlias = "hide.me",
     [int]$CapturePort = 0,
     [string]$SessionPrefix = "parity-oracle",
-    [int]$WaitAfterLaunchSeconds = 0
+    [int]$WaitAfterLaunchSeconds = 0,
+    [string]$ProfileRoot
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
-function Stop-DumpcapCapturePort {
-    param(
-        [Parameter(Mandatory = $true)]
-        [int]$Port
-    )
-
-    # Keep the agent and oracle captures alive together by only stopping the
-    # dumpcap instance that was already filtering this oracle UDP port.
-    $dumpcaps = Get-CimInstance Win32_Process -Filter "Name = 'dumpcap.exe'" -ErrorAction SilentlyContinue
-    foreach ($dumpcap in @($dumpcaps)) {
-        if ($null -eq $dumpcap.CommandLine) {
-            continue
-        }
-        if ($dumpcap.CommandLine -notmatch "udp port\s+$Port(\D|$)") {
-            continue
-        }
-        Stop-Process -Id $dumpcap.ProcessId -Force -ErrorAction SilentlyContinue
-    }
-}
 
 $projectDir = if ($env:OVERLORD_PROJECT_DIR) {
     $env:OVERLORD_PROJECT_DIR
@@ -98,16 +79,25 @@ function Resolve-OracleCapturePort {
     return $parsedCapturePort
 }
 
-$traceLogPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\logs\oracle-kad-trace.log"
-$verboseLogPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\logs\eMule_Verbose.log"
-$packetDumpDir = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\logs"
-$preferencesPath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\config\preferences.ini"
-$oracleExePath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\eMule_debug_loc.exe"
+$buildHelperPath = Join-Path $PSScriptRoot "helper-oracle-build-debug.ps1"
+$cleanupHelperPath = Join-Path $PSScriptRoot "helper-oracle-clean-runtime.ps1"
+$runtimeRoot = if ($ProfileRoot) {
+    [System.IO.Path]::GetFullPath($ProfileRoot)
+} else {
+    Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug"
+}
+$traceLogPath = Join-Path $runtimeRoot "logs\oracle-kad-trace.log"
+$verboseLogPath = Join-Path $runtimeRoot "logs\eMule_Verbose.log"
+$packetDumpDir = Join-Path $runtimeRoot "logs"
+$preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
 $oracleWorkDir = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug"
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 
-if (-not (Test-Path $oracleExePath)) {
-    throw "Oracle debug executable not found at $oracleExePath"
+if (-not (Test-Path $buildHelperPath)) {
+    throw "Oracle build helper not found at $buildHelperPath"
+}
+if (-not (Test-Path $cleanupHelperPath)) {
+    throw "Oracle cleanup helper not found at $cleanupHelperPath"
 }
 if (-not (Test-Path $preferencesPath)) {
     throw "Oracle preferences not found at $preferencesPath"
@@ -121,8 +111,15 @@ New-Item -ItemType Directory -Path $traceLogDir -Force | Out-Null
 $CapturePort = Resolve-OracleCapturePort -PreferencesPath $preferencesPath -RequestedCapturePort $CapturePort
 $dumpcapInterfaceIndex = Resolve-DumpcapInterfaceIndex -AdapterAlias $InterfaceAlias -DumpcapPath $dumpcapPath
 
-Get-Process -Name "eMule_debug_loc", "emule" -ErrorAction SilentlyContinue | Stop-Process -Force
-Stop-DumpcapCapturePort -Port $CapturePort
+$prelaunchCleanupArgs = @{
+    CapturePort = $CapturePort
+}
+& $cleanupHelperPath @prelaunchCleanupArgs | Out-Null
+$buildResult = & $buildHelperPath | Select-Object -Last 1
+$oracleExePath = $buildResult.RuntimeExePath
+if (-not $oracleExePath -or -not (Test-Path $oracleExePath)) {
+    throw "Parity oracle executable was not produced by the build helper"
+}
 
 $sessionName = "{0}-{1}" -f $SessionPrefix, (Get-Date -Format "yyyyMMdd-HHmmss")
 $sessionDir = Join-Path $tmpDir $sessionName
@@ -133,6 +130,8 @@ $metadataPath = Join-Path $sessionDir "oracle-session.json"
 $dumpcapStdoutPath = Join-Path $sessionDir "dumpcap-stdout.log"
 $dumpcapStderrPath = Join-Path $sessionDir "dumpcap-stderr.log"
 $sessionStartUtc = (Get-Date).ToUniversalTime()
+$oracleProcess = $null
+$dumpcap = $null
 
 $traceLinesBefore = 0
 $traceLengthBefore = 0
@@ -144,73 +143,89 @@ if (Test-Path $traceLogPath) {
     $traceLinesBefore = @(Get-Content $traceLogPath).Count
 }
 
-$dumpcap = Start-Process `
-    -FilePath $dumpcapPath `
-    -ArgumentList "-i $dumpcapInterfaceIndex -f `"udp port $CapturePort`" -w `"$pcapPath`"" `
-    -PassThru `
-    -RedirectStandardOutput $dumpcapStdoutPath `
-    -RedirectStandardError $dumpcapStderrPath `
-    -WindowStyle Hidden
+try {
+    $dumpcap = Start-Process `
+        -FilePath $dumpcapPath `
+        -ArgumentList "-i $dumpcapInterfaceIndex -f `"udp port $CapturePort`" -w `"$pcapPath`"" `
+        -PassThru `
+        -RedirectStandardOutput $dumpcapStdoutPath `
+        -RedirectStandardError $dumpcapStderrPath `
+        -WindowStyle Hidden
 
-Start-Sleep -Seconds 2
+    Start-Sleep -Seconds 2
 
-if ($dumpcap.HasExited) {
-    $stderr = if (Test-Path $dumpcapStderrPath) {
-        (Get-Content -Raw $dumpcapStderrPath).Trim()
-    } else {
-        ""
+    if ($dumpcap.HasExited) {
+        $stderr = if (Test-Path $dumpcapStderrPath) {
+            (Get-Content -Raw $dumpcapStderrPath).Trim()
+        } else {
+            ""
+        }
+        throw "dumpcap exited immediately with code $($dumpcap.ExitCode). $stderr"
     }
-    throw "dumpcap exited immediately with code $($dumpcap.ExitCode). $stderr"
+
+    Start-Process `
+        -FilePath $oracleExePath `
+        -ArgumentList @(if ($ProfileRoot) { @("-c", $runtimeRoot) } else { @() }) `
+        -WorkingDirectory $oracleWorkDir `
+        -PassThru `
+        -WindowStyle Hidden | Out-Null
+
+    Start-Sleep -Seconds 2
+    for ($attempt = 0; $attempt -lt 45; $attempt++) {
+        $oracleProcess = Get-Process -Name "eMule_v060_parity" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($oracleProcess) {
+            break
+        }
+        Start-Sleep -Seconds 1
+    }
+    if (-not $oracleProcess) {
+        throw "Parity oracle process did not stay running after launch"
+    }
+
+    if ($WaitAfterLaunchSeconds -gt 0) {
+        Start-Sleep -Seconds $WaitAfterLaunchSeconds
+    }
+
+    $packetDumpPath = Get-ChildItem -Path $packetDumpDir -Filter 'oracle-udp-dump-*.jsonl' -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTimeUtc -ge $sessionStartUtc.AddSeconds(-5) } |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
+
+    $metadata = [pscustomobject]@{
+        SessionDir = $sessionDir
+        SessionName = $sessionName
+        TraceLogPath = $traceLogPath
+        VerboseLogPath = $verboseLogPath
+        PacketDumpPath = $packetDumpPath
+        TraceLinesBefore = $traceLinesBefore
+        TraceLengthBefore = $traceLengthBefore
+        TraceWriteTimeBeforeUtc = if ($traceWriteTimeBefore) { $traceWriteTimeBefore.ToString("o") } else { $null }
+        CapturePath = $pcapPath
+        CapturePort = $CapturePort
+        InterfaceAlias = $InterfaceAlias
+        DumpcapInterfaceIndex = $dumpcapInterfaceIndex
+        DumpcapPid = $dumpcap.Id
+        DumpcapStdoutPath = $dumpcapStdoutPath
+        DumpcapStderrPath = $dumpcapStderrPath
+        OracleExePath = $oracleExePath
+        OracleProfileRoot = $runtimeRoot
+        OraclePid = $oracleProcess.Id
+        StartedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
+    }
+
+    $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8NoBOM $metadataPath
+    $metadata
 }
-
-$oracleCmd = Start-Process `
-    -FilePath $oracleExePath `
-    -WorkingDirectory $oracleWorkDir `
-    -PassThru `
-    -WindowStyle Hidden
-
-Start-Sleep -Seconds 2
-$oracleProcess = $null
-for ($attempt = 0; $attempt -lt 45; $attempt++) {
-    $oracleProcess = Get-Process -Name "eMule_debug_loc", "eMule", "emule" -ErrorAction SilentlyContinue | Select-Object -First 1
+catch {
+    $cleanupArgs = @{
+        CapturePort = $CapturePort
+    }
     if ($oracleProcess) {
-        break
+        $cleanupArgs.OraclePids = @($oracleProcess.Id)
     }
-    Start-Sleep -Seconds 1
+    if ($dumpcap) {
+        $cleanupArgs.DumpcapPids = @($dumpcap.Id)
+    }
+    & $cleanupHelperPath @cleanupArgs | Out-Null
+    throw
 }
-if (-not $oracleProcess) {
-    throw "Oracle process did not stay running after launch"
-}
-
-if ($WaitAfterLaunchSeconds -gt 0) {
-    Start-Sleep -Seconds $WaitAfterLaunchSeconds
-}
-
-$packetDumpPath = Get-ChildItem -Path $packetDumpDir -Filter 'oracle-udp-dump-*.jsonl' -ErrorAction SilentlyContinue |
-    Where-Object { $_.LastWriteTimeUtc -ge $sessionStartUtc.AddSeconds(-5) } |
-    Sort-Object LastWriteTimeUtc -Descending |
-    Select-Object -First 1 -ExpandProperty FullName
-
-$metadata = [pscustomobject]@{
-    SessionDir = $sessionDir
-    SessionName = $sessionName
-    TraceLogPath = $traceLogPath
-    VerboseLogPath = $verboseLogPath
-    PacketDumpPath = $packetDumpPath
-    TraceLinesBefore = $traceLinesBefore
-    TraceLengthBefore = $traceLengthBefore
-    TraceWriteTimeBeforeUtc = if ($traceWriteTimeBefore) { $traceWriteTimeBefore.ToString("o") } else { $null }
-    CapturePath = $pcapPath
-    CapturePort = $CapturePort
-    InterfaceAlias = $InterfaceAlias
-    DumpcapInterfaceIndex = $dumpcapInterfaceIndex
-    DumpcapPid = $dumpcap.Id
-    DumpcapStdoutPath = $dumpcapStdoutPath
-    DumpcapStderrPath = $dumpcapStderrPath
-    OracleExePath = $oracleExePath
-    OraclePid = $oracleProcess.Id
-    StartedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
-}
-
-$metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8NoBOM $metadataPath
-$metadata

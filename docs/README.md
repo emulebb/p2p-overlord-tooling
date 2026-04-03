@@ -25,3 +25,13 @@ Supporting notes for the workspace tooling platform.
   personal-name filenames.
 - Real personal identifiers must not be stored in tracked policy files; use
   local untracked policy or environment configuration for those checks.
+
+## Harness Commands
+
+- `../overlord-tooling.ps1 import-oracle-seeds -NodesDatPath <path> -ServerMetPath <path>`
+  imports canonical oracle seed files into the untracked local seed bundle.
+- `../overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1`
+  prints the first paired oracle+agent deterministic scenario manifest.
+- `../overlord-tooling.ps1 run-kad-startup-hello-publish`
+  runs the paired oracle+agent Kad startup, HELLO, and publish harness and
+  writes JSON manifests, summaries, and raw artifacts under `%OVERLORD_TMP_DIR%`.

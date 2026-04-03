@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "overlord-tooling/scenario-manifest/v1",
+  "title": "Overlord Tooling Scenario Manifest v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "scenarioId",
+    "description",
+    "seedBundle",
+    "oracle",
+    "agent",
+    "milestones"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "scenario-manifest/v1"
+    },
+    "scenarioId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seedBundle": {
+      "type": "object",
+      "required": [
+        "bundleId",
+        "requiredFiles"
+      ],
+      "properties": {
+        "bundleId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requiredFiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "oracle": {
+      "type": "object",
+      "required": [
+        "binaryRelativePath",
+        "dynamicPreferenceKeys",
+        "seededPreferenceDefaults"
+      ],
+      "properties": {
+        "binaryRelativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dynamicPreferenceKeys": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "seededPreferenceDefaults": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "agent": {
+      "type": "object",
+      "required": [
+        "controlUrl",
+        "statsUrl",
+        "seedRequest"
+      ],
+      "properties": {
+        "controlUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statsUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seedRequest": {
+          "type": "object",
+          "required": [
+            "hash",
+            "canonicalName",
+            "size",
+            "sourceCount"
+          ],
+          "properties": {
+            "hash": {
+              "type": "string",
+              "minLength": 1
+            },
+            "canonicalName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "sourceCount": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "milestones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": true
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": true
+}

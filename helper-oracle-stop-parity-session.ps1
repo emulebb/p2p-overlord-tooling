@@ -19,23 +19,30 @@ if (-not (Test-Path $metadataPath)) {
 }
 
 $metadata = Get-Content -Raw $metadataPath | ConvertFrom-Json
+$cleanupHelperPath = Join-Path $PSScriptRoot "helper-oracle-clean-runtime.ps1"
 
-if ($metadata.PSObject.Properties.Name -contains "DumpcapPid" -and $metadata.DumpcapPid) {
-    Stop-Process -Id $metadata.DumpcapPid -Force -ErrorAction SilentlyContinue
+if (-not (Test-Path $cleanupHelperPath)) {
+    throw "Oracle cleanup helper not found at $cleanupHelperPath"
 }
 
+if ($metadata.PSObject.Properties.Name -contains "CapturePort" -and $metadata.CapturePort) {
+    $capturePort = [int]$metadata.CapturePort
+} else {
+    $capturePort = 0
+}
+
+$cleanupArgs = @{
+    CapturePort = $capturePort
+    WaitTimeoutSeconds = [Math]::Max($FlushWaitSeconds, 5)
+}
 if ($metadata.PSObject.Properties.Name -contains "OraclePid" -and $metadata.OraclePid) {
-    Stop-Process -Id $metadata.OraclePid -Force -ErrorAction SilentlyContinue
+    $cleanupArgs.OraclePids = @([int]$metadata.OraclePid)
+}
+if ($metadata.PSObject.Properties.Name -contains "DumpcapPid" -and $metadata.DumpcapPid) {
+    $cleanupArgs.DumpcapPids = @([int]$metadata.DumpcapPid)
 }
 
-$processNames = @("eMule_debug_loc", "emule")
-foreach ($name in $processNames) {
-    Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force
-}
-
-if ($FlushWaitSeconds -gt 0) {
-    Start-Sleep -Seconds $FlushWaitSeconds
-}
+& $cleanupHelperPath @cleanupArgs | Out-Null
 
 [pscustomobject]@{
     SessionDir = $SessionDir

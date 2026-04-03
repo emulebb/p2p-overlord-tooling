@@ -5,10 +5,8 @@ Stable top-level CLI entrypoint for the Overlord workspace tooling platform.
 
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)]
-    [string]$Command = "help",
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$Args
+    [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
+    [object[]]$Arguments
 )
 
 Set-StrictMode -Version Latest
@@ -19,4 +17,4 @@ if (-not (Test-Path $cliScriptPath)) {
     throw "CLI dispatcher not found at $cliScriptPath"
 }
 
-& $cliScriptPath -Command $Command -Args $Args
+& $cliScriptPath @Arguments

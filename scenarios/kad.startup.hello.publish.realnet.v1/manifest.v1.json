@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad.startup.hello.publish.realnet.v1",
+  "description": "Paired oracle and agent real-network Kad startup, HELLO, and manual publish validation run.",
+  "requiredMilestoneIds": [
+    "seed-bundle-ready",
+    "oracle-profile-materialized",
+    "oracle-started",
+    "agent-started",
+    "manual-publish-triggered",
+    "oracle-artifacts-captured",
+    "agent-artifacts-captured"
+  ],
+  "seedBundle": {
+    "bundleId": "canonical",
+    "requiredFiles": [
+      "nodes.dat",
+      "server.met"
+    ]
+  },
+  "oracle": {
+    "binaryRelativePath": "ext-deps/eMule-build/eMule/srchybrid/x64/Debug/eMule_v060_parity.exe",
+    "dynamicPreferenceKeys": {
+      "BindAddr": "eMule",
+      "Port": "eMule",
+      "UDPPort": "eMule",
+      "ServerUDPPort": "eMule"
+    },
+    "seededPreferenceDefaults": {
+      "eMule": {
+        "AppVersion": "0.60a",
+        "Autoconnect": "1",
+        "BindAddr": "",
+        "CryptLayerRequested": "1",
+        "CryptLayerRequired": "0",
+        "CryptLayerSupported": "1",
+        "Debug2Disk": "1",
+        "FullVerbose": "0",
+        "KadUDPKey": "305419896",
+        "Language": "1033",
+        "Log2Disk": "1",
+        "NetworkED2K": "0",
+        "NetworkKademlia": "1",
+        "Port": "46671",
+        "ServerUDPPort": "0",
+        "UDPPort": "46673",
+        "Verbose": "1",
+        "VerboseOptions": "1"
+      },
+      "UPnP": {
+        "EnableUPnP": "1"
+      }
+    }
+  },
+  "agent": {
+    "controlUrl": "http://127.0.0.1:13301",
+    "statsUrl": "http://127.0.0.1:13301/api/internal/stats",
+    "seedRequest": {
+      "hash": "5E6E4C0D5B8D44C27DDA2B67A3F24E89",
+      "canonicalName": "ubuntu linux.iso",
+      "size": 734003200,
+      "sourceCount": 1
+    }
+  },
+  "milestones": [
+    {
+      "id": "seed-bundle-ready",
+      "description": "Canonical nodes.dat and server.met are available from the local untracked seed bundle."
+    },
+    {
+      "id": "oracle-profile-materialized",
+      "description": "A clean-room oracle profile root with a minimal preferences.ini was created for the run."
+    },
+    {
+      "id": "oracle-started",
+      "description": "The oracle launched with an explicit profile-root override."
+    },
+    {
+      "id": "agent-started",
+      "description": "The agent launched and exposed the internal control endpoints."
+    },
+    {
+      "id": "manual-publish-triggered",
+      "description": "A deterministic manual publish batch was posted to the agent."
+    },
+    {
+      "id": "oracle-artifacts-captured",
+      "description": "The oracle produced UDP and trace artifacts for startup, HELLO, and publish evidence."
+    },
+    {
+      "id": "agent-artifacts-captured",
+      "description": "The agent produced UDP, stats, and publish-log artifacts for the same run."
+    },
+    {
+      "id": "udp-parity-compared",
+      "description": "The oracle and agent UDP dumps were compared for HELLO and publish-related opcodes."
+    }
+  ]
+}

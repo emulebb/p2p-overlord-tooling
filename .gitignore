@@ -1,3 +1,4 @@
 *.tmp
 *.log
+.local/
 schemas/privacy-guard/policy.local.json

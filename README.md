@@ -36,3 +36,16 @@ Use the shared workspace rules from `../AGENTS.md` and the tooling-repo notes in
 - Repo-specific personal identifier checks should come from local untracked
   policy or environment configuration, not from tracked source.
 - The same guard is enforced in GitHub Actions for pushes and pull requests.
+
+## Deterministic Harness
+
+- `.\overlord-tooling.ps1 import-oracle-seeds -NodesDatPath <path> -ServerMetPath <path>`
+  copies the local canonical `nodes.dat` and `server.met` into the untracked
+  `.local/oracle-seeds/canonical/` bundle without persisting the source paths.
+- `.\overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1`
+  prints the first paired oracle+agent scenario contract.
+- `.\overlord-tooling.ps1 run-kad-startup-hello-publish` materializes a
+  clean-room oracle profile with a manifest-owned minimal `preferences.ini`,
+  launches the oracle with an explicit profile-root override, launches the
+  agent, triggers a deterministic manual publish, and writes run artifacts
+  under `%OVERLORD_TMP_DIR%`.

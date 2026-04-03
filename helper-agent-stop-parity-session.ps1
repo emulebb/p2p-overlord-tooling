@@ -26,8 +26,12 @@ if (-not (Test-Path $metadataPath)) {
 
 $metadata = Get-Content -Raw $metadataPath | ConvertFrom-Json
 $stopScriptPath = Join-Path $projectDir "overlord-agents\scripts\windows\agent_stop_direct.cmd"
+$cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 if (-not (Test-Path $stopScriptPath)) {
     throw "Agent stop script not found at $stopScriptPath"
+}
+if (-not (Test-Path $cleanupHelperPath)) {
+    throw "Agent cleanup helper not found at $cleanupHelperPath"
 }
 
 $resolvedPacketDumpPath = $metadata.PacketDumpPath
@@ -52,10 +56,6 @@ if (-not $resolvedPacketDumpPath) {
         Select-Object -First 1 -ExpandProperty FullName
 }
 
-if ($metadata.PSObject.Properties.Name -contains "DumpcapPid" -and $metadata.DumpcapPid) {
-    Stop-Process -Id $metadata.DumpcapPid -Force -ErrorAction SilentlyContinue
-}
-
 $null = Start-Process `
     -FilePath "cmd.exe" `
     -ArgumentList "/c", $stopScriptPath `
@@ -64,13 +64,23 @@ $null = Start-Process `
     -Wait `
     -PassThru
 
-if ($metadata.PSObject.Properties.Name -contains "AgentPid" -and $metadata.AgentPid) {
-    Stop-Process -Id $metadata.AgentPid -Force -ErrorAction SilentlyContinue
+if ($metadata.PSObject.Properties.Name -contains "CapturePort" -and $metadata.CapturePort) {
+    $capturePort = [int]$metadata.CapturePort
+} else {
+    $capturePort = 0
 }
 
-if ($FlushWaitSeconds -gt 0) {
-    Start-Sleep -Seconds $FlushWaitSeconds
+    $cleanupArgs = @{
+        CapturePort = $capturePort
+        WaitTimeoutSeconds = [Math]::Max($FlushWaitSeconds, 5)
+    }
+if ($metadata.PSObject.Properties.Name -contains "AgentPid" -and $metadata.AgentPid) {
+    $cleanupArgs.AgentPids = @([int]$metadata.AgentPid)
 }
+if ($metadata.PSObject.Properties.Name -contains "DumpcapPid" -and $metadata.DumpcapPid) {
+    $cleanupArgs.DumpcapPids = @([int]$metadata.DumpcapPid)
+}
+& $cleanupHelperPath @cleanupArgs | Out-Null
 
 if ($resolvedPacketDumpPath) {
     $metadata.PacketDumpPath = $resolvedPacketDumpPath

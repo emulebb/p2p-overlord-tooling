@@ -27,16 +27,16 @@ if ($LASTEXITCODE -ne 0) {
 
 $debugDir = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug"
 $builtExePath = Join-Path $debugDir "emule.exe"
-$runtimeExePath = Join-Path $debugDir "eMule_debug_loc.exe"
+$runtimeExePath = Join-Path $debugDir "eMule_v060_parity.exe"
 $builtPdbPath = Join-Path $debugDir "emule.pdb"
-$runtimePdbPath = Join-Path $debugDir "eMule_debug_loc.pdb"
+$runtimePdbPath = Join-Path $debugDir "eMule_v060_parity.pdb"
 
 if (-not (Test-Path $builtExePath)) {
     throw "Built oracle executable not found at $builtExePath"
 }
 
-# Keep the user-designated debug-local oracle binary in sync with the latest
-# MSBuild output so captures always run the patched code we just built.
+# Keep the distinct parity oracle binary in sync with the latest MSBuild output
+# so harness runs never pick up the generic debug executable by accident.
 Copy-Item -Path $builtExePath -Destination $runtimeExePath -Force
 if (Test-Path $builtPdbPath) {
     Copy-Item -Path $builtPdbPath -Destination $runtimePdbPath -Force

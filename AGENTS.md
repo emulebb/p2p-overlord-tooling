@@ -17,3 +17,7 @@
   - Keep the tracked-file privacy guard passing locally and in CI.
 - Use LF for tracked text files by default. `.ps1`, `.cmd`, and `.bat` may use CRLF.
 - Do not store personal information or user-specific filesystem paths in tracked helper content.
+- Oracle seed source paths must stay out of tracked files. Import operator-local
+  `nodes.dat` and `server.met` through the untracked local seed bundle flow.
+- Seeded oracle `preferences.ini` files must contain only the manifest-owned
+  minimal settings needed for the active harness scenario.

@@ -5,9 +5,8 @@ Dispatches stable workspace tooling platform CLI commands.
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$Command,
-    [string[]]$Args = @()
+    [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
+    [object[]]$Arguments
 )
 
 Set-StrictMode -Version Latest
@@ -24,6 +23,9 @@ function Show-ToolingHelp {
             [ordered]@{ name = "layout"; description = "Show the platform directory layout" }
             [ordered]@{ name = "paths"; description = "Show canonical workspace and repo paths" }
             [ordered]@{ name = "guard-tracked-files"; description = "Fail when tracked files contain local user-profile paths or configured personal-name filename leaks" }
+            [ordered]@{ name = "import-oracle-seeds"; description = "Import local nodes.dat and server.met into the untracked canonical oracle seed bundle" }
+            [ordered]@{ name = "show-scenario"; description = "Print a scenario manifest" }
+            [ordered]@{ name = "run-kad-startup-hello-publish"; description = "Run the first paired oracle+agent Kad startup, HELLO, and publish scenario" }
         )
     }
 }
@@ -55,9 +57,58 @@ function Get-ToolingLayout {
     }
 }
 
+function ConvertTo-ScriptInvocationArgs {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyCollection()]
+        [object[]]$Tokens
+    )
+
+    $named = @{}
+    $positional = @()
+    if (-not $Tokens) {
+        return [pscustomobject]@{
+            Named = $named
+            Positional = $positional
+        }
+    }
+
+    for ($index = 0; $index -lt $Tokens.Count; $index++) {
+        $token = [string]$Tokens[$index]
+        if ($token.StartsWith("-")) {
+            $parameterName = $token.TrimStart("-")
+            $nextIsValue = $index + 1 -lt $Tokens.Count -and -not ([string]$Tokens[$index + 1]).StartsWith("-")
+            if ($nextIsValue) {
+                $named[$parameterName] = $Tokens[$index + 1]
+                $index++
+            } else {
+                $named[$parameterName] = $true
+            }
+            continue
+        }
+
+        $positional += $Tokens[$index]
+    }
+
+    [pscustomobject]@{
+        Named = $named
+        Positional = $positional
+    }
+}
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $workspaceRoot = Resolve-Path (Join-Path $repoRoot "..")
 $guardScriptPath = Join-Path $repoRoot "orchestration\Invoke-TrackedFilePrivacyGuard.ps1"
+$seedImportScriptPath = Join-Path $repoRoot "orchestration\Import-OracleSeedBundle.ps1"
+$scenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-KadStartupHelloPublishScenario.ps1"
+$command = "help"
+$commandArgs = @()
+if ($Arguments -and $Arguments.Count -gt 0) {
+    $command = [string]$Arguments[0]
+    if ($Arguments.Count -gt 1) {
+        $commandArgs = @($Arguments[1..($Arguments.Count - 1)])
+    }
+}
 
 switch ($Command.ToLowerInvariant()) {
     "help" {
@@ -80,7 +131,43 @@ switch ($Command.ToLowerInvariant()) {
             throw "Tracked-file privacy guard not found at $guardScriptPath"
         }
 
-        & $guardScriptPath -RepoRoot $repoRoot @Args
+        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
+        $namedArgs = $invocationArgs.Named
+        $positionalArgs = $invocationArgs.Positional
+        & $guardScriptPath -RepoRoot $repoRoot @namedArgs @positionalArgs
+    }
+    "import-oracle-seeds" {
+        if (-not (Test-Path $seedImportScriptPath)) {
+            throw "Oracle seed import helper not found at $seedImportScriptPath"
+        }
+
+        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
+        $namedArgs = $invocationArgs.Named
+        $positionalArgs = $invocationArgs.Positional
+        & $seedImportScriptPath @namedArgs @positionalArgs
+    }
+    "show-scenario" {
+        if ($commandArgs.Count -eq 0) {
+            throw "show-scenario requires a scenario id, for example '.\\overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1'"
+        }
+
+        $scenarioId = $commandArgs[0]
+        $manifestPath = Join-Path $repoRoot ("scenarios\{0}\manifest.v1.json" -f $scenarioId)
+        if (-not (Test-Path $manifestPath)) {
+            throw "Scenario manifest not found at $manifestPath"
+        }
+
+        Get-Content -Raw $manifestPath | ConvertFrom-Json
+    }
+    "run-kad-startup-hello-publish" {
+        if (-not (Test-Path $scenarioRunnerScriptPath)) {
+            throw "Scenario runner not found at $scenarioRunnerScriptPath"
+        }
+
+        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
+        $namedArgs = $invocationArgs.Named
+        $positionalArgs = $invocationArgs.Positional
+        & $scenarioRunnerScriptPath @namedArgs @positionalArgs
     }
     default {
         throw "Unknown overlord-tooling command '$Command'. Run '.\\overlord-tooling.ps1 help'."
