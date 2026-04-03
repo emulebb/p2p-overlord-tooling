@@ -1,12 +1,6 @@
 {
   "policyVersion": "privacy-guard-policy/v1",
-  "pathRules": [
-    {
-      "id": "personal-name-filename-macius",
-      "reason": "Tracked filenames must not embed configured personal identifiers.",
-      "regex": "(^|[\\\\/])[^\\\\/]*macius[^\\\\/]*$"
-    }
-  ],
+  "pathRules": [],
   "contentRules": [
     {
       "id": "windows-user-profile-path",

@@ -23,3 +23,5 @@ Supporting notes for the workspace tooling platform.
 - `../overlord-tooling.ps1 guard-tracked-files` validates that tracked files do
   not contain committed local user-profile paths and do not use configured
   personal-name filenames.
+- Real personal identifiers must not be stored in tracked policy files; use
+  local untracked policy or environment configuration for those checks.

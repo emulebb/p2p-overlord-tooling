@@ -13,6 +13,7 @@
 - Guard tracked files against user-profile paths and personal-name file leaks.
   - Do not commit content containing local Windows or Unix user-home path fragments.
   - Do not commit tracked filenames that embed personal identifiers such as local usernames.
+  - Do not hardcode real personal identifiers in tracked policy files; use local untracked policy or environment configuration for repo-specific identifier checks.
   - Keep the tracked-file privacy guard passing locally and in CI.
 - Use LF for tracked text files by default. `.ps1`, `.cmd`, and `.bat` may use CRLF.
 - Do not store personal information or user-specific filesystem paths in tracked helper content.

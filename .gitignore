@@ -1,2 +1,3 @@
 *.tmp
 *.log
+schemas/privacy-guard/policy.local.json

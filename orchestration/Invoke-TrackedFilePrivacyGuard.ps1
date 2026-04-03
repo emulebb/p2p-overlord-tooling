@@ -7,7 +7,8 @@ personal-name filename leaks.
 [CmdletBinding()]
 param(
     [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
-    [string]$PolicyPath = ""
+    [string]$PolicyPath = "",
+    [string]$LocalPolicyPath = ""
 )
 
 Set-StrictMode -Version Latest
@@ -17,6 +18,10 @@ if ([string]::IsNullOrWhiteSpace($PolicyPath)) {
     $PolicyPath = Join-Path $RepoRoot "schemas\privacy-guard\policy.v1.json"
 }
 
+if ([string]::IsNullOrWhiteSpace($LocalPolicyPath)) {
+    $LocalPolicyPath = Join-Path $RepoRoot "schemas\privacy-guard\policy.local.json"
+}
+
 function Get-TrackedFiles {
     [CmdletBinding()]
     param(
@@ -24,12 +29,12 @@ function Get-TrackedFiles {
         [string]$RepoRoot
     )
 
-    $output = & git -C $RepoRoot ls-files -z
+    $output = & git -C $RepoRoot ls-files
     if ($LASTEXITCODE -ne 0) {
         throw "git ls-files failed for $RepoRoot"
     }
 
-    @($output -split "`0" | Where-Object { $_ })
+    @($output | Where-Object { $_ })
 }
 
 function Test-RelativePathAgainstRegexes {
@@ -37,9 +42,16 @@ function Test-RelativePathAgainstRegexes {
     param(
         [Parameter(Mandatory = $true)]
         [string]$RelativePath,
-        [Parameter(Mandatory = $true)]
         [object[]]$Rules
     )
+
+    if (@($Rules).Count -eq 0) {
+        return [pscustomobject]@{
+            matched = $false
+            reason = $null
+            regex = $null
+        }
+    }
 
     foreach ($rule in $Rules) {
         if ($RelativePath -match $rule.regex) {
@@ -63,11 +75,13 @@ function Get-ContentMatches {
     param(
         [Parameter(Mandatory = $true)]
         [string]$RepoRoot,
-        [Parameter(Mandatory = $true)]
         [object[]]$Rules
     )
 
     $matches = @()
+    if (@($Rules).Count -eq 0) {
+        return $matches
+    }
     foreach ($rule in $Rules) {
         $output = & git -C $RepoRoot grep -n -I -E $rule.regex -- . 2>$null
         if ($LASTEXITCODE -eq 0 -and $output) {
@@ -84,11 +98,63 @@ function Get-ContentMatches {
     $matches
 }
 
+function Merge-PolicyRules {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$BasePolicy,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$ExtraPolicy
+    )
+
+    $BasePolicy.pathRules = @($BasePolicy.pathRules) + @($ExtraPolicy.pathRules)
+    $BasePolicy.contentRules = @($BasePolicy.contentRules) + @($ExtraPolicy.contentRules)
+}
+
+function New-IdentifierRules {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Identifiers
+    )
+
+    $pathRules = @()
+    foreach ($identifier in $Identifiers) {
+        if ([string]::IsNullOrWhiteSpace($identifier)) {
+            continue
+        }
+
+        $escaped = [regex]::Escape($identifier.Trim())
+        $pathRules += [ordered]@{
+            id = "local-identifier-filename"
+            reason = "Tracked filenames must not embed configured personal identifiers."
+            regex = "(^|[\\\\/])[^\\\\/]*$escaped[^\\\\/]*$"
+        }
+    }
+
+    @{
+        pathRules = $pathRules
+        contentRules = @()
+    }
+}
+
 if (-not (Test-Path $PolicyPath)) {
     throw "Privacy-guard policy not found at $PolicyPath"
 }
 
 $policy = Get-Content -Raw $PolicyPath | ConvertFrom-Json -AsHashtable
+$policy.pathRules = @($policy.pathRules)
+$policy.contentRules = @($policy.contentRules)
+
+if (Test-Path $LocalPolicyPath) {
+    $localPolicy = Get-Content -Raw $LocalPolicyPath | ConvertFrom-Json -AsHashtable
+    Merge-PolicyRules -BasePolicy $policy -ExtraPolicy $localPolicy
+}
+
+if (-not [string]::IsNullOrWhiteSpace($env:OVERLORD_PRIVACY_GUARD_IDENTIFIERS)) {
+    $identifierPolicy = New-IdentifierRules -Identifiers ($env:OVERLORD_PRIVACY_GUARD_IDENTIFIERS -split ",")
+    Merge-PolicyRules -BasePolicy $policy -ExtraPolicy $identifierPolicy
+}
 $trackedFiles = @(Get-TrackedFiles -RepoRoot $RepoRoot)
 $pathMatches = @()
 
