@@ -1,0 +1,37 @@
+name: Tracked File Privacy Guard
+
+on:
+  push:
+    paths:
+      - ".github/workflows/tracked-file-privacy-guard.yml"
+      - "AGENTS.md"
+      - "README.md"
+      - "docs/**"
+      - "cli/**"
+      - "orchestration/**"
+      - "schemas/**"
+      - "*.ps1"
+      - "*.py"
+  pull_request:
+    paths:
+      - ".github/workflows/tracked-file-privacy-guard.yml"
+      - "AGENTS.md"
+      - "README.md"
+      - "docs/**"
+      - "cli/**"
+      - "orchestration/**"
+      - "schemas/**"
+      - "*.ps1"
+      - "*.py"
+
+jobs:
+  tracked-file-privacy-guard:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run tracked-file privacy guard
+        shell: pwsh
+        run: .\overlord-tooling.ps1 guard-tracked-files

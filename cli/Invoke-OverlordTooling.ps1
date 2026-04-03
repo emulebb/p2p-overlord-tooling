@@ -23,6 +23,7 @@ function Show-ToolingHelp {
             [ordered]@{ name = "help"; description = "Show CLI help" }
             [ordered]@{ name = "layout"; description = "Show the platform directory layout" }
             [ordered]@{ name = "paths"; description = "Show canonical workspace and repo paths" }
+            [ordered]@{ name = "guard-tracked-files"; description = "Fail when tracked files contain local user-profile paths or configured personal-name filename leaks" }
         )
     }
 }
@@ -56,6 +57,7 @@ function Get-ToolingLayout {
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $workspaceRoot = Resolve-Path (Join-Path $repoRoot "..")
+$guardScriptPath = Join-Path $repoRoot "orchestration\Invoke-TrackedFilePrivacyGuard.ps1"
 
 switch ($Command.ToLowerInvariant()) {
     "help" {
@@ -72,6 +74,13 @@ switch ($Command.ToLowerInvariant()) {
             schemasRoot = (Join-Path $repoRoot "schemas")
             scenariosRoot = (Join-Path $repoRoot "scenarios")
         }
+    }
+    "guard-tracked-files" {
+        if (-not (Test-Path $guardScriptPath)) {
+            throw "Tracked-file privacy guard not found at $guardScriptPath"
+        }
+
+        & $guardScriptPath -RepoRoot $repoRoot @Args
     }
     default {
         throw "Unknown overlord-tooling command '$Command'. Run '.\\overlord-tooling.ps1 help'."

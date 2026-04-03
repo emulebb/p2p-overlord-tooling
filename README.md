@@ -28,3 +28,9 @@ Use the shared workspace rules from `../AGENTS.md` and the tooling-repo notes in
 
 - [Tooling Docs](docs/README.md)
 - [PowerShell Mistakes](docs/POWERSHELL_MISTAKES.md)
+
+## Guards
+
+- `.\overlord-tooling.ps1 guard-tracked-files` scans tracked files for user-profile
+  path leaks and configured personal-name filename leaks.
+- The same guard is enforced in GitHub Actions for pushes and pull requests.

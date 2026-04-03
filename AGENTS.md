@@ -10,5 +10,9 @@
 - Prefer tooling that orchestrates existing repo commands instead of re-implementing product logic here.
 - Use versioned JSON contracts for manifests, summaries, and machine-readable reports.
 - Keep subsystem-specific logic isolated under `subsystems/` when adding new platform features.
+- Guard tracked files against user-profile paths and personal-name file leaks.
+  - Do not commit content containing local Windows or Unix user-home path fragments.
+  - Do not commit tracked filenames that embed personal identifiers such as local usernames.
+  - Keep the tracked-file privacy guard passing locally and in CI.
 - Use LF for tracked text files by default. `.ps1`, `.cmd`, and `.bat` may use CRLF.
 - Do not store personal information or user-specific filesystem paths in tracked helper content.

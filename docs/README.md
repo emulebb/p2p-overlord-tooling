@@ -17,3 +17,9 @@ Supporting notes for the workspace tooling platform.
 - `../normalizers/` trace normalization
 - `../reports/` machine-readable and terminal summaries
 - `../subsystems/` subsystem modules
+
+## Repo Guards
+
+- `../overlord-tooling.ps1 guard-tracked-files` validates that tracked files do
+  not contain committed local user-profile paths and do not use configured
+  personal-name filenames.
