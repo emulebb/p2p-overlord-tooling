@@ -140,7 +140,7 @@ function Wait-OraclePublishReady {
         }
 
         if (Test-Path -LiteralPath $OracleSession.VerboseLogPath) {
-            $verboseLines = Get-Content -LiteralPath $OracleSession.VerboseLogPath
+            $verboseLines = @(Get-Content -LiteralPath $OracleSession.VerboseLogPath)
             $verbosePublishLines = @($verboseLines | Where-Object { $_ -match $verbosePattern })
             if ($verbosePublishLines.Count -gt 0) {
                 return [pscustomobject]@{
