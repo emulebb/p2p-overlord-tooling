@@ -131,7 +131,7 @@ function Wait-OraclePublishReady {
     $tracePattern = 'event=(publish_|search_storefile_prepare|search_storekeyword_prepare|search_storesource_prepare)'
     $verbosePattern = 'Oracle publish gate ready|Oracle publish start family='
     while ((Get-Date) -lt $deadline) {
-        $lines = Get-NewOracleTraceLines -OracleSession $OracleSession
+        $lines = @(Get-NewOracleTraceLines -OracleSession $OracleSession)
         $publishLines = @($lines | Where-Object { $_ -match $tracePattern })
         if ($publishLines.Count -gt 0) {
             return [pscustomobject]@{
