@@ -12,6 +12,7 @@ param(
     [UInt16]$ControlPort = 13301,
     [UInt16]$KadPort = 41120,
     [UInt16]$Ed2kPort = 41121,
+    [int]$LaunchTimeoutSeconds = 300,
     [switch]$EnableObfuscation
 )
 
@@ -69,7 +70,8 @@ try {
         -WindowStyle Hidden
 
     Start-Sleep -Seconds 2
-    for ($attempt = 0; $attempt -lt 90; $attempt++) {
+    $deadline = (Get-Date).AddSeconds($LaunchTimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
         $agentProcess = Get-Process -Name "overlord-agent-emule" -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($agentProcess) {
             break
@@ -78,7 +80,7 @@ try {
     }
 
     if (-not $agentProcess) {
-        throw "Agent process overlord-agent-emule.exe did not stay running after launch"
+        throw "Agent process overlord-agent-emule.exe did not stay running within $LaunchTimeoutSeconds seconds after launch"
     }
 
     $metadata = [pscustomobject]@{

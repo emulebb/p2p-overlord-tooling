@@ -287,7 +287,7 @@ try {
         $agentStartParams.EnableObfuscation = $true
     }
     $agentSession = & $agentStartScriptPath @agentStartParams
-    Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl -TimeoutSeconds 60
+    Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl -TimeoutSeconds 180
 
     $publishSummary = Wait-OraclePublishReady -OracleSession $oracleSession -TimeoutSeconds $OraclePublishTimeoutSeconds
 
