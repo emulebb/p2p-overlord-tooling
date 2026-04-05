@@ -73,7 +73,7 @@ function Parse-Ed2kLinkFile {
     )
 
     $link = (Get-Content -LiteralPath $Path -Raw).Trim()
-    $pattern = '^ed2k://\|file\|(?<Name>[^|]+)\|(?<Size>\d+)\|(?<Hash>[0-9A-Fa-f]{32})\|/'
+    $pattern = '^ed2k://\|file\|(?<Name>[^|]+)\|(?<Size>\d+)\|(?<Hash>[0-9A-Fa-f]{32})\|'
     if ($link -notmatch $pattern) {
         throw "ED2K link at $Path is not in the expected format"
     }
