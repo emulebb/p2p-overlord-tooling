@@ -7,11 +7,22 @@ Starts a private local-only agent session for one oracle download scenario.
 param(
     [Parameter(Mandatory = $true)]
     [string]$ScenarioRoot,
-    [Parameter(Mandatory = $true)]
     [string]$OracleBootstrapNode,
     [UInt16]$ControlPort = 13301,
     [UInt16]$KadPort = 41120,
     [UInt16]$Ed2kPort = 41121,
+    [switch]$DisableKad,
+    [string]$ServerHost,
+    [UInt16]$ServerPort = 0,
+    [UInt32]$ServerUdpFlags = 0,
+    [UInt32]$ServerUdpKey = 0,
+    [UInt32]$ServerUdpKeyIp = 0,
+    [UInt16]$ServerObfuscationPortTcp = 0,
+    [UInt16]$ServerObfuscationPortUdp = 0,
+    [UInt64]$ServerConnectTimeoutSeconds = 8,
+    [UInt64]$ServerReconnectIntervalSeconds = 5,
+    [UInt64]$ServerSessionRotationSeconds = 45,
+    [string]$ProbeSearchTerm = "ubuntu linux",
     [int]$LaunchTimeoutSeconds = 300,
     [switch]$EnableObfuscation
 )
@@ -32,7 +43,7 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
 
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $configWriterPath = Join-Path $PSScriptRoot "helper-agent-write-private-local-config.ps1"
-$startScriptPath = Join-Path $projectDir "overlord-agents\scripts\windows\agent_run_debug_direct.cmd"
+$startScriptPath = Join-Path $projectDir "p2p-overlord-agents\scripts\windows\agent_run_debug_direct.cmd"
 
 foreach ($requiredPath in @($cleanupHelperPath, $configWriterPath, $startScriptPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
@@ -48,6 +59,18 @@ $configWriterParams = @{
     ControlPort = $ControlPort
     KadPort = $KadPort
     Ed2kPort = $Ed2kPort
+    DisableKad = $DisableKad
+    ServerHost = $ServerHost
+    ServerPort = $ServerPort
+    ServerUdpFlags = $ServerUdpFlags
+    ServerUdpKey = $ServerUdpKey
+    ServerUdpKeyIp = $ServerUdpKeyIp
+    ServerObfuscationPortTcp = $ServerObfuscationPortTcp
+    ServerObfuscationPortUdp = $ServerObfuscationPortUdp
+    ServerConnectTimeoutSeconds = $ServerConnectTimeoutSeconds
+    ServerReconnectIntervalSeconds = $ServerReconnectIntervalSeconds
+    ServerSessionRotationSeconds = $ServerSessionRotationSeconds
+    ProbeSearchTerm = $ProbeSearchTerm
 }
 if ($EnableObfuscation) {
     $configWriterParams.EnableObfuscation = $true
@@ -99,6 +122,10 @@ try {
         ControlPort = $ControlPort
         KadPort = $KadPort
         Ed2kPort = $Ed2kPort
+        KadDisabled = [bool]$DisableKad
+        ServerHost = if ([string]::IsNullOrWhiteSpace($ServerHost)) { $null } else { $ServerHost }
+        ServerPort = if ($ServerPort -gt 0) { $ServerPort } else { $null }
+        ProbeSearchTerm = $ProbeSearchTerm
         TransferRoot = (Join-Path $configResult.StateRoot "overlord-ed2k-transfer")
         AgentLauncherPid = $launcher.Id
         AgentPid = $agentProcess.Id

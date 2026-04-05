@@ -16,7 +16,8 @@ param(
     [int]$UdpKey = 0,
     [int]$UdpKeyIp = 0,
     [int]$TcpObfuscationPort = 0,
-    [int]$UdpObfuscationPort = 0
+    [int]$UdpObfuscationPort = 0,
+    [string]$DestinationPath
 )
 
 Set-StrictMode -Version Latest
@@ -28,8 +29,13 @@ $projectDir = if ($env:OVERLORD_PROJECT_DIR) {
     (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 }
 
-$destinationDir = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\config"
-$destinationPath = Join-Path $destinationDir "server.met"
+$resolvedDestinationPath = if ([string]::IsNullOrWhiteSpace($DestinationPath)) {
+    Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\config\server.met"
+} else {
+    [System.IO.Path]::GetFullPath($DestinationPath)
+}
+$destinationDir = Split-Path -Parent $resolvedDestinationPath
+$destinationPath = $resolvedDestinationPath
 New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
 
 $ipBytes = [System.Net.IPAddress]::Parse($ServerIp).GetAddressBytes()

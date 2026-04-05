@@ -22,6 +22,8 @@ param(
     [UInt16]$ServerUdpPort = 0,
     [UInt16]$WebPort = 47101,
     [UInt32]$KadUdpKey = 4206201,
+    [bool]$EnableKademlia = $true,
+    [bool]$EnableEd2k = $true,
     [switch]$ResetTransientState
 )
 
@@ -41,7 +43,11 @@ function Get-PreferencesContent {
         [Parameter(Mandatory = $true)]
         [UInt16]$WebPort,
         [Parameter(Mandatory = $true)]
-        [UInt32]$KadUdpKey
+        [UInt32]$KadUdpKey,
+        [Parameter(Mandatory = $true)]
+        [bool]$EnableKademlia,
+        [Parameter(Mandatory = $true)]
+        [bool]$EnableEd2k
     )
 
 @"
@@ -66,8 +72,8 @@ AutoConnectStaticOnly=0
 Serverlist=0
 AddServersFromServer=0
 AddServersFromClient=0
-NetworkKademlia=1
-NetworkED2K=1
+NetworkKademlia=$(if ($EnableKademlia) { 1 } else { 0 })
+NetworkED2K=$(if ($EnableEd2k) { 1 } else { 0 })
 OpenPortsOnStartUp=0
 EnableScheduler=0
 KadUDPKey=$KadUdpKey
@@ -97,7 +103,7 @@ foreach ($path in @($resolvedProfileRoot, $configRoot, $logsRoot, $incomingRoot,
 $preferencesPath = Join-Path $configRoot "preferences.ini"
 [System.IO.File]::WriteAllText(
     $preferencesPath,
-    (Get-PreferencesContent -BindAddr $BindAddr -TcpPort $TcpPort -UdpPort $UdpPort -ServerUdpPort $ServerUdpPort -WebPort $WebPort -KadUdpKey $KadUdpKey),
+    (Get-PreferencesContent -BindAddr $BindAddr -TcpPort $TcpPort -UdpPort $UdpPort -ServerUdpPort $ServerUdpPort -WebPort $WebPort -KadUdpKey $KadUdpKey -EnableKademlia $EnableKademlia -EnableEd2k $EnableEd2k),
     (New-Object System.Text.ASCIIEncoding)
 )
 
@@ -138,4 +144,6 @@ if ($ResetTransientState) {
     LogsRoot = $logsRoot
     IncomingRoot = $incomingRoot
     TempRoot = $tempRoot
+    EnableKademlia = $EnableKademlia
+    EnableEd2k = $EnableEd2k
 }

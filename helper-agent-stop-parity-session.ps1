@@ -25,7 +25,7 @@ if (-not (Test-Path $metadataPath)) {
 }
 
 $metadata = Get-Content -Raw $metadataPath | ConvertFrom-Json
-$stopScriptPath = Join-Path $projectDir "overlord-agents\scripts\windows\agent_stop_direct.cmd"
+$stopScriptPath = Join-Path $projectDir "p2p-overlord-agents\scripts\windows\agent_stop_direct.cmd"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 if (-not (Test-Path $stopScriptPath)) {
     throw "Agent stop script not found at $stopScriptPath"

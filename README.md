@@ -1,4 +1,4 @@
-# overlord-tooling
+# p2p-overlord-tooling
 
 Workspace tooling platform for the `p2p-overlord` workspace.
 
@@ -6,8 +6,8 @@ This repo is the canonical home for reusable automation across parity, reproduci
 scenario orchestration, trace/report normalization, and workspace operations.
 Product runtime logic remains in:
 
-- `../overlord-agents`
-- `../overlord-be`
+- `../p2p-overlord-agents`
+- `../p2p-overlord-be`
 
 Use the shared workspace rules from `../AGENTS.md` and the tooling-repo notes in `./AGENTS.md`.
 

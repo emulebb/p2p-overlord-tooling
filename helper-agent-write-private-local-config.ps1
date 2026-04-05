@@ -12,11 +12,22 @@ stores all logs and transfer manifests under a scenario-owned root.
 param(
     [Parameter(Mandatory = $true)]
     [string]$ScenarioRoot,
-    [Parameter(Mandatory = $true)]
     [string]$OracleBootstrapNode,
     [UInt16]$ControlPort = 13301,
     [UInt16]$KadPort = 41120,
     [UInt16]$Ed2kPort = 41121,
+    [switch]$DisableKad,
+    [string]$ServerHost,
+    [UInt16]$ServerPort = 0,
+    [UInt32]$ServerUdpFlags = 0,
+    [UInt32]$ServerUdpKey = 0,
+    [UInt32]$ServerUdpKeyIp = 0,
+    [UInt16]$ServerObfuscationPortTcp = 0,
+    [UInt16]$ServerObfuscationPortUdp = 0,
+    [UInt64]$ServerConnectTimeoutSeconds = 8,
+    [UInt64]$ServerReconnectIntervalSeconds = 5,
+    [UInt64]$ServerSessionRotationSeconds = 45,
+    [string]$ProbeSearchTerm = "ubuntu linux",
     [switch]$EnableObfuscation
 )
 
@@ -43,6 +54,24 @@ if (Test-Path -LiteralPath $configPath) {
 }
 
 $obfuscationEnabled = if ($EnableObfuscation) { "true" } else { "false" }
+$bootstrapNodesValue = if ($DisableKad -or [string]::IsNullOrWhiteSpace($OracleBootstrapNode)) {
+    "[]"
+} else {
+    '["{0}"]' -f $OracleBootstrapNode
+}
+$serverEndpointsValue = "[]"
+$serverEntriesValue = "[]"
+if (-not [string]::IsNullOrWhiteSpace($ServerHost) -and $ServerPort -gt 0) {
+    $serverEndpointsValue = '["{0}:{1}"]' -f $ServerHost, $ServerPort
+    $serverEntriesValue = '[{{ host = "{0}", port = {1}, name = "", description = "", udp_flags = {2}, udp_key = {3}, udp_key_ip = {4}, obfuscation_port_tcp = {5}, obfuscation_port_udp = {6} }}]' -f `
+        $ServerHost, `
+        $ServerPort, `
+        $ServerUdpFlags, `
+        $ServerUdpKey, `
+        $ServerUdpKeyIp, `
+        $ServerObfuscationPortTcp, `
+        $ServerObfuscationPortUdp
+}
 $configContent = @"
 [coordinator]
 url = "http://127.0.0.1:13300"
@@ -67,7 +96,7 @@ selection_confirmed = true
 [p2p.kad]
 listen_port = $KadPort
 nodes_dat_path = "$($stateRoot.Replace('\', '/'))/overlord-kad.nodes.dat"
-bootstrap_nodes = ["$OracleBootstrapNode"]
+bootstrap_nodes = $bootstrapNodesValue
 search_timeout_secs = 45
 store_timeout_secs = 140
 republish_interval_secs = 18000
@@ -96,14 +125,14 @@ enable_mock_results = false
 
 [p2p.ed2k]
 listen_port = $Ed2kPort
-server_entries = []
-server_endpoints = []
+server_entries = $serverEntriesValue
+server_endpoints = $serverEndpointsValue
 obfuscation_enabled = $obfuscationEnabled
-probe_search_term = "ubuntu linux"
-connect_timeout_secs = 8
-reconnect_interval_secs = 5
+probe_search_term = "$($ProbeSearchTerm.Replace('"', ''))"
+connect_timeout_secs = $ServerConnectTimeoutSeconds
+reconnect_interval_secs = $ServerReconnectIntervalSeconds
 keepalive_secs = 60
-session_rotation_secs = 45
+session_rotation_secs = $ServerSessionRotationSeconds
 
 [p2p.snoop_queue]
 dedup_window_secs = 28800
@@ -146,4 +175,8 @@ max_files = 7
     KadPort = $KadPort
     Ed2kPort = $Ed2kPort
     OracleBootstrapNode = $OracleBootstrapNode
+    KadDisabled = [bool]$DisableKad
+    ServerHost = if ([string]::IsNullOrWhiteSpace($ServerHost)) { $null } else { $ServerHost }
+    ServerPort = if ($ServerPort -gt 0) { $ServerPort } else { $null }
+    ProbeSearchTerm = $ProbeSearchTerm
 }

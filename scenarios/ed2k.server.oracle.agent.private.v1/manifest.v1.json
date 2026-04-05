@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.server.oracle.agent.private.v1",
+  "description": "Private local oracle and agent ED2K download routed through a local goed2k-server.",
+  "server": {
+    "host": "127.0.0.1",
+    "tcpPort": 42161,
+    "adminPort": 42180,
+    "udpPortOffset": 4,
+    "adminToken": "local-goed2k-token",
+    "enableObfuscation": false
+  },
+  "oracle": {
+    "bindAddr": "127.0.0.1",
+    "tcpPort": 42062,
+    "udpPort": 42072,
+    "serverUdpPort": 0,
+    "webPort": 47111,
+    "kadUdpKey": 4206201,
+    "seedFileName": "ubuntu-linux-private-server.pdf",
+    "seedRepeatCount": 512
+  },
+  "agent": {
+    "controlPort": 13301,
+    "kadPort": 41120,
+    "ed2kPort": 41121
+  }
+}

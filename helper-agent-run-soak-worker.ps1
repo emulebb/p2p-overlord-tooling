@@ -216,7 +216,7 @@ function Stop-StartedSessionProcesses {
 
     $projectDir = $Metadata.ProjectDir
     if (($Metadata.StartedAgentPids | Measure-Object).Count -gt 0) {
-        $stopScriptPath = Join-Path $projectDir "overlord-agents\scripts\windows\agent_stop_direct.cmd"
+        $stopScriptPath = Join-Path $projectDir "p2p-overlord-agents\scripts\windows\agent_stop_direct.cmd"
         if (Test-Path $stopScriptPath) {
             Start-Process `
                 -FilePath "cmd.exe" `
@@ -240,8 +240,8 @@ $metadataPath = Join-Path $SessionDir "soak-session.json"
 $metadata = Load-SessionMetadata -Path $metadataPath
 $refreshScriptPath = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"
 $summaryScriptPath = Join-Path $PSScriptRoot "helper-agent-summarize-soak-session.ps1"
-$startCoordinatorPath = Join-Path $metadata.ProjectDir "overlord-be\overlord-be-coordinator\scripts\windows\coordinator_run_start_direct.cmd"
-$startAgentPath = Join-Path $metadata.ProjectDir "overlord-agents\scripts\windows\agent_run_start_direct.cmd"
+$startCoordinatorPath = Join-Path $metadata.ProjectDir "p2p-overlord-be\overlord-be-coordinator\scripts\windows\coordinator_run_start_direct.cmd"
+$startAgentPath = Join-Path $metadata.ProjectDir "p2p-overlord-agents\scripts\windows\agent_run_start_direct.cmd"
 $agentLogPath = Join-Path $metadata.LogDir "overlord-agent-emule.log"
 
 try {

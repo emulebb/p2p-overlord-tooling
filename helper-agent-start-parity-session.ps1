@@ -32,7 +32,7 @@ $logDir = if ($env:OVERLORD_LOG_DIR) {
 
 $agentLogPath = Join-Path $logDir "overlord-agent-emule.log"
 $packetDumpDir = $logDir
-$startScriptPath = Join-Path $projectDir "overlord-agents\scripts\windows\agent_run_debug_direct.cmd"
+$startScriptPath = Join-Path $projectDir "p2p-overlord-agents\scripts\windows\agent_run_debug_direct.cmd"
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $refreshNetworkingHelperPath = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"

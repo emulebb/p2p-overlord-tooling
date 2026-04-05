@@ -27,6 +27,8 @@ function Show-ToolingHelp {
             [ordered]@{ name = "show-scenario"; description = "Print a scenario manifest" }
             [ordered]@{ name = "run-kad-startup-hello-publish"; description = "Run the first paired oracle+agent Kad startup, HELLO, and publish scenario" }
             [ordered]@{ name = "run-private-oracle-ed2k-download"; description = "Run a private local oracle Kad source publish plus native ED2K download scenario" }
+            [ordered]@{ name = "run-private-oracle-ed2k-server-download"; description = "Run a private local oracle+agent ED2K download through a local goed2k-server" }
+            [ordered]@{ name = "validate-ed2k-server-triplet"; description = "Run focused local triplet validation for multi-file, multi-source, and callback-limit ED2K server cases" }
         )
     }
 }
@@ -103,6 +105,8 @@ $guardScriptPath = Join-Path $repoRoot "orchestration\Invoke-TrackedFilePrivacyG
 $seedImportScriptPath = Join-Path $repoRoot "orchestration\Import-OracleSeedBundle.ps1"
 $scenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-KadStartupHelloPublishScenario.ps1"
 $privateEd2kScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateOracleEd2kDownloadScenario.ps1"
+$privateEd2kServerScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateOracleEd2kServerDownloadScenario.ps1"
+$tripletValidationScriptPath = Join-Path $repoRoot "orchestration\Invoke-ValidateEd2kServerTriplet.ps1"
 $command = "help"
 $commandArgs = @()
 if ($Arguments -and $Arguments.Count -gt 0) {
@@ -180,6 +184,26 @@ switch ($Command.ToLowerInvariant()) {
         $namedArgs = $invocationArgs.Named
         $positionalArgs = $invocationArgs.Positional
         & $privateEd2kScenarioRunnerScriptPath @namedArgs @positionalArgs
+    }
+    "run-private-oracle-ed2k-server-download" {
+        if (-not (Test-Path $privateEd2kServerScenarioRunnerScriptPath)) {
+            throw "Private ED2K server scenario runner not found at $privateEd2kServerScenarioRunnerScriptPath"
+        }
+
+        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
+        $namedArgs = $invocationArgs.Named
+        $positionalArgs = $invocationArgs.Positional
+        & $privateEd2kServerScenarioRunnerScriptPath @namedArgs @positionalArgs
+    }
+    "validate-ed2k-server-triplet" {
+        if (-not (Test-Path $tripletValidationScriptPath)) {
+            throw "ED2K server triplet validation runner not found at $tripletValidationScriptPath"
+        }
+
+        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
+        $namedArgs = $invocationArgs.Named
+        $positionalArgs = $invocationArgs.Positional
+        & $tripletValidationScriptPath @namedArgs @positionalArgs
     }
     default {
         throw "Unknown overlord-tooling command '$Command'. Run '.\\overlord-tooling.ps1 help'."
