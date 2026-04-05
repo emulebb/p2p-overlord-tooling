@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad.oracle.ed2k.download.private.v1",
+  "description": "Private local oracle-to-agent Kad source discovery followed by native ED2K download.",
+  "oracle": {
+    "bindAddr": "127.0.0.1",
+    "tcpPort": 42062,
+    "udpPort": 42072,
+    "serverUdpPort": 0,
+    "webPort": 47111,
+    "kadUdpKey": 4206201,
+    "seedFileName": "ubuntu-linux-private-parity.pdf",
+    "seedRepeatCount": 512
+  },
+  "agent": {
+    "controlPort": 13301,
+    "kadPort": 41120,
+    "ed2kPort": 41121
+  }
+}

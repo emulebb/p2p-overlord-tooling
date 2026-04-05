@@ -26,6 +26,7 @@ function Show-ToolingHelp {
             [ordered]@{ name = "import-oracle-seeds"; description = "Import local nodes.dat and server.met into the untracked canonical oracle seed bundle" }
             [ordered]@{ name = "show-scenario"; description = "Print a scenario manifest" }
             [ordered]@{ name = "run-kad-startup-hello-publish"; description = "Run the first paired oracle+agent Kad startup, HELLO, and publish scenario" }
+            [ordered]@{ name = "run-private-oracle-ed2k-download"; description = "Run a private local oracle Kad source publish plus native ED2K download scenario" }
         )
     }
 }
@@ -101,6 +102,7 @@ $workspaceRoot = Resolve-Path (Join-Path $repoRoot "..")
 $guardScriptPath = Join-Path $repoRoot "orchestration\Invoke-TrackedFilePrivacyGuard.ps1"
 $seedImportScriptPath = Join-Path $repoRoot "orchestration\Import-OracleSeedBundle.ps1"
 $scenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-KadStartupHelloPublishScenario.ps1"
+$privateEd2kScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateOracleEd2kDownloadScenario.ps1"
 $command = "help"
 $commandArgs = @()
 if ($Arguments -and $Arguments.Count -gt 0) {
@@ -168,6 +170,16 @@ switch ($Command.ToLowerInvariant()) {
         $namedArgs = $invocationArgs.Named
         $positionalArgs = $invocationArgs.Positional
         & $scenarioRunnerScriptPath @namedArgs @positionalArgs
+    }
+    "run-private-oracle-ed2k-download" {
+        if (-not (Test-Path $privateEd2kScenarioRunnerScriptPath)) {
+            throw "Private ED2K scenario runner not found at $privateEd2kScenarioRunnerScriptPath"
+        }
+
+        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
+        $namedArgs = $invocationArgs.Named
+        $positionalArgs = $invocationArgs.Positional
+        & $privateEd2kScenarioRunnerScriptPath @namedArgs @positionalArgs
     }
     default {
         throw "Unknown overlord-tooling command '$Command'. Run '.\\overlord-tooling.ps1 help'."
