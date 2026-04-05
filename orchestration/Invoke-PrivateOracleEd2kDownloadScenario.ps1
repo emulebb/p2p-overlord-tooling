@@ -125,15 +125,30 @@ function Wait-OraclePublishReady {
     )
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    $pattern = 'event=(publish_|search_storefile_prepare|search_storekeyword_prepare|search_storesource_prepare)'
+    $tracePattern = 'event=(publish_|search_storefile_prepare|search_storekeyword_prepare|search_storesource_prepare)'
+    $verbosePattern = 'Oracle publish gate ready|Oracle publish start family='
     while ((Get-Date) -lt $deadline) {
         $lines = Get-NewOracleTraceLines -OracleSession $OracleSession
-        $publishLines = @($lines | Where-Object { $_ -match $pattern })
+        $publishLines = @($lines | Where-Object { $_ -match $tracePattern })
         if ($publishLines.Count -gt 0) {
             return [pscustomobject]@{
                 Ready = $true
+                Source = "trace"
                 TraceLineCount = $lines.Count
                 PublishLineCount = $publishLines.Count
+            }
+        }
+
+        if (Test-Path -LiteralPath $OracleSession.VerboseLogPath) {
+            $verboseLines = Get-Content -LiteralPath $OracleSession.VerboseLogPath
+            $verbosePublishLines = @($verboseLines | Where-Object { $_ -match $verbosePattern })
+            if ($verbosePublishLines.Count -gt 0) {
+                return [pscustomobject]@{
+                    Ready = $true
+                    Source = "verbose"
+                    TraceLineCount = $lines.Count
+                    PublishLineCount = $verbosePublishLines.Count
+                }
             }
         }
         Start-Sleep -Seconds 2
