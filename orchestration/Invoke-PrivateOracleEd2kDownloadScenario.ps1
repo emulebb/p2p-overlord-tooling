@@ -114,7 +114,10 @@ function Get-NewOracleTraceLines {
         return @()
     }
 
-    @(Get-Content -LiteralPath $OracleSession.TraceLogPath | Select-Object -Skip ([int]$OracleSession.TraceLinesBefore))
+    return @(
+        Get-Content -LiteralPath $OracleSession.TraceLogPath |
+            Select-Object -Skip ([int]$OracleSession.TraceLinesBefore)
+    )
 }
 
 function Wait-OraclePublishReady {
