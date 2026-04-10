@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Starts one minimized experimental eMule oracle for a private Kad+ED2K run.
+Starts one minimized eMule oracle for a private Kad+ED2K run.
 #>
 
 [CmdletBinding()]
@@ -12,27 +12,11 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ExportLinkPath,
     [Parameter(Mandatory = $true)]
-    [string]$AgentBootstrapNode,
-    [ValidateSet("Debug", "Release")]
-    [string]$BuildConfig = "Debug",
-    [string]$OracleWorkspaceRoot
+    [string]$AgentBootstrapNode
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
-function Resolve-OracleWorkspaceRoot {
-    param(
-        [string]$ExplicitRoot
-    )
-
-    if ($ExplicitRoot) {
-        return [System.IO.Path]::GetFullPath($ExplicitRoot)
-    }
-
-    $workspaceRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-    return [System.IO.Path]::GetFullPath((Join-Path $workspaceRoot "..\eMule\eMulebb\eMule-build-v0.60"))
-}
 
 $tmpDir = if ($env:OVERLORD_TMP_DIR) {
     $env:OVERLORD_TMP_DIR
@@ -40,21 +24,18 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
     throw "OVERLORD_TMP_DIR is not set"
 }
 
-$oracleRoot = Resolve-OracleWorkspaceRoot -ExplicitRoot $OracleWorkspaceRoot
-$oracleWorkspaceScript = Join-Path $oracleRoot "workspace.ps1"
+$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+$oracleExePath = Join-Path $oracleHarnessDebugDir "eMule_v072a_parity.exe"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-oracle-clean-runtime.ps1"
-foreach ($requiredPath in @($oracleWorkspaceScript, $cleanupHelperPath, $SeedFilePath)) {
-    if (-not (Test-Path -LiteralPath $requiredPath)) {
-        throw "Required oracle path not found at $requiredPath"
-    }
-}
 
-$oracleExePath = Join-Path $oracleRoot ("eMule-v0.60d-experimental-clean\srchybrid\x64\{0}\emule.exe" -f $BuildConfig)
 if (-not (Test-Path -LiteralPath $oracleExePath)) {
-    & pwsh -NoProfile -File $oracleWorkspaceScript build-experimental -Config $BuildConfig | Out-Null
+    throw "Oracle executable not found at $oracleExePath — run helper-oracle-build-debug.ps1 first"
 }
-if (-not (Test-Path -LiteralPath $oracleExePath)) {
-    throw "Experimental oracle executable not found at $oracleExePath"
+if (-not (Test-Path -LiteralPath $cleanupHelperPath)) {
+    throw "Oracle cleanup helper not found at $cleanupHelperPath"
+}
+if (-not (Test-Path -LiteralPath $SeedFilePath)) {
+    throw "Seed file not found at $SeedFilePath"
 }
 
 $profile = [System.IO.Path]::GetFullPath($ProfileRoot)
@@ -81,7 +62,7 @@ foreach ($path in @($readyFile, $ExportLinkPath, $statusLogPath)) {
 $traceLinesBefore = if (Test-Path -LiteralPath $traceLogPath) { @(Get-Content $traceLogPath).Count } else { 0 }
 $oracleProcess = Start-Process `
     -FilePath $oracleExePath `
-    -WorkingDirectory (Split-Path -Parent $oracleExePath) `
+    -WorkingDirectory $oracleHarnessDebugDir `
     -ArgumentList @(
         "-AutoStart",
         "-configdir=""$profile""",

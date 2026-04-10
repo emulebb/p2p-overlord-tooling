@@ -9,27 +9,11 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$projectDir = if ($env:OVERLORD_PROJECT_DIR) {
-    $env:OVERLORD_PROJECT_DIR
-} else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+$preferencesPath = Join-Path $oracleHarnessDebugDir "config\preferences.ini"
+if (-not (Test-Path $preferencesPath)) {
+    throw "preferences.ini not found at $preferencesPath"
 }
-
-function Resolve-OraclePreferencesPath {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ProjectDir
-    )
-
-    $preferencesPath = Join-Path $ProjectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\config\preferences.ini"
-    if (Test-Path $preferencesPath) {
-        return $preferencesPath
-    }
-
-    throw "preferences.ini not found in the oracle debug config directory"
-}
-
-$preferencesPath = Resolve-OraclePreferencesPath -ProjectDir $projectDir
 
 $desiredValues = [ordered]@{
     Verbose = "1"

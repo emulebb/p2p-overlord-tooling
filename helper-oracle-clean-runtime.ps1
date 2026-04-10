@@ -23,7 +23,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 function Get-OracleProcessNames {
-    @("eMule_v060_parity", "eMule_debug_loc", "emule")
+    @("eMule_v072a_parity")
 }
 
 function Stop-ProcessIds {

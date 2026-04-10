@@ -13,14 +13,8 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$projectDir = if ($env:OVERLORD_PROJECT_DIR) {
-    $env:OVERLORD_PROJECT_DIR
-} else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-}
-
-$sourcePath = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\config\server.met"
-$destinationPath = $sourcePath
+$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+$sourcePath = Join-Path $oracleHarnessDebugDir "config\server.met"
 
 if (-not (Test-Path $sourcePath)) {
     throw "Bundled server.met not found at $sourcePath"
@@ -28,6 +22,6 @@ if (-not (Test-Path $sourcePath)) {
 
 [pscustomobject]@{
     SourcePath = $sourcePath
-    DestinationPath = $destinationPath
-    Bytes = (Get-Item $destinationPath).Length
+    DestinationPath = $sourcePath
+    Bytes = (Get-Item $sourcePath).Length
 }

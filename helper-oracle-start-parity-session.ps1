@@ -25,6 +25,7 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
 } else {
     throw "OVERLORD_TMP_DIR is not set"
 }
+$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
 
 function Resolve-DumpcapInterfaceIndex {
     param(
@@ -84,13 +85,13 @@ $cleanupHelperPath = Join-Path $PSScriptRoot "helper-oracle-clean-runtime.ps1"
 $runtimeRoot = if ($ProfileRoot) {
     [System.IO.Path]::GetFullPath($ProfileRoot)
 } else {
-    Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug"
+    $oracleHarnessDebugDir
 }
 $traceLogPath = Join-Path $runtimeRoot "logs\oracle-kad-trace.log"
 $verboseLogPath = Join-Path $runtimeRoot "logs\eMule_Verbose.log"
 $packetDumpDir = Join-Path $runtimeRoot "logs"
 $preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
-$oracleWorkDir = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug"
+$oracleWorkDir = $oracleHarnessDebugDir
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 
 if (-not (Test-Path $buildHelperPath)) {
@@ -172,7 +173,7 @@ try {
 
     Start-Sleep -Seconds 2
     for ($attempt = 0; $attempt -lt 45; $attempt++) {
-        $oracleProcess = Get-Process -Name "eMule_v060_parity" -ErrorAction SilentlyContinue | Select-Object -First 1
+        $oracleProcess = Get-Process -Name "eMule_v072a_parity" -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($oracleProcess) {
             break
         }

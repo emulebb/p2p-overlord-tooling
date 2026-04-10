@@ -23,14 +23,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$projectDir = if ($env:OVERLORD_PROJECT_DIR) {
-    $env:OVERLORD_PROJECT_DIR
-} else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-}
-
 $resolvedDestinationPath = if ([string]::IsNullOrWhiteSpace($DestinationPath)) {
-    Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug\config\server.met"
+    $oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+    Join-Path $oracleHarnessDebugDir "config\server.met"
 } else {
     [System.IO.Path]::GetFullPath($DestinationPath)
 }

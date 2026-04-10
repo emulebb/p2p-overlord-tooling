@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Builds the x64 Debug oracle via the workspace's canonical build wrapper.
+Builds the x64 Debug tracing-harness oracle via the workspace's canonical build wrapper.
 #>
 
 [CmdletBinding()]
@@ -9,27 +9,21 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$projectDir = if ($env:OVERLORD_PROJECT_DIR) {
-    $env:OVERLORD_PROJECT_DIR
-} else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+$buildCmd = Join-Path $env:EMULE_WORKSPACE_ROOT "repos\eMule-build\workspace.cmd"
+if (-not (Test-Path $buildCmd)) {
+    throw "Build wrapper not found at $buildCmd"
 }
 
-$buildScriptPath = Join-Path $projectDir "ext-deps\eMule-build\build_MSBuild_eMule_build_debug.cmd"
-if (-not (Test-Path $buildScriptPath)) {
-    throw "Build script not found at $buildScriptPath"
-}
-
-& $buildScriptPath
+& $buildCmd "build-app" "-Config" "Debug"
 if ($LASTEXITCODE -ne 0) {
     throw "Oracle debug build failed with exit code $LASTEXITCODE"
 }
 
-$debugDir = Join-Path $projectDir "ext-deps\eMule-build\eMule\srchybrid\x64\Debug"
-$builtExePath = Join-Path $debugDir "emule.exe"
-$runtimeExePath = Join-Path $debugDir "eMule_v060_parity.exe"
-$builtPdbPath = Join-Path $debugDir "emule.pdb"
-$runtimePdbPath = Join-Path $debugDir "eMule_v060_parity.pdb"
+$builtExePath = Join-Path $oracleHarnessDebugDir "emule.exe"
+$runtimeExePath = Join-Path $oracleHarnessDebugDir "eMule_v072a_parity.exe"
+$builtPdbPath = Join-Path $oracleHarnessDebugDir "emule.pdb"
+$runtimePdbPath = Join-Path $oracleHarnessDebugDir "eMule_v072a_parity.pdb"
 
 if (-not (Test-Path $builtExePath)) {
     throw "Built oracle executable not found at $builtExePath"
@@ -43,8 +37,8 @@ if (Test-Path $builtPdbPath) {
 }
 
 [pscustomobject]@{
-    BuildScriptPath = $buildScriptPath
-    BuiltExePath = $builtExePath
-    RuntimeExePath = $runtimeExePath
-    RuntimePdbPath = if (Test-Path $runtimePdbPath) { $runtimePdbPath } else { $null }
+    BuildScriptPath = $buildCmd
+    BuiltExePath    = $builtExePath
+    RuntimeExePath  = $runtimeExePath
+    RuntimePdbPath  = if (Test-Path $runtimePdbPath) { $runtimePdbPath } else { $null }
 }
