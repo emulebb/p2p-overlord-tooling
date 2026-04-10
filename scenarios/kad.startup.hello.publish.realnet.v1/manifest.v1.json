@@ -19,7 +19,6 @@
     ]
   },
   "oracle": {
-    "binaryRelativePath": "ext-deps/eMule-build/eMule/srchybrid/x64/Debug/eMule_v060_parity.exe",
     "dynamicPreferenceKeys": {
       "BindAddr": "eMule",
       "Port": "eMule",
@@ -69,7 +68,7 @@
     },
     {
       "id": "oracle-profile-materialized",
-      "description": "A clean-room oracle profile root with a minimal preferences.ini was created for the run."
+      "description": "A scenario-owned oracle profile root with a minimal preferences.ini was created for the run."
     },
     {
       "id": "oracle-started",

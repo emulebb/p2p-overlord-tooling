@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Materializes a clean-room oracle profile root from a scenario manifest.
+Materializes a scenario-owned oracle profile root from a scenario manifest.
 
 .DESCRIPTION
 Creates the profile-root layout expected by the instrumented oracle and writes a

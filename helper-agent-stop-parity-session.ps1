@@ -14,6 +14,24 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Convert-ToUtcDateTime {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Value
+    )
+
+    if ($Value -is [DateTime]) {
+        return $Value.ToUniversalTime()
+    }
+
+    $parsed = [DateTimeOffset]::Parse(
+        [string]$Value,
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::RoundtripKind
+    )
+    return $parsed.UtcDateTime
+}
+
 $metadataPath = Join-Path $SessionDir "agent-session.json"
 if (-not (Test-Path $metadataPath)) {
     throw "Session metadata not found at $metadataPath"
@@ -34,7 +52,7 @@ if (-not $resolvedPacketDumpPath) {
     }
     $startedAtUtc = $null
     if ($metadata.PSObject.Properties.Name -contains "StartedAtUtc" -and $metadata.StartedAtUtc) {
-        $startedAtUtc = [DateTime]::Parse($metadata.StartedAtUtc).ToUniversalTime()
+        $startedAtUtc = Convert-ToUtcDateTime -Value $metadata.StartedAtUtc
     }
     $resolvedPacketDumpPath = Get-ChildItem -Path $packetDumpDir -Filter 'agent-udp-dump-*.jsonl' -ErrorAction SilentlyContinue |
         Where-Object {

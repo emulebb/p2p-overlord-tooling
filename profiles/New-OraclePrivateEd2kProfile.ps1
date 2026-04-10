@@ -53,6 +53,7 @@ function Get-PreferencesContent {
 
 @"
 [eMule]
+AppVersion=0.72a
 Port=$TcpPort
 UDPPort=$UdpPort
 ServerUDPPort=$ServerUdpPort
@@ -79,6 +80,7 @@ OpenPortsOnStartUp=0
 EnableScheduler=0
 KadUDPKey=$KadUdpKey
 CreateCrashDump=0
+Nick=eMule harness
 
 [WebServer]
 Enabled=0

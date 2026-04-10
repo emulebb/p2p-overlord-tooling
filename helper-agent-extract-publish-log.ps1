@@ -24,16 +24,38 @@ if (-not (Test-Path $agentLogPath)) {
     throw "Agent log not found at $agentLogPath"
 }
 
-$startLine = [int]$metadata.LogLinesBefore
-$newLines = Get-Content $agentLogPath | Select-Object -Skip $startLine
+$allCurrentLines = @(Get-Content $agentLogPath)
+$recordedStartLine = if ($metadata.PSObject.Properties.Name -contains "LogLinesBefore" -and $metadata.LogLinesBefore) {
+    [int]$metadata.LogLinesBefore
+} else {
+    0
+}
+
+# If the log rotated or truncated after startup, fall back to the full current file
+# instead of silently returning an empty slice.
+$startLine = if ($recordedStartLine -gt 0 -and $allCurrentLines.Count -ge $recordedStartLine) {
+    $recordedStartLine
+} else {
+    0
+}
+$newLines = @($allCurrentLines | Select-Object -Skip $startLine)
 $allPath = Join-Path $SessionDir "agent-log-new.log"
 $publishPath = Join-Path $SessionDir "agent-publish.log"
 
-$newLines | Set-Content -Encoding utf8NoBOM $allPath
-$publishLines = $newLines | Where-Object {
+$publishLines = @($newLines | Where-Object {
     $_ -match "kad publish send|kad publish recv|kad publish progress|kad publish contact|kad publish pending|traversal phase1 done|bootstrap complete"
-}
-$publishLines | Set-Content -Encoding utf8NoBOM $publishPath
+})
+
+[System.IO.File]::WriteAllLines(
+    $allPath,
+    [string[]]$newLines,
+    (New-Object System.Text.UTF8Encoding($false))
+)
+[System.IO.File]::WriteAllLines(
+    $publishPath,
+    [string[]]$publishLines,
+    (New-Object System.Text.UTF8Encoding($false))
+)
 
 [pscustomobject]@{
     SessionDir = $SessionDir

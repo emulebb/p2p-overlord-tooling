@@ -31,6 +31,15 @@ function Stop-ProcessIds {
     }
 }
 
+function Get-ValidProcessIds {
+    param(
+        [AllowEmptyCollection()]
+        [int[]]$Ids
+    )
+
+    return ,@($Ids | Where-Object { $_ -gt 0 } | Select-Object -Unique)
+}
+
 function Stop-DumpcapCapturePort {
     param(
         [Parameter(Mandatory = $true)]
@@ -57,20 +66,23 @@ function Test-NoProcessesRemain {
         [int[]]$CaptureIds
     )
 
-    foreach ($processId in $RuntimeIds | Where-Object { $_ -gt 0 } | Select-Object -Unique) {
+    $resolvedRuntimeIds = Get-ValidProcessIds -Ids $RuntimeIds
+    $resolvedCaptureIds = Get-ValidProcessIds -Ids $CaptureIds
+
+    foreach ($processId in $resolvedRuntimeIds) {
         if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
             return $false
         }
     }
 
-    foreach ($processId in $CaptureIds | Where-Object { $_ -gt 0 } | Select-Object -Unique) {
+    foreach ($processId in $resolvedCaptureIds) {
         if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
             return $false
         }
     }
 
     # Pre-launch cleanup (no specific PIDs): wait for all name-matched processes to be gone
-    if (($RuntimeIds | Where-Object { $_ -gt 0 }).Count -eq 0) {
+    if ($resolvedRuntimeIds.Count -eq 0) {
         if (@(Get-Process -Name "overlord-agent-emule" -ErrorAction SilentlyContinue).Count -gt 0) {
             return $false
         }
@@ -86,7 +98,7 @@ if ($CapturePort -gt 0) {
 
 Stop-ProcessIds -Ids $AgentPids
 # Pre-launch cleanup only: if no PIDs were provided, kill any leftover agent by name
-if (($AgentPids | Where-Object { $_ -gt 0 }).Count -eq 0) {
+if ((Get-ValidProcessIds -Ids $AgentPids).Count -eq 0) {
     Get-Process -Name "overlord-agent-emule" -ErrorAction SilentlyContinue | Stop-Process -Force
 }
 
@@ -104,7 +116,7 @@ if (-not (Test-NoProcessesRemain -RuntimeIds $AgentPids -CaptureIds $DumpcapPids
 
 [pscustomobject]@{
     CapturePort = $CapturePort
-    AgentPids = @($AgentPids | Where-Object { $_ -gt 0 } | Select-Object -Unique)
-    DumpcapPids = @($DumpcapPids | Where-Object { $_ -gt 0 } | Select-Object -Unique)
+    AgentPids = Get-ValidProcessIds -Ids $AgentPids
+    DumpcapPids = Get-ValidProcessIds -Ids $DumpcapPids
     CleanedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
 }

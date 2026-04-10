@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Refreshes the agent networking files to the current VPN IPv4.
+Refreshes the agent networking files to the current preferred IPv4 adapter.
 
 .DESCRIPTION
 Updates the runtime fallback file consumed by the Windows debug launcher when the
@@ -32,6 +32,7 @@ if (-not $RuntimeDir) {
 if (-not $TempConfigPath -and $env:OVERLORD_TMP_DIR) {
     $TempConfigPath = Join-Path $env:OVERLORD_TMP_DIR "agent-real-miniupnpc.toml"
 }
+$networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
 
 function Update-TomlBindValue {
     param(
@@ -68,13 +69,9 @@ function Update-TomlBindValue {
 
 New-Item -ItemType Directory -Path $RuntimeDir -Force | Out-Null
 $networkingPath = Join-Path $RuntimeDir "overlord-agent.networking.json"
-$vpnIp = Get-NetIPAddress -AddressFamily IPv4 |
-    Where-Object { $_.InterfaceAlias -eq $InterfaceAlias -and $_.AddressState -eq "Preferred" } |
-    Select-Object -First 1 -ExpandProperty IPAddress
-
-if (-not $vpnIp) {
-    throw "No preferred IPv4 address found on interface '$InterfaceAlias'"
-}
+$resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
+$resolvedInterfaceAlias = [string]$resolvedAdapter.InterfaceAlias
+$resolvedBindIp = [string]$resolvedAdapter.IPAddress
 
 $snapshot = if (Test-Path $networkingPath) {
     Get-Content -Raw $networkingPath | ConvertFrom-Json -AsHashtable
@@ -109,9 +106,9 @@ if (-not $snapshot["control"].ContainsKey("listen_port")) {
     $snapshot["control"]["listen_port"] = 13301
 }
 
-# Pin live Kad/ED2K traffic to the VPN interface rather than a transient IPv4 so the
-# next hide.me readdressing event does not stale the persisted fallback snapshot again.
-$snapshot["p2p"]["bind_iface"] = $InterfaceAlias
+# Pin live Kad/ED2K traffic to the selected adapter rather than a transient IPv4 so the
+# next interface readdressing event does not stale the persisted fallback snapshot again.
+$snapshot["p2p"]["bind_iface"] = $resolvedInterfaceAlias
 $snapshot["p2p"]["bind_ip"] = $null
 $snapshot["p2p"]["selection_confirmed"] = $true
 if (-not $snapshot["p2p"]["kad"].ContainsKey("listen_port")) {
@@ -162,12 +159,12 @@ if ($TempConfigPath -and (Test-Path $TempConfigPath)) {
         -Content $tempConfigContent `
         -SectionName "p2p" `
         -Key "bind_iface" `
-        -Value $InterfaceAlias
+        -Value $resolvedInterfaceAlias
     $tempConfigContent = Update-TomlBindValue `
         -Content $tempConfigContent `
         -SectionName "p2p" `
         -Key "bind_ip" `
-        -Value $vpnIp
+        -Value $resolvedBindIp
     [System.IO.File]::WriteAllText(
         $TempConfigPath,
         $tempConfigContent,
@@ -178,8 +175,11 @@ if ($TempConfigPath -and (Test-Path $TempConfigPath)) {
 
 [pscustomobject]@{
     NetworkingPath = $networkingPath
-    InterfaceAlias = $InterfaceAlias
-    ResolvedP2pBindIp = $vpnIp
+    RequestedInterfaceAlias = $InterfaceAlias
+    InterfaceAlias = $resolvedInterfaceAlias
+    InterfaceIndex = $resolvedAdapter.InterfaceIndex
+    ResolvedP2pBindIp = $resolvedBindIp
+    UsedFallback = $resolvedAdapter.UsedFallback
     NatEnabled = $snapshot["nat"]["p2p"]["enabled"]
     TempConfigPath = $TempConfigPath
     UpdatedTempConfig = $updatedTempConfig

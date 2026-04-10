@@ -13,14 +13,19 @@ This helper updates the runtime-local debug `preferences.ini` used by the oracle
 [CmdletBinding()]
 param(
     [ValidateSet("ObfuscatedPreferred", "PlaintextOnly")]
-    [string]$Mode = "ObfuscatedPreferred"
+    [string]$Mode = "ObfuscatedPreferred",
+    [string]$ProfileRoot
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
-$preferencesPath = Join-Path $oracleHarnessDebugDir "config\preferences.ini"
+$runtimeRoot = if ($ProfileRoot) {
+    [System.IO.Path]::GetFullPath($ProfileRoot)
+} else {
+    & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+}
+$preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
 if (-not (Test-Path $preferencesPath)) {
     throw "preferences.ini not found at $preferencesPath"
 }
@@ -60,6 +65,7 @@ foreach ($entry in $desiredValues.GetEnumerator()) {
 
 [pscustomobject]@{
     PreferencesPath = $preferencesPath
+    RuntimeRoot = $runtimeRoot
     Mode = $Mode
     CryptLayerRequested = $desiredValues.CryptLayerRequested
     CryptLayerRequired = $desiredValues.CryptLayerRequired

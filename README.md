@@ -45,7 +45,8 @@ Use the shared workspace rules from `../AGENTS.md` and the tooling-repo notes in
 - `.\overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1`
   prints the first paired oracle+agent scenario contract.
 - `.\overlord-tooling.ps1 run-kad-startup-hello-publish` materializes a
-  clean-room oracle profile with a manifest-owned minimal `preferences.ini`,
+  scenario-owned oracle profile with a manifest-owned minimal `preferences.ini`,
   launches the oracle with an explicit profile-root override, launches the
-  agent, triggers a deterministic manual publish, and writes run artifacts
-  under `%OVERLORD_TMP_DIR%`.
+  agent, triggers a deterministic manual publish, resolves the oracle runtime
+  from `%EMULE_WORKSPACE_ROOT%`, and writes run artifacts under
+  `%OVERLORD_TMP_DIR%`.

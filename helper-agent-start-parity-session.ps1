@@ -32,6 +32,7 @@ $launchHelperPath = Join-Path $PSScriptRoot "helper-agent-launch-debug.ps1"
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $refreshNetworkingHelperPath = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"
+$networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
 
 if (-not (Test-Path $launchHelperPath)) {
     throw "Agent launch helper not found at $launchHelperPath"
@@ -44,6 +45,9 @@ if (-not (Test-Path $cleanupHelperPath)) {
 }
 if (-not (Test-Path $refreshNetworkingHelperPath)) {
     throw "Agent networking refresh helper not found at $refreshNetworkingHelperPath"
+}
+if (-not (Test-Path $networkResolverPath)) {
+    throw "Network adapter resolver not found at $networkResolverPath"
 }
 
 function Resolve-DumpcapInterfaceIndex {
@@ -73,12 +77,14 @@ function Resolve-DumpcapInterfaceIndex {
     throw "Could not map interface '$AdapterAlias' to a dumpcap device index"
 }
 
+$resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
+$resolvedInterfaceAlias = [string]$resolvedAdapter.InterfaceAlias
 $InterfaceIndex = Resolve-DumpcapInterfaceIndex `
     -RequestedIndex $InterfaceIndex `
-    -AdapterAlias $InterfaceAlias `
+    -AdapterAlias $resolvedInterfaceAlias `
     -DumpcapPath $dumpcapPath
 
-$networkingRefresh = & $refreshNetworkingHelperPath -InterfaceAlias $InterfaceAlias
+$networkingRefresh = & $refreshNetworkingHelperPath -InterfaceAlias $resolvedInterfaceAlias
 
 & $cleanupHelperPath -CapturePort $CapturePort | Out-Null
 
@@ -155,7 +161,9 @@ try {
         CapturePath = $pcapPath
         CapturePort = $CapturePort
         InterfaceIndex = $InterfaceIndex
-        InterfaceAlias = $InterfaceAlias
+        RequestedInterfaceAlias = $InterfaceAlias
+        InterfaceAlias = $resolvedInterfaceAlias
+        InterfaceFallbackUsed = $resolvedAdapter.UsedFallback
         NetworkingPath = $networkingRefresh.NetworkingPath
         NetworkingBindIp = $networkingRefresh.ResolvedP2pBindIp
         DumpcapPid = $dumpcap.Id

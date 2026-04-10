@@ -62,14 +62,24 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
 }
 
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
+$networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
 if (-not (Test-Path $dumpcapPath)) {
     throw "dumpcap.exe not found at $dumpcapPath"
+}
+if (-not (Test-Path -LiteralPath $networkResolverPath -PathType Leaf)) {
+    throw "Network adapter resolver not found at $networkResolverPath"
+}
+
+$resolvedAdapter = if ($PSBoundParameters.ContainsKey("InterfaceIndex")) {
+    $null
+} else {
+    & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
 }
 
 $dumpcapInterfaceIndex = if ($PSBoundParameters.ContainsKey("InterfaceIndex")) {
     Resolve-DumpcapInterfaceIndex -WindowsInterfaceIndex $InterfaceIndex -DumpcapPath $dumpcapPath
 } else {
-    Resolve-DumpcapInterfaceIndex -AdapterAlias $InterfaceAlias -DumpcapPath $dumpcapPath
+    Resolve-DumpcapInterfaceIndex -AdapterAlias $resolvedAdapter.InterfaceAlias -DumpcapPath $dumpcapPath
 }
 
 $sessionName = "{0}-{1}" -f $SessionPrefix, (Get-Date -Format "yyyyMMdd-HHmmss")
@@ -107,8 +117,10 @@ $metadata = [pscustomobject]@{
     CaptureLabel = $CaptureLabel
     CapturePath = $pcapPath
     CaptureFilter = $CaptureFilter
-    InterfaceAlias = if ($PSBoundParameters.ContainsKey("InterfaceIndex")) { $null } else { $InterfaceAlias }
+    RequestedInterfaceAlias = if ($PSBoundParameters.ContainsKey("InterfaceIndex")) { $null } else { $InterfaceAlias }
+    InterfaceAlias = if ($PSBoundParameters.ContainsKey("InterfaceIndex")) { $null } else { $resolvedAdapter.InterfaceAlias }
     InterfaceIndex = if ($PSBoundParameters.ContainsKey("InterfaceIndex")) { $InterfaceIndex } else { $null }
+    InterfaceFallbackUsed = if ($PSBoundParameters.ContainsKey("InterfaceIndex")) { $null } else { $resolvedAdapter.UsedFallback }
     DumpcapInterfaceIndex = $dumpcapInterfaceIndex
     DumpcapPid = $dumpcap.Id
     DumpcapStdoutPath = $dumpcapStdoutPath

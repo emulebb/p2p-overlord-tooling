@@ -4,7 +4,7 @@
 Runs the first deterministic Kad oracle+agent parity scenario.
 
 .DESCRIPTION
-Creates a clean-room oracle profile, launches the oracle with an explicit
+Creates a scenario-owned oracle profile, launches the oracle with an explicit
 profile-root override, launches the agent, triggers a deterministic manual
 publish, captures artifacts, and writes run manifest and summary JSON files.
 #>
@@ -33,21 +33,14 @@ function Resolve-BindAddress {
     param(
         [string]$ExplicitBindAddr,
         [Parameter(Mandatory = $true)]
-        [string]$AdapterAlias
+        [object]$ResolvedAdapter
     )
 
     if ($ExplicitBindAddr) {
         return $ExplicitBindAddr
     }
 
-    $vpnIp = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
-        Where-Object { $_.InterfaceAlias -eq $AdapterAlias -and $_.AddressState -eq "Preferred" } |
-        Select-Object -First 1 -ExpandProperty IPAddress
-    if (-not $vpnIp) {
-        throw "No preferred IPv4 address found on interface '$AdapterAlias'"
-    }
-
-    return $vpnIp
+    return [string]$ResolvedAdapter.IPAddress
 }
 
 function New-MilestoneMap {
@@ -235,11 +228,24 @@ function Test-MilestonesPassed {
     return $true
 }
 
+function Resolve-OracleRuntimeExePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ToolingRoot
+    )
+
+    $resolverPath = Join-Path $ToolingRoot "helper-oracle-resolve-harness-debug-dir.ps1"
+    $harnessDebugDir = & $resolverPath
+    return (Join-Path $harnessDebugDir "eMule_v072a_parity.exe")
+}
+
 $toolingRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$workspaceRoot = Resolve-Path (Join-Path $toolingRoot "..")
+$networkResolverPath = Join-Path $toolingRoot "helper-network-resolve-adapter.ps1"
 $manifest = Get-Content -Raw $ScenarioManifestPath | ConvertFrom-Json
 $requiredMilestoneIds = @(Get-RequiredMilestoneIds -Manifest $manifest)
-$bindAddrValue = Resolve-BindAddress -ExplicitBindAddr $BindAddr -AdapterAlias $InterfaceAlias
+$resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
+$resolvedInterfaceAlias = [string]$resolvedAdapter.InterfaceAlias
+$bindAddrValue = Resolve-BindAddress -ExplicitBindAddr $BindAddr -ResolvedAdapter $resolvedAdapter
 
 if (-not $env:OVERLORD_TMP_DIR) {
     throw "OVERLORD_TMP_DIR is not set"
@@ -315,6 +321,7 @@ try {
         -ServerUdpPort $OracleServerUdpPort
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "oracle-profile-materialized" -Details "Profile root created at $($profile.ProfileRoot)"
 
+    $oracleRuntimeExePath = Resolve-OracleRuntimeExePath -ToolingRoot $toolingRoot
     $runManifest = [ordered]@{
         schemaVersion = "run-manifest/v1"
         scenarioId = $manifest.scenarioId
@@ -323,10 +330,12 @@ try {
         artifactRoot = $artifactRoot
         requiredMilestoneIds = $requiredMilestoneIds
         binary = [ordered]@{
-            oracle = (Join-Path $workspaceRoot ($manifest.oracle.binaryRelativePath -replace '/', '\'))
+            oracle = $oracleRuntimeExePath
         }
         inputs = [ordered]@{
-            interfaceAlias = $InterfaceAlias
+            requestedInterfaceAlias = $InterfaceAlias
+            interfaceAlias = $resolvedInterfaceAlias
+            interfaceFallbackUsed = $resolvedAdapter.UsedFallback
             bindAddr = $bindAddrValue
             oracleTcpPort = $OracleTcpPort
             oracleUdpPort = $OracleUdpPort
@@ -343,7 +352,7 @@ try {
 
     $oracleStartScriptPath = Join-Path $toolingRoot "helper-oracle-start-parity-session.ps1"
     $oracleSession = & $oracleStartScriptPath `
-        -InterfaceAlias $InterfaceAlias `
+        -InterfaceAlias $resolvedInterfaceAlias `
         -CapturePort $OracleUdpPort `
         -SessionPrefix $runId `
         -WaitAfterLaunchSeconds $OracleWarmupSeconds `
@@ -353,7 +362,7 @@ try {
     $agentStartScriptPath = Join-Path $toolingRoot "helper-agent-start-parity-session.ps1"
     $agentSession = & $agentStartScriptPath `
         -InterfaceIndex $AgentInterfaceIndex `
-        -InterfaceAlias $InterfaceAlias `
+        -InterfaceAlias $resolvedInterfaceAlias `
         -CapturePort $AgentCapturePort `
         -SessionPrefix $runId
     Wait-AgentControlReady -StatsUrl $manifest.agent.statsUrl

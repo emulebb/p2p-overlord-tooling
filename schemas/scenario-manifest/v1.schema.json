@@ -49,15 +49,10 @@
     "oracle": {
       "type": "object",
       "required": [
-        "binaryRelativePath",
         "dynamicPreferenceKeys",
         "seededPreferenceDefaults"
       ],
       "properties": {
-        "binaryRelativePath": {
-          "type": "string",
-          "minLength": 1
-        },
         "dynamicPreferenceKeys": {
           "type": "object",
           "additionalProperties": {

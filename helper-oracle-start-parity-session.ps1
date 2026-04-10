@@ -81,8 +81,146 @@ function Resolve-OracleCapturePort {
     return $parsedCapturePort
 }
 
+function Normalize-DirectoryPath {
+    param(
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $null
+    }
+
+    return ([System.IO.Path]::GetFullPath($Path)).TrimEnd('\')
+}
+
+function Get-PreferencesValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PreferencesPath,
+        [Parameter(Mandatory = $true)]
+        [string]$Key
+    )
+
+    $escapedKey = [regex]::Escape($Key)
+    $matchedLine = Get-Content -LiteralPath $PreferencesPath |
+        Where-Object { $_ -match "^(?:$escapedKey)=" } |
+        Select-Object -First 1
+    if (-not $matchedLine) {
+        throw "Could not find $Key in $PreferencesPath"
+    }
+
+    return ($matchedLine -replace "^(?:$escapedKey)=", "")
+}
+
+function Get-ExpectedOracleReadyState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PreferencesPath,
+        [Parameter(Mandatory = $true)]
+        [string]$RuntimeRoot
+    )
+
+    $runtimeRootPath = [System.IO.Path]::GetFullPath($RuntimeRoot)
+
+    [pscustomobject]@{
+        ProfileRoot = Normalize-DirectoryPath -Path $runtimeRootPath
+        ConfigDir = Normalize-DirectoryPath -Path (Join-Path $runtimeRootPath "config")
+        TcpPort = [int](Get-PreferencesValue -PreferencesPath $PreferencesPath -Key "Port")
+        UdpPort = [int](Get-PreferencesValue -PreferencesPath $PreferencesPath -Key "UDPPort")
+        ServerUdpPort = [int](Get-PreferencesValue -PreferencesPath $PreferencesPath -Key "ServerUDPPort")
+        NetworkEd2k = [int](Get-PreferencesValue -PreferencesPath $PreferencesPath -Key "NetworkED2K")
+        NetworkKademlia = [int](Get-PreferencesValue -PreferencesPath $PreferencesPath -Key "NetworkKademlia")
+        Autoconnect = [int](Get-PreferencesValue -PreferencesPath $PreferencesPath -Key "Autoconnect")
+        BindAddr = [string](Get-PreferencesValue -PreferencesPath $PreferencesPath -Key "BindAddr")
+    }
+}
+
+function Wait-OracleReadyFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ReadyFilePath,
+        [Parameter(Mandatory = $true)]
+        [System.Diagnostics.Process]$OracleProcess,
+        [int]$TimeoutSeconds = 90
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path -LiteralPath $ReadyFilePath -PathType Leaf) {
+            return
+        }
+        if (-not (Get-Process -Id $OracleProcess.Id -ErrorAction SilentlyContinue)) {
+            throw "Parity oracle process (PID $($OracleProcess.Id)) exited before writing $ReadyFilePath"
+        }
+        Start-Sleep -Milliseconds 250
+    }
+
+    throw "Timed out waiting for oracle readiness marker at $ReadyFilePath"
+}
+
+function Assert-OracleReadyState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$ExpectedState,
+        [Parameter(Mandatory = $true)]
+        [object]$ReadyState,
+        [Parameter(Mandatory = $true)]
+        [int]$ExpectedOraclePid,
+        [Parameter(Mandatory = $true)]
+        [int]$ExpectedCapturePort
+    )
+
+    $mismatches = [System.Collections.Generic.List[string]]::new()
+
+    if ($ReadyState.State -ne "ready") {
+        $mismatches.Add("state=$($ReadyState.State)") | Out-Null
+    }
+    if ($ReadyState.Pid -ne $ExpectedOraclePid) {
+        $mismatches.Add("pid=$($ReadyState.Pid)") | Out-Null
+    }
+    if ((Normalize-DirectoryPath -Path $ReadyState.ProfileRoot) -ne $ExpectedState.ProfileRoot) {
+        $mismatches.Add("profile_root=$($ReadyState.ProfileRoot)") | Out-Null
+    }
+    if ((Normalize-DirectoryPath -Path $ReadyState.ConfigDir) -ne $ExpectedState.ConfigDir) {
+        $mismatches.Add("config_dir=$($ReadyState.ConfigDir)") | Out-Null
+    }
+    if ($ReadyState.TcpPort -ne $ExpectedState.TcpPort) {
+        $mismatches.Add("tcp_port=$($ReadyState.TcpPort)") | Out-Null
+    }
+    if ($ReadyState.UdpPort -ne $ExpectedState.UdpPort) {
+        $mismatches.Add("udp_port=$($ReadyState.UdpPort)") | Out-Null
+    }
+    if ($ReadyState.ServerUdpPort -ne $ExpectedState.ServerUdpPort) {
+        $mismatches.Add("server_udp_port=$($ReadyState.ServerUdpPort)") | Out-Null
+    }
+    if ($ReadyState.NetworkEd2k -ne $ExpectedState.NetworkEd2k) {
+        $mismatches.Add("network_ed2k=$($ReadyState.NetworkEd2k)") | Out-Null
+    }
+    if ($ReadyState.NetworkKademlia -ne $ExpectedState.NetworkKademlia) {
+        $mismatches.Add("network_kademlia=$($ReadyState.NetworkKademlia)") | Out-Null
+    }
+    if ($ReadyState.Autoconnect -ne $ExpectedState.Autoconnect) {
+        $mismatches.Add("autoconnect=$($ReadyState.Autoconnect)") | Out-Null
+    }
+    if ([string]$ReadyState.BindAddr -ne [string]$ExpectedState.BindAddr) {
+        $mismatches.Add("bind_addr=$($ReadyState.BindAddr)") | Out-Null
+    }
+    if ($ReadyState.UdpPort -ne $ExpectedCapturePort) {
+        $mismatches.Add("capture_port=$ExpectedCapturePort observed_udp_port=$($ReadyState.UdpPort)") | Out-Null
+    }
+    if ($ReadyState.ParityMode -ne 1) {
+        $mismatches.Add("parity_mode=$($ReadyState.ParityMode)") | Out-Null
+    }
+
+    if ($mismatches.Count -gt 0) {
+        throw "Oracle readiness validation failed: $($mismatches -join '; ')"
+    }
+}
+
 $buildHelperPath = Join-Path $PSScriptRoot "helper-oracle-build-debug.ps1"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-oracle-clean-runtime.ps1"
+$readyReaderPath = Join-Path $PSScriptRoot "helper-oracle-read-ready-file.ps1"
+$networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
 $runtimeRoot = if ($ProfileRoot) {
     [System.IO.Path]::GetFullPath($ProfileRoot)
 } else {
@@ -92,6 +230,7 @@ $traceLogPath = Join-Path $runtimeRoot "logs\oracle-kad-trace.log"
 $verboseLogPath = Join-Path $runtimeRoot "logs\eMule_Verbose.log"
 $packetDumpDir = Join-Path $runtimeRoot "logs"
 $preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
+$readyFilePath = Join-Path $runtimeRoot "harness.ready"
 $oracleWorkDir = $oracleHarnessDebugDir
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 
@@ -100,6 +239,12 @@ if (-not (Test-Path $buildHelperPath)) {
 }
 if (-not (Test-Path $cleanupHelperPath)) {
     throw "Oracle cleanup helper not found at $cleanupHelperPath"
+}
+if (-not (Test-Path -LiteralPath $readyReaderPath -PathType Leaf)) {
+    throw "Oracle ready-file reader not found at $readyReaderPath"
+}
+if (-not (Test-Path -LiteralPath $networkResolverPath -PathType Leaf)) {
+    throw "Network adapter resolver not found at $networkResolverPath"
 }
 if (-not (Test-Path $preferencesPath)) {
     throw "Oracle preferences not found at $preferencesPath"
@@ -110,8 +255,11 @@ if (-not (Test-Path $dumpcapPath)) {
 $traceLogDir = Split-Path -Parent $traceLogPath
 New-Item -ItemType Directory -Path $traceLogDir -Force | Out-Null
 
+$resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
+$resolvedInterfaceAlias = [string]$resolvedAdapter.InterfaceAlias
+$expectedReadyState = Get-ExpectedOracleReadyState -PreferencesPath $preferencesPath -RuntimeRoot $runtimeRoot
 $CapturePort = Resolve-OracleCapturePort -PreferencesPath $preferencesPath -RequestedCapturePort $CapturePort
-$dumpcapInterfaceIndex = Resolve-DumpcapInterfaceIndex -AdapterAlias $InterfaceAlias -DumpcapPath $dumpcapPath
+$dumpcapInterfaceIndex = Resolve-DumpcapInterfaceIndex -AdapterAlias $resolvedInterfaceAlias -DumpcapPath $dumpcapPath
 
 $prelaunchCleanupArgs = @{
     CapturePort = $CapturePort
@@ -134,6 +282,7 @@ $dumpcapStderrPath = Join-Path $sessionDir "dumpcap-stderr.log"
 $sessionStartUtc = (Get-Date).ToUniversalTime()
 $oracleProcess = $null
 $dumpcap = $null
+$readyState = $null
 
 $traceLinesBefore = 0
 $traceLengthBefore = 0
@@ -146,6 +295,10 @@ if (Test-Path $traceLogPath) {
 }
 
 try {
+    if (Test-Path -LiteralPath $readyFilePath) {
+        Remove-Item -LiteralPath $readyFilePath -Force -ErrorAction SilentlyContinue
+    }
+
     $dumpcap = Start-Process `
         -FilePath $dumpcapPath `
         -ArgumentList "-i $dumpcapInterfaceIndex -f `"udp port $CapturePort`" -w `"$pcapPath`"" `
@@ -181,15 +334,18 @@ try {
 
     $oracleProcess = Start-Process `
         -FilePath $oracleExePath `
-        -ArgumentList @(if ($ProfileRoot) { @("-c", $runtimeRoot) } else { @() }) `
+        -ArgumentList @(
+            "-configdir=""$runtimeRoot""",
+            "-readyfile=""$readyFilePath""",
+            "-ignoreinstances"
+        ) `
         -WorkingDirectory $oracleWorkDir `
         -PassThru `
         -WindowStyle Hidden
 
-    Start-Sleep -Seconds 2
-    if (-not (Get-Process -Id $oracleProcess.Id -ErrorAction SilentlyContinue)) {
-        throw "Parity oracle process (PID $($oracleProcess.Id)) is not running after launch"
-    }
+    Wait-OracleReadyFile -ReadyFilePath $readyFilePath -OracleProcess $oracleProcess
+    $readyState = & $readyReaderPath -Path $readyFilePath
+    Assert-OracleReadyState -ExpectedState $expectedReadyState -ReadyState $readyState -ExpectedOraclePid $oracleProcess.Id -ExpectedCapturePort $CapturePort
 
     if ($WaitAfterLaunchSeconds -gt 0) {
         Start-Sleep -Seconds $WaitAfterLaunchSeconds
@@ -211,13 +367,17 @@ try {
         TraceWriteTimeBeforeUtc = if ($traceWriteTimeBefore) { $traceWriteTimeBefore.ToString("o") } else { $null }
         CapturePath = $pcapPath
         CapturePort = $CapturePort
-        InterfaceAlias = $InterfaceAlias
+        RequestedInterfaceAlias = $InterfaceAlias
+        InterfaceAlias = $resolvedInterfaceAlias
+        InterfaceFallbackUsed = $resolvedAdapter.UsedFallback
         DumpcapInterfaceIndex = $dumpcapInterfaceIndex
         DumpcapPid = $dumpcap.Id
         DumpcapStdoutPath = $dumpcapStdoutPath
         DumpcapStderrPath = $dumpcapStderrPath
         OracleExePath = $oracleExePath
         OracleProfileRoot = $runtimeRoot
+        OracleReadyFilePath = $readyFilePath
+        OracleReadyState = $readyState
         OraclePid = $oracleProcess.Id
         StartedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     }

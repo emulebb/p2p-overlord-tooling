@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Builds the x64 Debug tracing-harness oracle via the workspace's canonical build wrapper.
+Builds the x64 Debug eMule harness runtime executable.
 #>
 
 [CmdletBinding()]
@@ -10,15 +10,39 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
-$buildCmd = Join-Path $env:EMULE_WORKSPACE_ROOT "repos\eMule-build\workspace.cmd"
-if (-not (Test-Path $buildCmd)) {
-    throw "Build wrapper not found at $buildCmd"
+$emuleWorkspaceRoot = if ($env:EMULE_WORKSPACE_ROOT) {
+    [System.IO.Path]::GetFullPath($env:EMULE_WORKSPACE_ROOT)
+} else {
+    throw "EMULE_WORKSPACE_ROOT is not set"
 }
 
-& $buildCmd "build-app" "-Config" "Debug"
+$workspaceScriptPath = Join-Path $emuleWorkspaceRoot "repos\eMule-build\workspace.ps1"
+if (-not (Test-Path -LiteralPath $workspaceScriptPath -PathType Leaf)) {
+    throw "Canonical eMule-build workspace entrypoint not found at $workspaceScriptPath"
+}
+
+$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+$buildArguments = @(
+    '-NoLogo'
+    '-NoProfile'
+    '-ExecutionPolicy'
+    'Bypass'
+    '-File'
+    $workspaceScriptPath
+    'build-app'
+    '-EmuleWorkspaceRoot'
+    $emuleWorkspaceRoot
+    '-AppVariant'
+    'tracing-harness'
+    '-Config'
+    'Debug'
+    '-Platform'
+    'x64'
+)
+
+& 'pwsh' @buildArguments
 if ($LASTEXITCODE -ne 0) {
-    throw "Oracle debug build failed with exit code $LASTEXITCODE"
+    throw "eMule harness debug build failed with exit code $LASTEXITCODE"
 }
 
 $builtExePath = Join-Path $oracleHarnessDebugDir "emule.exe"
@@ -27,18 +51,19 @@ $builtPdbPath = Join-Path $oracleHarnessDebugDir "emule.pdb"
 $runtimePdbPath = Join-Path $oracleHarnessDebugDir "eMule_v072a_parity.pdb"
 
 if (-not (Test-Path $builtExePath)) {
-    throw "Built oracle executable not found at $builtExePath"
+    throw "Built eMule harness executable not found at $builtExePath"
 }
 
-# Keep the distinct parity oracle binary in sync with the latest MSBuild output
-# so harness runs never pick up the generic debug executable by accident.
+# Keep the distinct parity harness binary in sync with the latest build output
+# so eMule harness runs never pick up the generic debug executable by accident.
 Copy-Item -Path $builtExePath -Destination $runtimeExePath -Force
 if (Test-Path $builtPdbPath) {
     Copy-Item -Path $builtPdbPath -Destination $runtimePdbPath -Force
 }
 
 [pscustomobject]@{
-    BuildScriptPath = $buildCmd
+    BuildScriptPath = $workspaceScriptPath
+    AppVariant = 'tracing-harness'
     BuiltExePath    = $builtExePath
     RuntimeExePath  = $runtimeExePath
     RuntimePdbPath  = if (Test-Path $runtimePdbPath) { $runtimePdbPath } else { $null }

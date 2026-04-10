@@ -16,14 +16,19 @@ param(
     [ValidateSet("On", "Off")]
     [string]$Kad = "On",
     [ValidateSet("On", "Off")]
-    [string]$Autoconnect = "On"
+    [string]$Autoconnect = "On",
+    [string]$ProfileRoot
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
-$preferencesPath = Join-Path $oracleHarnessDebugDir "config\preferences.ini"
+$runtimeRoot = if ($ProfileRoot) {
+    [System.IO.Path]::GetFullPath($ProfileRoot)
+} else {
+    & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+}
+$preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
 if (-not (Test-Path $preferencesPath)) {
     throw "preferences.ini not found at $preferencesPath"
 }
@@ -52,6 +57,7 @@ foreach ($entry in $desiredValues.GetEnumerator()) {
 
 [pscustomobject]@{
     PreferencesPath = $preferencesPath
+    RuntimeRoot = $runtimeRoot
     NetworkED2K = $desiredValues.NetworkED2K
     NetworkKademlia = $desiredValues.NetworkKademlia
     Autoconnect = $desiredValues.Autoconnect

@@ -34,4 +34,5 @@ Supporting notes for the workspace tooling platform.
   prints the first paired oracle+agent deterministic scenario manifest.
 - `../overlord-tooling.ps1 run-kad-startup-hello-publish`
   runs the paired oracle+agent Kad startup, HELLO, and publish harness and
-  writes JSON manifests, summaries, and raw artifacts under `%OVERLORD_TMP_DIR%`.
+  resolves the oracle runtime from `%EMULE_WORKSPACE_ROOT%` and writes JSON
+  manifests, summaries, and raw artifacts under `%OVERLORD_TMP_DIR%`.
