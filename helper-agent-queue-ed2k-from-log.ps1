@@ -6,7 +6,7 @@ Queues ED2K download requests from recent live-agent search-result log samples.
 
 [CmdletBinding()]
 param(
-    [string]$LogPath = "C:\tmp\overlord-logs\overlord-agent-emule.log",
+    [string]$LogPath = $(if ($env:OVERLORD_LOG_DIR) { Join-Path $env:OVERLORD_LOG_DIR "overlord-agent-emule.log" } else { throw "OVERLORD_LOG_DIR is not set and no -LogPath was provided" }),
     [string]$Needle = "ebook",
     [int]$MaxItems = 8,
     [string]$ControlUrl = "http://127.0.0.1:13301"

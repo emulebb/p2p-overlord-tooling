@@ -119,6 +119,20 @@ try {
         throw "dumpcap exited immediately with code $($dumpcap.ExitCode). $stderr"
     }
 
+    $pcapDeadline = (Get-Date).AddSeconds(15)
+    while ((Get-Date) -lt $pcapDeadline) {
+        if (Test-Path $pcapPath) { break }
+        if ($dumpcap.HasExited) {
+            $stderr = if (Test-Path $dumpcapStderrPath) { (Get-Content -Raw $dumpcapStderrPath).Trim() } else { "" }
+            throw "dumpcap exited before creating capture file. $stderr"
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    if (-not (Test-Path $pcapPath)) {
+        Stop-Process -Id $dumpcap.Id -Force -ErrorAction SilentlyContinue
+        throw "dumpcap did not create capture file at $pcapPath within 15 seconds"
+    }
+
     $launchResult = & $launchHelperPath
     $agentProcess = Get-Process -Id $launchResult.AgentPid -ErrorAction SilentlyContinue
     if (-not $agentProcess) {

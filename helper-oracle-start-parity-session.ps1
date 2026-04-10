@@ -165,23 +165,30 @@ try {
         throw "dumpcap exited immediately with code $($dumpcap.ExitCode). $stderr"
     }
 
-    Start-Process `
+    $pcapDeadline = (Get-Date).AddSeconds(15)
+    while ((Get-Date) -lt $pcapDeadline) {
+        if (Test-Path $pcapPath) { break }
+        if ($dumpcap.HasExited) {
+            $stderr = if (Test-Path $dumpcapStderrPath) { (Get-Content -Raw $dumpcapStderrPath).Trim() } else { "" }
+            throw "dumpcap exited before creating capture file. $stderr"
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    if (-not (Test-Path $pcapPath)) {
+        Stop-Process -Id $dumpcap.Id -Force -ErrorAction SilentlyContinue
+        throw "dumpcap did not create capture file at $pcapPath within 15 seconds"
+    }
+
+    $oracleProcess = Start-Process `
         -FilePath $oracleExePath `
         -ArgumentList @(if ($ProfileRoot) { @("-c", $runtimeRoot) } else { @() }) `
         -WorkingDirectory $oracleWorkDir `
         -PassThru `
-        -WindowStyle Hidden | Out-Null
+        -WindowStyle Hidden
 
     Start-Sleep -Seconds 2
-    for ($attempt = 0; $attempt -lt 45; $attempt++) {
-        $oracleProcess = Get-Process -Name "eMule_v072a_parity" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($oracleProcess) {
-            break
-        }
-        Start-Sleep -Seconds 1
-    }
-    if (-not $oracleProcess) {
-        throw "Parity oracle process did not stay running after launch"
+    if (-not (Get-Process -Id $oracleProcess.Id -ErrorAction SilentlyContinue)) {
+        throw "Parity oracle process (PID $($oracleProcess.Id)) is not running after launch"
     }
 
     if ($WaitAfterLaunchSeconds -gt 0) {

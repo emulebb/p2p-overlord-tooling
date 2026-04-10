@@ -57,24 +57,26 @@ function Test-NoProcessesRemain {
         [int[]]$CaptureIds
     )
 
-    $remainingByName = @(Get-Process -Name "overlord-agent-emule" -ErrorAction SilentlyContinue)
-    $remainingById = @()
     foreach ($processId in $RuntimeIds | Where-Object { $_ -gt 0 } | Select-Object -Unique) {
-        $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-        if ($process) {
-            $remainingById += $process
+        if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
+            return $false
         }
     }
 
-    $remainingDumpcaps = @()
     foreach ($processId in $CaptureIds | Where-Object { $_ -gt 0 } | Select-Object -Unique) {
-        $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-        if ($process) {
-            $remainingDumpcaps += $process
+        if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
+            return $false
         }
     }
 
-    return ($remainingByName.Count -eq 0 -and $remainingById.Count -eq 0 -and $remainingDumpcaps.Count -eq 0)
+    # Pre-launch cleanup (no specific PIDs): wait for all name-matched processes to be gone
+    if (($RuntimeIds | Where-Object { $_ -gt 0 }).Count -eq 0) {
+        if (@(Get-Process -Name "overlord-agent-emule" -ErrorAction SilentlyContinue).Count -gt 0) {
+            return $false
+        }
+    }
+
+    return $true
 }
 
 Stop-ProcessIds -Ids $DumpcapPids
@@ -83,7 +85,10 @@ if ($CapturePort -gt 0) {
 }
 
 Stop-ProcessIds -Ids $AgentPids
-Get-Process -Name "overlord-agent-emule" -ErrorAction SilentlyContinue | Stop-Process -Force
+# Pre-launch cleanup only: if no PIDs were provided, kill any leftover agent by name
+if (($AgentPids | Where-Object { $_ -gt 0 }).Count -eq 0) {
+    Get-Process -Name "overlord-agent-emule" -ErrorAction SilentlyContinue | Stop-Process -Force
+}
 
 $deadline = (Get-Date).AddSeconds($WaitTimeoutSeconds)
 while ((Get-Date) -lt $deadline) {

@@ -266,6 +266,9 @@ try {
                 Where-Object { $_.ProcessId -notin $metadata.PreexistingCoordinatorPids } |
                 ForEach-Object { $_.ProcessId }
         )
+        if (($metadata.StartedCoordinatorPids | Measure-Object).Count -eq 0) {
+            throw "Coordinator process did not start — no new node/vite processes found after launch"
+        }
         Save-SessionMetadata -Path $metadataPath -Metadata $metadata
     }
 

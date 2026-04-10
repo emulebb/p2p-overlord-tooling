@@ -69,24 +69,26 @@ function Test-NoProcessesRemain {
         [int[]]$CaptureIds
     )
 
-    $remainingOracleByName = @(Get-Process -Name $OracleNames -ErrorAction SilentlyContinue)
-    $remainingOracleById = @()
     foreach ($processId in $OracleIds | Where-Object { $_ -gt 0 } | Select-Object -Unique) {
-        $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-        if ($process) {
-            $remainingOracleById += $process
+        if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
+            return $false
         }
     }
 
-    $remainingDumpcaps = @()
     foreach ($processId in $CaptureIds | Where-Object { $_ -gt 0 } | Select-Object -Unique) {
-        $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-        if ($process) {
-            $remainingDumpcaps += $process
+        if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
+            return $false
         }
     }
 
-    return ($remainingOracleByName.Count -eq 0 -and $remainingOracleById.Count -eq 0 -and $remainingDumpcaps.Count -eq 0)
+    # Pre-launch cleanup (no specific PIDs): wait for all name-matched processes to be gone
+    if (($OracleIds | Where-Object { $_ -gt 0 }).Count -eq 0) {
+        if (@(Get-Process -Name $OracleNames -ErrorAction SilentlyContinue).Count -gt 0) {
+            return $false
+        }
+    }
+
+    return $true
 }
 
 $oracleProcessNames = Get-OracleProcessNames
@@ -96,8 +98,11 @@ if ($CapturePort -gt 0) {
 }
 
 Stop-ProcessIds -Ids $OraclePids
-foreach ($name in $oracleProcessNames) {
-    Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force
+# Pre-launch cleanup only: if no PIDs were provided, kill any leftover oracle by name
+if (($OraclePids | Where-Object { $_ -gt 0 }).Count -eq 0) {
+    foreach ($name in $oracleProcessNames) {
+        Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force
+    }
 }
 
 $deadline = (Get-Date).AddSeconds($WaitTimeoutSeconds)
