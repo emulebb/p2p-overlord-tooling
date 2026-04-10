@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Summarizes ED2K-related TCP streams from a pcap by first payload shape.

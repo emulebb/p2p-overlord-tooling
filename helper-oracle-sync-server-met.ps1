@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Reports the bundled oracle server.met used by the debug build.

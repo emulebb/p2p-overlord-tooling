@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Resolves and returns the absolute path to the tracing-harness srchybrid\x64\Debug directory.

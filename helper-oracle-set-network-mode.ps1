@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Sets the oracle's ED2K and Kad network mode flags in preferences.ini.

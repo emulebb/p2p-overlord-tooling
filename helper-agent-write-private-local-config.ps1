@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Writes a local-only agent config for a private oracle download scenario.

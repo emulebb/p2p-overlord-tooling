@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Stops agent parity runtime processes and waits for them to exit.

@@ -1,6 +1,7 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
-Stops the agent parity session via the existing stop script and ends capture.
+Stops the agent parity session and ends packet capture.
 #>
 
 [CmdletBinding()]
@@ -13,23 +14,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$projectDir = if ($env:OVERLORD_PROJECT_DIR) {
-    $env:OVERLORD_PROJECT_DIR
-} else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-}
-
 $metadataPath = Join-Path $SessionDir "agent-session.json"
 if (-not (Test-Path $metadataPath)) {
     throw "Session metadata not found at $metadataPath"
 }
 
 $metadata = Get-Content -Raw $metadataPath | ConvertFrom-Json
-$stopScriptPath = Join-Path $projectDir "p2p-overlord-agents\scripts\windows\agent_stop_direct.cmd"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
-if (-not (Test-Path $stopScriptPath)) {
-    throw "Agent stop script not found at $stopScriptPath"
-}
 if (-not (Test-Path $cleanupHelperPath)) {
     throw "Agent cleanup helper not found at $cleanupHelperPath"
 }
@@ -55,14 +46,6 @@ if (-not $resolvedPacketDumpPath) {
         Sort-Object LastWriteTimeUtc -Descending |
         Select-Object -First 1 -ExpandProperty FullName
 }
-
-$null = Start-Process `
-    -FilePath "cmd.exe" `
-    -ArgumentList "/c", $stopScriptPath `
-    -WorkingDirectory $projectDir `
-    -WindowStyle Hidden `
-    -Wait `
-    -PassThru
 
 if ($metadata.PSObject.Properties.Name -contains "CapturePort" -and $metadata.CapturePort) {
     $capturePort = [int]$metadata.CapturePort

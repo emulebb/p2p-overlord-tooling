@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Materializes a clean-room oracle profile root from a scenario manifest.

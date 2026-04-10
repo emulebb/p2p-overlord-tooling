@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Summarizes a Kad UDP pcap by packet count and visible plaintext Kad payloads.

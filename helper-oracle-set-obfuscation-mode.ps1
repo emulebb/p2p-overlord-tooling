@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Sets the oracle debug build's protocol obfuscation preferences.

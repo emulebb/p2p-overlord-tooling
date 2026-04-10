@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Dispatches stable workspace tooling platform CLI commands.

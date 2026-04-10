@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Runs a detached long-run agent soak session and records health samples.
@@ -214,18 +215,7 @@ function Stop-StartedSessionProcesses {
         [hashtable]$Metadata
     )
 
-    $projectDir = $Metadata.ProjectDir
     if (($Metadata.StartedAgentPids | Measure-Object).Count -gt 0) {
-        $stopScriptPath = Join-Path $projectDir "p2p-overlord-agents\scripts\windows\agent_stop_direct.cmd"
-        if (Test-Path $stopScriptPath) {
-            Start-Process `
-                -FilePath "cmd.exe" `
-                -ArgumentList "/c", $stopScriptPath `
-                -WorkingDirectory $projectDir `
-                -WindowStyle Hidden `
-                -Wait | Out-Null
-        }
-
         foreach ($startedAgentPid in @($Metadata.StartedAgentPids)) {
             Stop-Process -Id $startedAgentPid -Force -ErrorAction SilentlyContinue
         }
@@ -240,8 +230,8 @@ $metadataPath = Join-Path $SessionDir "soak-session.json"
 $metadata = Load-SessionMetadata -Path $metadataPath
 $refreshScriptPath = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"
 $summaryScriptPath = Join-Path $PSScriptRoot "helper-agent-summarize-soak-session.ps1"
+$launchHelperPath = Join-Path $PSScriptRoot "helper-agent-launch-debug.ps1"
 $startCoordinatorPath = Join-Path $metadata.ProjectDir "p2p-overlord-be\overlord-be-coordinator\scripts\windows\coordinator_run_start_direct.cmd"
-$startAgentPath = Join-Path $metadata.ProjectDir "p2p-overlord-agents\scripts\windows\agent_run_start_direct.cmd"
 $agentLogPath = Join-Path $metadata.LogDir "overlord-agent-emule.log"
 
 try {
@@ -280,34 +270,17 @@ try {
     }
 
     if (($metadata.PreexistingAgentPids | Measure-Object).Count -eq 0) {
-        if (-not (Test-Path $startAgentPath)) {
-            throw "Agent start script not found at $startAgentPath"
+        if (-not (Test-Path $launchHelperPath)) {
+            throw "Agent launch helper not found at $launchHelperPath"
         }
 
-        Start-Process `
-            -FilePath "cmd.exe" `
-            -ArgumentList "/c", $startAgentPath `
-            -WorkingDirectory $metadata.ProjectDir `
-            -WindowStyle Hidden | Out-Null
-
-        $startupDeadlineUtc = (Get-Date).ToUniversalTime().AddMinutes(15)
-        while ((Get-Date).ToUniversalTime() -lt $startupDeadlineUtc) {
-            $startedAgentPids = @(
-                Get-AgentProcesses |
-                    Where-Object { $_.Id -notin $metadata.PreexistingAgentPids } |
-                    ForEach-Object { $_.Id }
-            )
-            if (($startedAgentPids | Measure-Object).Count -gt 0) {
-                $metadata.StartedAgentPids = $startedAgentPids
-                Save-SessionMetadata -Path $metadataPath -Metadata $metadata
-                break
-            }
-            Start-Sleep -Seconds 2
+        $launchResult = & $launchHelperPath
+        $agentProcess = Get-Process -Id $launchResult.AgentPid -ErrorAction SilentlyContinue
+        if (-not $agentProcess) {
+            throw "Agent process overlord-agent-emule.exe (PID $($launchResult.AgentPid)) is not running after launch"
         }
-
-        if (($metadata.StartedAgentPids | Measure-Object).Count -eq 0) {
-            throw "Agent process overlord-agent-emule.exe did not appear after launch"
-        }
+        $metadata.StartedAgentPids = @($launchResult.AgentPid)
+        Save-SessionMetadata -Path $metadataPath -Metadata $metadata
     }
 
     $metadata.WorkerStatus = "sampling"

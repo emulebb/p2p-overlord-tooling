@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Materializes a deterministic local oracle profile for private Kad+ED2K runs.

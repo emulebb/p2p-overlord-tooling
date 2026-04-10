@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Samples the live agent stats endpoint repeatedly and stores JSONL snapshots for a session.

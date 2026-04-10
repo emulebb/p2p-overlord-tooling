@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Runs focused local validation of the oracle + goed2k-server + agent triplet.

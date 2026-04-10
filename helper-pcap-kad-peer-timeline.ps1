@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Prints the packet timeline for one remote UDP endpoint in a Kad capture.

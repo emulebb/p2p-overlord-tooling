@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Queues ED2K download requests from recent live-agent search-result log samples.

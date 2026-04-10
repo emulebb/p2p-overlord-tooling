@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Collects one ED2K transfer manifest and payload directory for a scenario run.

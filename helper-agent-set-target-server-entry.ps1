@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Pins the agent runtime ED2K config to a single metadata-rich server entry.

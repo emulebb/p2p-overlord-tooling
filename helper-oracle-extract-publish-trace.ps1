@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Extracts only the new oracle trace window and publish-related lines for a session.

@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Requests a running soak session to stop and waits for its summary.
@@ -51,6 +52,7 @@ if ($metadata.WorkerPid) {
     try {
         Wait-Process -Id $metadata.WorkerPid -Timeout $WaitSeconds -ErrorAction Stop
     } catch {
+        Stop-Process -Id $metadata.WorkerPid -Force -ErrorAction SilentlyContinue
     }
 }
 

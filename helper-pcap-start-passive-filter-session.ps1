@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Starts a passive packet capture session with a caller-provided BPF filter.

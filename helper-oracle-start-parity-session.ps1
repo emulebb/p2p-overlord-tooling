@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Starts a fresh oracle parity session using the rebuilt distinct parity oracle executable.

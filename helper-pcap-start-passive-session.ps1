@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Starts a passive UDP capture session without launching or stopping the target process.

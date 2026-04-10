@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Starts a private local-only agent session for one oracle download scenario.
@@ -30,11 +31,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$projectDir = if ($env:OVERLORD_PROJECT_DIR) {
-    $env:OVERLORD_PROJECT_DIR
-} else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-}
 $tmpDir = if ($env:OVERLORD_TMP_DIR) {
     $env:OVERLORD_TMP_DIR
 } else {
@@ -43,9 +39,9 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
 
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $configWriterPath = Join-Path $PSScriptRoot "helper-agent-write-private-local-config.ps1"
-$startScriptPath = Join-Path $projectDir "p2p-overlord-agents\scripts\windows\agent_run_debug_direct.cmd"
+$launchHelperPath = Join-Path $PSScriptRoot "helper-agent-launch-debug.ps1"
 
-foreach ($requiredPath in @($cleanupHelperPath, $configWriterPath, $startScriptPath)) {
+foreach ($requiredPath in @($cleanupHelperPath, $configWriterPath, $launchHelperPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required helper path not found at $requiredPath"
     }
@@ -85,25 +81,10 @@ $sessionStartUtc = (Get-Date).ToUniversalTime()
 $agentProcess = $null
 
 try {
-    $launcher = Start-Process `
-        -FilePath "cmd.exe" `
-        -ArgumentList "/c", $startScriptPath `
-        -WorkingDirectory $projectDir `
-        -PassThru `
-        -WindowStyle Hidden
-
-    Start-Sleep -Seconds 2
-    $deadline = (Get-Date).AddSeconds($LaunchTimeoutSeconds)
-    while ((Get-Date) -lt $deadline) {
-        $agentProcess = Get-Process -Name "overlord-agent-emule" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($agentProcess) {
-            break
-        }
-        Start-Sleep -Seconds 1
-    }
-
+    $launchResult = & $launchHelperPath
+    $agentProcess = Get-Process -Id $launchResult.AgentPid -ErrorAction SilentlyContinue
     if (-not $agentProcess) {
-        throw "Agent process overlord-agent-emule.exe did not stay running within $LaunchTimeoutSeconds seconds after launch"
+        throw "Agent process overlord-agent-emule.exe (PID $($launchResult.AgentPid)) is not running after launch"
     }
 
     $metadata = [pscustomobject]@{
@@ -127,7 +108,6 @@ try {
         ServerPort = if ($ServerPort -gt 0) { $ServerPort } else { $null }
         ProbeSearchTerm = $ProbeSearchTerm
         TransferRoot = (Join-Path $configResult.StateRoot "overlord-ed2k-transfer")
-        AgentLauncherPid = $launcher.Id
         AgentPid = $agentProcess.Id
         StartedAtUtc = $sessionStartUtc.ToString("o")
     }

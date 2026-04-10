@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Builds the x64 Debug tracing-harness oracle via the workspace's canonical build wrapper.

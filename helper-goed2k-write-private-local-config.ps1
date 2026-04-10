@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Writes a local-only goed2k-server config and catalog for one scenario run.

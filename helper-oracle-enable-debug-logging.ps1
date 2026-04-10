@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Enables the oracle's verbose and debug preference flags that are useful for Kad parity work.

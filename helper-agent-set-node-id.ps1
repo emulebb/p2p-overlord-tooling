@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Sets the persisted Kad node ID used by the local agent runtime.

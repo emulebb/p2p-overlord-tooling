@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Stops the oracle parity session processes and waits for trace flush.

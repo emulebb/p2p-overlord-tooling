@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Runs the first deterministic Kad oracle+agent parity scenario.

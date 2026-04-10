@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Imports canonical oracle seed files into an untracked local seed bundle.

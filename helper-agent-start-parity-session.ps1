@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Starts a fresh agent parity session with UDP capture and log window markers.
@@ -14,11 +15,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$projectDir = if ($env:OVERLORD_PROJECT_DIR) {
-    $env:OVERLORD_PROJECT_DIR
-} else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-}
 $tmpDir = if ($env:OVERLORD_TMP_DIR) {
     $env:OVERLORD_TMP_DIR
 } else {
@@ -32,13 +28,13 @@ $logDir = if ($env:OVERLORD_LOG_DIR) {
 
 $agentLogPath = Join-Path $logDir "overlord-agent-emule.log"
 $packetDumpDir = $logDir
-$startScriptPath = Join-Path $projectDir "p2p-overlord-agents\scripts\windows\agent_run_debug_direct.cmd"
+$launchHelperPath = Join-Path $PSScriptRoot "helper-agent-launch-debug.ps1"
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $refreshNetworkingHelperPath = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"
 
-if (-not (Test-Path $startScriptPath)) {
-    throw "Agent start script not found at $startScriptPath"
+if (-not (Test-Path $launchHelperPath)) {
+    throw "Agent launch helper not found at $launchHelperPath"
 }
 if (-not (Test-Path $dumpcapPath)) {
     throw "dumpcap.exe not found at $dumpcapPath"
@@ -123,24 +119,10 @@ try {
         throw "dumpcap exited immediately with code $($dumpcap.ExitCode). $stderr"
     }
 
-    $launcher = Start-Process `
-        -FilePath "cmd.exe" `
-        -ArgumentList "/c", $startScriptPath `
-        -WorkingDirectory $projectDir `
-        -PassThru `
-        -WindowStyle Hidden
-
-    Start-Sleep -Seconds 2
-    for ($attempt = 0; $attempt -lt 45; $attempt++) {
-        $agentProcess = Get-Process -Name "overlord-agent-emule" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($agentProcess) {
-            break
-        }
-        Start-Sleep -Seconds 1
-    }
-
+    $launchResult = & $launchHelperPath
+    $agentProcess = Get-Process -Id $launchResult.AgentPid -ErrorAction SilentlyContinue
     if (-not $agentProcess) {
-        throw "Agent process overlord-agent-emule.exe did not stay running after launch"
+        throw "Agent process overlord-agent-emule.exe (PID $($launchResult.AgentPid)) is not running after launch"
     }
 
     $packetDumpPath = Get-ChildItem -Path $packetDumpDir -Filter 'agent-udp-dump-*.jsonl' -ErrorAction SilentlyContinue |
@@ -165,7 +147,6 @@ try {
         DumpcapPid = $dumpcap.Id
         DumpcapStdoutPath = $dumpcapStdoutPath
         DumpcapStderrPath = $dumpcapStderrPath
-        AgentLauncherPid = $launcher.Id
         AgentPid = $agentProcess.Id
         StatsUrl = "http://127.0.0.1:13301/api/internal/stats"
         StartedAtUtc = (Get-Date).ToUniversalTime().ToString("o")

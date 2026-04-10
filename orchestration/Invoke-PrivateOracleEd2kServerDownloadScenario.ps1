@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Runs a deterministic private oracle-to-agent ED2K download through a local goed2k-server.

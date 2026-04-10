@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Summarizes UDP conversations for a local Kad capture port.

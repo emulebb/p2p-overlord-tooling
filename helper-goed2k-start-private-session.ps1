@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Builds and starts one local goed2k-server session for a scenario run.

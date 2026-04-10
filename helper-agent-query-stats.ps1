@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Fetches the live agent internal stats endpoint used during parity sessions.

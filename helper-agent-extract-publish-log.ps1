@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Extracts only the new agent publish-related log slice for a parity session.

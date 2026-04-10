@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Starts a detached long-run agent soak session with periodic stats monitoring.

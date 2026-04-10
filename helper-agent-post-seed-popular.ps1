@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Posts one or more explicit popular-hash seeds to the live agent internal API.

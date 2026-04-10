@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Updates the oracle preferences BindAddr to the current hide.me VPN IPv4.

@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Summarizes protocol-shape signals for a Kad UDP capture.

@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Checks whether remote peers sent any packet after the last outbound packet.

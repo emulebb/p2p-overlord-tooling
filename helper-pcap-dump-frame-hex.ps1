@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Dumps packet payload hex for selected frames from a pcap.

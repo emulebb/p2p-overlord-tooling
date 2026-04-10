@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Sets the local agent's Kad and ED2K obfuscation flags in the runtime TOML config.

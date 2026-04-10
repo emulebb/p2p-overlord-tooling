@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Writes a minimal runtime server.met containing a single ED2K server entry.

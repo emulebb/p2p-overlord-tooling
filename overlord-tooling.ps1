@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Stable top-level CLI entrypoint for the Overlord workspace tooling platform.

@@ -1,3 +1,4 @@
+#Requires -Version 7.6
 <#
 .SYNOPSIS
 Starts one minimized eMule oracle for a private Kad+ED2K run.
