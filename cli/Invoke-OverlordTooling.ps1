@@ -29,6 +29,7 @@ function Show-ToolingHelp {
             [ordered]@{ name = "run-kad-startup-hello-publish"; description = "Run the first paired oracle+agent Kad startup, HELLO, and publish scenario" }
             [ordered]@{ name = "run-private-oracle-ed2k-download"; description = "Run a private local oracle Kad source publish plus native ED2K download scenario" }
             [ordered]@{ name = "run-private-oracle-ed2k-server-download"; description = "Run a private local oracle+agent ED2K download through a local goed2k-server" }
+            [ordered]@{ name = "run-private-harness-kad-triplet"; description = "Run a local Kad cluster with three eMule harness peers plus one agent, including publish and search" }
             [ordered]@{ name = "validate-ed2k-server-triplet"; description = "Run focused local triplet validation for multi-file, multi-source, and callback-limit ED2K server cases" }
         )
     }
@@ -107,6 +108,7 @@ $seedImportScriptPath = Join-Path $repoRoot "orchestration\Import-OracleSeedBund
 $scenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-KadStartupHelloPublishScenario.ps1"
 $privateEd2kScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateOracleEd2kDownloadScenario.ps1"
 $privateEd2kServerScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateOracleEd2kServerDownloadScenario.ps1"
+$privateHarnessKadTripletScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateHarnessKadTripletScenario.ps1"
 $tripletValidationScriptPath = Join-Path $repoRoot "orchestration\Invoke-ValidateEd2kServerTriplet.ps1"
 $command = "help"
 $commandArgs = @()
@@ -195,6 +197,16 @@ switch ($Command.ToLowerInvariant()) {
         $namedArgs = $invocationArgs.Named
         $positionalArgs = $invocationArgs.Positional
         & $privateEd2kServerScenarioRunnerScriptPath @namedArgs @positionalArgs
+    }
+    "run-private-harness-kad-triplet" {
+        if (-not (Test-Path $privateHarnessKadTripletScenarioRunnerScriptPath)) {
+            throw "Private harness Kad triplet scenario runner not found at $privateHarnessKadTripletScenarioRunnerScriptPath"
+        }
+
+        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
+        $namedArgs = $invocationArgs.Named
+        $positionalArgs = $invocationArgs.Positional
+        & $privateHarnessKadTripletScenarioRunnerScriptPath @namedArgs @positionalArgs
     }
     "validate-ed2k-server-triplet" {
         if (-not (Test-Path $tripletValidationScriptPath)) {

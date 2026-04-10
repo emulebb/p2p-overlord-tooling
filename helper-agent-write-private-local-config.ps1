@@ -17,6 +17,7 @@ param(
     [UInt16]$ControlPort = 13301,
     [UInt16]$KadPort = 41120,
     [UInt16]$Ed2kPort = 41121,
+    [string]$P2pBindIp = "127.0.0.1",
     [switch]$DisableKad,
     [string]$ServerHost,
     [UInt16]$ServerPort = 0,
@@ -91,7 +92,7 @@ listen_port = $ControlPort
 
 [p2p]
 bind_iface = ""
-bind_ip = "127.0.0.1"
+bind_ip = "$P2pBindIp"
 selection_confirmed = true
 
 [p2p.kad]
@@ -175,6 +176,7 @@ max_files = 7
     ControlPort = $ControlPort
     KadPort = $KadPort
     Ed2kPort = $Ed2kPort
+    P2pBindIp = $P2pBindIp
     OracleBootstrapNode = $OracleBootstrapNode
     KadDisabled = [bool]$DisableKad
     ServerHost = if ([string]::IsNullOrWhiteSpace($ServerHost)) { $null } else { $ServerHost }

@@ -1,0 +1,65 @@
+{
+  "scenarioId": "kad.harness.triplet.local.v1",
+  "description": "Local loopback-only Kad cluster with three eMule harness peers and one agent, validating publish plus keyword search on ubuntu linux.",
+  "coordinator": {
+    "url": "http://127.0.0.1:13300"
+  },
+  "search": {
+    "query": "ubuntu linux",
+    "expectedMinimumResults": 3,
+    "retryCount": 3
+  },
+  "agent": {
+    "controlPort": 13301,
+    "kadPort": 41120,
+    "ed2kPort": 41121,
+    "p2pBindIp": "127.0.0.10",
+    "manualPublish": {
+      "hash": "0123456789abcdeffedcba9876543210",
+      "canonicalName": "ubuntu linux agent manual publish.pdf",
+      "size": 2161463,
+      "sourceCount": 1
+    }
+  },
+  "harnesses": [
+    {
+      "id": "harness-a",
+      "bindAddr": "127.0.0.2",
+      "tcpPort": 46671,
+      "udpPort": 46672,
+      "serverUdpPort": 0,
+      "webPort": 47101,
+      "kadUdpKey": 4206201,
+      "seedFileName": "ubuntu linux harness a.pdf",
+      "markerText": "Ubuntu Linux harness A",
+      "seedRepeatCount": 2500,
+      "bootstrapPeers": "127.0.0.3:46682"
+    },
+    {
+      "id": "harness-b",
+      "bindAddr": "127.0.0.3",
+      "tcpPort": 46681,
+      "udpPort": 46682,
+      "serverUdpPort": 0,
+      "webPort": 47102,
+      "kadUdpKey": 4206202,
+      "seedFileName": "ubuntu linux harness b.pdf",
+      "markerText": "Ubuntu Linux harness B",
+      "seedRepeatCount": 2600,
+      "bootstrapPeers": "127.0.0.2:46672"
+    },
+    {
+      "id": "harness-c",
+      "bindAddr": "127.0.0.4",
+      "tcpPort": 46691,
+      "udpPort": 46692,
+      "serverUdpPort": 0,
+      "webPort": 47103,
+      "kadUdpKey": 4206203,
+      "seedFileName": "ubuntu linux harness c.pdf",
+      "markerText": "Ubuntu Linux harness C",
+      "seedRepeatCount": 2700,
+      "bootstrapPeers": "127.0.0.2:46672,127.0.0.3:46682"
+    }
+  ]
+}

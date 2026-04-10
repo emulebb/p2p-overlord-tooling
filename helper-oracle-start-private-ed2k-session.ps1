@@ -15,7 +15,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$AgentBootstrapNode,
     [ValidateSet("Debug", "Release")]
-    [string]$BuildConfig = "Debug"
+    [string]$BuildConfig = "Debug",
+    [switch]$SkipRuntimeCleanup
 )
 
 Set-StrictMode -Version Latest
@@ -99,7 +100,9 @@ $traceLogPath = Join-Path $logsRoot "oracle-kad-trace.log"
 $verboseLogPath = Join-Path $logsRoot "eMule_Verbose.log"
 $statusLogPath = Join-Path $profile "status.log"
 
-& $cleanupHelperPath -CapturePort 0 | Out-Null
+if (-not $SkipRuntimeCleanup) {
+    & $cleanupHelperPath -CapturePort 0 | Out-Null
+}
 
 $sessionName = "private-oracle-{0}" -f (Get-Date -Format "yyyyMMdd-HHmmss")
 $sessionDir = Join-Path $tmpDir $sessionName

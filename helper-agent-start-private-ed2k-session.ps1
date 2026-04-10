@@ -12,6 +12,7 @@ param(
     [UInt16]$ControlPort = 13301,
     [UInt16]$KadPort = 41120,
     [UInt16]$Ed2kPort = 41121,
+    [string]$P2pBindIp = "127.0.0.1",
     [switch]$DisableKad,
     [string]$ServerHost,
     [UInt16]$ServerPort = 0,
@@ -55,6 +56,7 @@ $configWriterParams = @{
     ControlPort = $ControlPort
     KadPort = $KadPort
     Ed2kPort = $Ed2kPort
+    P2pBindIp = $P2pBindIp
     DisableKad = $DisableKad
     ServerHost = $ServerHost
     ServerPort = $ServerPort
@@ -103,6 +105,7 @@ try {
         ControlPort = $ControlPort
         KadPort = $KadPort
         Ed2kPort = $Ed2kPort
+        P2pBindIp = $P2pBindIp
         KadDisabled = [bool]$DisableKad
         ServerHost = if ([string]::IsNullOrWhiteSpace($ServerHost)) { $null } else { $ServerHost }
         ServerPort = if ($ServerPort -gt 0) { $ServerPort } else { $null }
