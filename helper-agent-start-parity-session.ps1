@@ -166,11 +166,15 @@ try {
         InterfaceFallbackUsed = $resolvedAdapter.UsedFallback
         NetworkingPath = $networkingRefresh.NetworkingPath
         NetworkingBindIp = $networkingRefresh.ResolvedP2pBindIp
+        ControlPort = $networkingRefresh.ControlListenPort
+        KadPort = $networkingRefresh.KadListenPort
+        Ed2kPort = $networkingRefresh.Ed2kListenPort
         DumpcapPid = $dumpcap.Id
         DumpcapStdoutPath = $dumpcapStdoutPath
         DumpcapStderrPath = $dumpcapStderrPath
         AgentPid = $agentProcess.Id
-        StatsUrl = "http://127.0.0.1:13301/api/internal/stats"
+        ControlUrl = "http://127.0.0.1:$($networkingRefresh.ControlListenPort)"
+        StatsUrl = "http://127.0.0.1:$($networkingRefresh.ControlListenPort)/api/internal/stats"
         StartedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     }
 

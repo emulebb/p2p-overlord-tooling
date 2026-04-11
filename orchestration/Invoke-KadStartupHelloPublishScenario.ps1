@@ -365,8 +365,8 @@ try {
         -InterfaceAlias $resolvedInterfaceAlias `
         -CapturePort $AgentCapturePort `
         -SessionPrefix $runId
-    Wait-AgentControlReady -StatsUrl $manifest.agent.statsUrl
-    Set-MilestonePassed -MilestoneMap $milestoneMap -Id "agent-started" -Details "Agent launched and exposed stats at $($manifest.agent.statsUrl)"
+    Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl
+    Set-MilestonePassed -MilestoneMap $milestoneMap -Id "agent-started" -Details "Agent launched and exposed stats at $($agentSession.StatsUrl)"
 
     $seedScriptPath = Join-Path $toolingRoot "helper-agent-post-seed-popular.ps1"
     $publishAttempt = Invoke-SeedPopularWithRetry `
@@ -375,7 +375,7 @@ try {
         -CanonicalName $manifest.agent.seedRequest.canonicalName `
         -Size ([uint64]$manifest.agent.seedRequest.size) `
         -SourceCount ([uint32]$manifest.agent.seedRequest.sourceCount) `
-        -ControlUrl $manifest.agent.controlUrl `
+        -ControlUrl $agentSession.ControlUrl `
         -TimeoutSeconds $PublishReadyTimeoutSeconds
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "manual-publish-triggered" -Details "Triggered manual publish for $($manifest.agent.seedRequest.canonicalName) after $($publishAttempt.Attempts) attempt(s)"
 
@@ -383,7 +383,7 @@ try {
         Start-Sleep -Seconds $PublishObserveSeconds
     }
 
-    $null = Get-AgentStatsSlice -StatsUrl $manifest.agent.statsUrl -DestinationPath $agentStatsPath
+    $null = Get-AgentStatsSlice -StatsUrl $agentSession.StatsUrl -DestinationPath $agentStatsPath
     $agentExtractScriptPath = Join-Path $toolingRoot "helper-agent-extract-publish-log.ps1"
     $agentPublishArtifacts = & $agentExtractScriptPath -SessionDir $agentSession.SessionDir
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "agent-artifacts-captured" -Details "Agent publish log saved to $($agentPublishArtifacts.PublishLogPath)"
