@@ -341,7 +341,7 @@ try {
         ) `
         -WorkingDirectory $oracleWorkDir `
         -PassThru `
-        -WindowStyle Hidden
+        -WindowStyle Minimized
 
     Wait-EmuleHarnessReadyFile -ReadyFilePath $readyFilePath -EmuleHarnessProcess $emuleHarnessProcess
     $readyState = & $readyReaderPath -Path $readyFilePath

@@ -104,6 +104,15 @@ foreach ($sectionName in $manifest.emuleHarness.seededPreferenceDefaults.Keys) {
     $preferenceSections[$sectionName] = $entries
 }
 
+if (-not $preferenceSections.Contains("eMule")) {
+    $preferenceSections["eMule"] = [ordered]@{}
+}
+
+$preferenceSections["eMule"]["StartupMinimized"] = "1"
+$preferenceSections["eMule"]["MinToTray"] = "1"
+$preferenceSections["eMule"]["BringToFront"] = "0"
+$preferenceSections["eMule"]["Splashscreen"] = "0"
+
 foreach ($overrideName in $dynamicOverrides.Keys) {
     $targetSection = $manifest.emuleHarness.dynamicPreferenceKeys[$overrideName]
     if (-not $targetSection) {
