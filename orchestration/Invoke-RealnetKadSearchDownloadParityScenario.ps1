@@ -52,6 +52,32 @@ function Wait-AgentControlReady {
     throw "Agent stats endpoint did not become ready at $StatsUrl within $TimeoutSeconds seconds"
 }
 
+function Get-JsonObjectPropertyValue {
+    param(
+        [Parameter(Mandatory = $false)]
+        [object]$Object,
+        [Parameter(Mandatory = $true)]
+        [string]$PropertyName,
+        [Parameter(Mandatory = $false)]
+        [object]$DefaultValue = $null
+    )
+
+    if ($null -eq $Object) {
+        return $DefaultValue
+    }
+
+    if ($Object -is [System.Collections.IDictionary] -and $Object.Contains($PropertyName)) {
+        return $Object[$PropertyName]
+    }
+
+    $property = $Object.PSObject.Properties[$PropertyName]
+    if ($null -ne $property) {
+        return $property.Value
+    }
+
+    return $DefaultValue
+}
+
 function Wait-TransferManifestState {
     param(
         [Parameter(Mandatory = $true)]
@@ -63,7 +89,7 @@ function Wait-TransferManifestState {
     while ((Get-Date) -lt $deadline) {
         if (Test-Path -LiteralPath $ManifestPath) {
             $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
-            if ([bool]$manifest.completed) {
+            if ([bool](Get-JsonObjectPropertyValue -Object $manifest -PropertyName "completed" -DefaultValue $false)) {
                 return $manifest
             }
         }
@@ -89,7 +115,10 @@ function Wait-TransferManifestProbeState {
     while ((Get-Date) -lt $deadline) {
         if (Test-Path -LiteralPath $ManifestPath) {
             $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
-            if ([bool]$manifest.completed -or @($manifest.verified_ranges).Count -gt 0 -or @($manifest.sources).Count -gt 0) {
+            $manifestCompleted = [bool](Get-JsonObjectPropertyValue -Object $manifest -PropertyName "completed" -DefaultValue $false)
+            $verifiedRanges = @(Get-JsonObjectPropertyValue -Object $manifest -PropertyName "verified_ranges" -DefaultValue @())
+            $sources = @(Get-JsonObjectPropertyValue -Object $manifest -PropertyName "sources" -DefaultValue @())
+            if ($manifestCompleted -or $verifiedRanges.Count -gt 0 -or $sources.Count -gt 0) {
                 return $manifest
             }
         }
@@ -577,9 +606,9 @@ foreach ($mode in $modeDefinitions) {
                 AgentSourceCount = [int]$candidate.AgentSourceCount
                 AgentBatchHits = [int]$candidate.AgentBatchHits
                 ProbeManifestPath = $probeManifestPath
-                ProbeSources = if ($null -ne $probeManifest) { @($probeManifest.sources).Count } else { 0 }
-                ProbeCompleted = if ($null -ne $probeManifest) { [bool]$probeManifest.completed } else { $false }
-                ProbeVerifiedRanges = if ($null -ne $probeManifest) { @($probeManifest.verified_ranges).Count } else { 0 }
+                ProbeSources = if ($null -ne $probeManifest) { @(Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "sources" -DefaultValue @()).Count } else { 0 }
+                ProbeCompleted = if ($null -ne $probeManifest) { [bool](Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "completed" -DefaultValue $false) } else { $false }
+                ProbeVerifiedRanges = if ($null -ne $probeManifest) { @(Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "verified_ranges" -DefaultValue @()).Count } else { 0 }
                 DownloadSucceeded = $false
             }
 
@@ -624,7 +653,7 @@ foreach ($mode in $modeDefinitions) {
                     HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
                     HarnessCompletionKind = $harnessDownloadState.CompletionKind
                     AgentTransferManifestPath = $probeManifestPath
-                    AgentTransferCompleted = [bool]$agentTransferManifest.completed
+                    AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
                     AgentTransferCollectedRoot = $transferCollection.DestinationRoot
                 }
 
@@ -636,7 +665,7 @@ foreach ($mode in $modeDefinitions) {
                     HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
                     HarnessCompletionKind = $harnessDownloadState.CompletionKind
                     AgentTransferManifestPath = $probeManifestPath
-                    AgentTransferCompleted = [bool]$agentTransferManifest.completed
+                    AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
                     AgentTransferCollectedRoot = $transferCollection.DestinationRoot
                 }) | Out-Null
 
