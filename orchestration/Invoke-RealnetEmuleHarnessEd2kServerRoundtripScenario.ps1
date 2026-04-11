@@ -119,6 +119,27 @@ function Parse-Ed2kLinkFile {
     }
 }
 
+function Add-Ed2kLinkSource {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Link,
+        [Parameter(Mandatory = $true)]
+        [string]$SourceIp,
+        [Parameter(Mandatory = $true)]
+        [UInt16]$SourceTcpPort
+    )
+
+    $trimmedLink = $Link.Trim()
+    if ($trimmedLink -match '\|sources,') {
+        return $trimmedLink
+    }
+    if ($trimmedLink -notmatch '\|/$') {
+        throw "ED2K link did not end with '|/' as expected: $trimmedLink"
+    }
+
+    return ($trimmedLink -replace '\|/$', ('|sources,{0}:{1}|/' -f $SourceIp, $SourceTcpPort))
+}
+
 function Wait-TransferManifestState {
     param(
         [Parameter(Mandatory = $true)]
@@ -266,6 +287,8 @@ $seederSession = $null
 $downloaderSession = $null
 $parsedLink = $null
 $failedReason = $null
+$agentDirectDownloadLink = $null
+$harnessDirectDownloadLink = $null
 
 try {
     $seederProfile = & $profileScriptPath `
@@ -312,10 +335,15 @@ try {
         -ProfileRoot $seederProfile.ProfileRoot `
         -SeedFilePath $seedFilePath `
         -ExportLinkPath $seedLinkPath `
+        -ExportSourceIp $bindAddr `
         -BuildConfig $EmuleHarnessBuildConfig
 
     Wait-Path -Path $seedLinkPath -TimeoutSeconds ([int]$manifest.timeouts.harnessReadySeconds)
     $parsedLink = Parse-Ed2kLinkFile -Path $seedLinkPath
+    $agentDirectDownloadLink = Add-Ed2kLinkSource `
+        -Link $parsedLink.Link `
+        -SourceIp $bindAddr `
+        -SourceTcpPort ([UInt16]$manifest.harnessSeeder.tcpPort)
 
     if ([int]$manifest.timeouts.initialPublishDelaySeconds -gt 0) {
         Start-Sleep -Seconds ([int]$manifest.timeouts.initialPublishDelaySeconds)
@@ -325,6 +353,8 @@ try {
         -FileHash $parsedLink.FileHash `
         -FileName $parsedLink.FileName `
         -FileSize $parsedLink.FileSize `
+        -SourceIp $bindAddr `
+        -SourceTcpPort ([UInt16]$manifest.harnessSeeder.tcpPort) `
         -ControlUrl $agentStage1Session.ControlUrl | Out-Null
 
     $agentTransferManifestPath = Join-Path $agentStage1Session.TransferRoot ($parsedLink.FileHash.ToLowerInvariant()) "resume-manifest.json"
@@ -396,9 +426,13 @@ try {
 
     [System.IO.File]::WriteAllText(
         $downloadLinkPath,
-        $parsedLink.Link + [Environment]::NewLine,
+        (Add-Ed2kLinkSource `
+            -Link $parsedLink.Link `
+            -SourceIp $bindAddr `
+            -SourceTcpPort ([UInt16]$manifest.agent.ed2kTcpPort)) + [Environment]::NewLine,
         (New-Object System.Text.UTF8Encoding($false))
     )
+    $harnessDirectDownloadLink = (Get-Content -LiteralPath $downloadLinkPath -Raw).Trim()
 
     $downloaderSession = & $startHarnessHelperPath `
         -ProfileRoot $downloaderProfile.ProfileRoot `
@@ -427,6 +461,12 @@ try {
         fileHash = $parsedLink.FileHash
         fileName = $parsedLink.FileName
         fileSize = $parsedLink.FileSize
+        sameHostTransferMode = [ordered]@{
+            enabled = $true
+            rationale = "real_server_publish_plus_local_source_hint"
+            agentDownloadLink = $agentDirectDownloadLink
+            harnessDownloadLink = $harnessDirectDownloadLink
+        }
         agentTransferManifestPath = $agentTransferManifestPath
         harnessDownloadedFilePath = $downloadedFile.FullName
         finishedAtUtc = (Get-Date).ToUniversalTime().ToString("o")

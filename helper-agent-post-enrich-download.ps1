@@ -12,18 +12,42 @@ param(
     [string]$FileName,
     [Parameter(Mandatory = $true)]
     [UInt64]$FileSize,
+    [string]$SourceIp,
+    [UInt16]$SourceTcpPort,
+    [UInt32]$SourceClientId,
+    [string]$SourceUserHash,
     [string]$ControlUrl = "http://127.0.0.1:13301"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$sources = @()
+if (-not [string]::IsNullOrWhiteSpace($SourceIp)) {
+    if ($SourceTcpPort -eq 0) {
+        throw "SourceTcpPort must be provided when SourceIp is set"
+    }
+
+    $source = [ordered]@{
+        ip = $SourceIp
+        tcpPort = $SourceTcpPort
+    }
+    if ($PSBoundParameters.ContainsKey("SourceClientId")) {
+        $source.clientId = $SourceClientId
+    }
+    if (-not [string]::IsNullOrWhiteSpace($SourceUserHash)) {
+        $source.userHash = $SourceUserHash
+    }
+
+    $sources = @([pscustomobject]$source)
+}
+
 $payload = [pscustomobject]@{
     kind = "ed2k_download"
     fileHash = $FileHash.ToLowerInvariant()
     fileName = $FileName
     fileSize = $FileSize
-    sources = @()
+    sources = $sources
 }
 
 Invoke-RestMethod `
