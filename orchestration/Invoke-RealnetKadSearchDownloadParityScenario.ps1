@@ -17,6 +17,8 @@ param(
     [string]$EmuleHarnessBuildConfig = "Debug",
     [int]$SearchTimeoutSeconds = 240,
     [int]$DownloadTimeoutSeconds = 900,
+    [int]$CandidateAttemptCount = 5,
+    [int]$CandidateSourceProbeTimeoutSeconds = 45,
     [UInt64]$MaxCandidateSizeBytes = 16777216,
     [string]$InterfaceAlias = "hide.me",
     [switch]$KeepSessionsRunning
@@ -73,6 +75,32 @@ function Wait-TransferManifestState {
     }
 
     throw "Transfer manifest did not appear at $ManifestPath within $TimeoutSeconds seconds"
+}
+
+function Wait-TransferManifestProbeState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ManifestPath,
+        [int]$TimeoutSeconds = 45
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path -LiteralPath $ManifestPath) {
+            $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
+            if ([bool]$manifest.completed -or @($manifest.verified_ranges).Count -gt 0 -or @($manifest.sources).Count -gt 0) {
+                return $manifest
+            }
+        }
+
+        Start-Sleep -Seconds 3
+    }
+
+    if (Test-Path -LiteralPath $ManifestPath) {
+        return (Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json)
+    }
+
+    return $null
 }
 
 function Wait-FileCompleted {
@@ -168,14 +196,15 @@ function Get-PreferredExtensionRank {
     }
 }
 
-function Select-CommonCandidate {
+function Select-CommonCandidates {
     param(
         [Parameter(Mandatory = $true)]
         [psobject]$HarnessSnapshot,
         [Parameter(Mandatory = $true)]
         [psobject]$AgentSearchSummary,
         [Parameter(Mandatory = $true)]
-        [UInt64]$MaxSizeBytes
+        [UInt64]$MaxSizeBytes,
+        [int]$MaxCandidates = 5
     )
 
     $agentByHash = @{}
@@ -238,9 +267,9 @@ function Select-CommonCandidate {
             @{ Expression = { $_.HarnessSourceCount + $_.AgentSourceCount + $_.AgentBatchHits }; Descending = $true }, `
             @{ Expression = "Size"; Descending = $false }, `
             @{ Expression = "Hash"; Descending = $false } |
-        Select-Object -First 1
+        Select-Object -First $MaxCandidates
 
-    if ($null -eq $selected) {
+    if ($null -eq $selected -or @($selected).Count -eq 0) {
         throw "No common Kad search result matched the candidate filters"
     }
 
@@ -363,6 +392,7 @@ foreach ($mode in $modeDefinitions) {
     $agentSearchRoot = Join-Path $modeRoot "agent-search"
     $harnessSearchPath = Join-Path $modeRoot "emule-harness-kad-search.jsonl"
     $harnessSelectedHashPath = Join-Path $modeRoot "selected-hash.txt"
+    $candidateAttemptsPath = Join-Path $modeRoot "candidate-attempts.json"
     $upnpBeforePath = Join-Path $modeRoot "miniupnpc-before.txt"
     $upnpAfterPath = Join-Path $modeRoot "miniupnpc-after.txt"
     foreach ($path in @($modeRoot, $harnessArtifactRoot, $agentArtifactRoot, $agentSearchRoot)) {
@@ -435,24 +465,60 @@ foreach ($mode in $modeDefinitions) {
             -MinimumResults 1 `
             -TimeoutSeconds $SearchTimeoutSeconds
 
-        $selectedCandidate = Select-CommonCandidate `
+        $candidateList = Select-CommonCandidates `
             -HarnessSnapshot $harnessSnapshot `
             -AgentSearchSummary $agentSearchSummary `
-            -MaxSizeBytes $MaxCandidateSizeBytes
+            -MaxSizeBytes $MaxCandidateSizeBytes `
+            -MaxCandidates $CandidateAttemptCount
 
-        $agentTransferDir = Join-Path $agentSession.TransferRoot $selectedCandidate.Hash.ToLowerInvariant()
-        if (Test-Path -LiteralPath $agentTransferDir) {
-            Remove-Item -LiteralPath $agentTransferDir -Recurse -Force
+        $candidateAttempts = [System.Collections.Generic.List[object]]::new()
+        $selectedCandidate = $null
+        $agentTransferManifestPath = $null
+        foreach ($candidate in @($candidateList)) {
+            $agentTransferDir = Join-Path $agentSession.TransferRoot $candidate.Hash.ToLowerInvariant()
+            if (Test-Path -LiteralPath $agentTransferDir) {
+                Remove-Item -LiteralPath $agentTransferDir -Recurse -Force
+            }
+
+            & $agentDownloadHelperPath `
+                -FileHash $candidate.Hash `
+                -FileName $candidate.Name `
+                -FileSize ([UInt64]$candidate.Size) `
+                -ControlUrl $agentSession.ControlUrl | Out-Null
+
+            $probeManifestPath = Join-Path $agentTransferDir "resume-manifest.json"
+            $probeManifest = Wait-TransferManifestProbeState `
+                -ManifestPath $probeManifestPath `
+                -TimeoutSeconds $CandidateSourceProbeTimeoutSeconds
+
+            $attempt = [pscustomobject]@{
+                Hash = $candidate.Hash
+                Name = $candidate.Name
+                Size = [UInt64]$candidate.Size
+                HarnessSourceCount = [int]$candidate.HarnessSourceCount
+                HarnessCompleteSourceCount = [int]$candidate.HarnessCompleteSourceCount
+                AgentSourceCount = [int]$candidate.AgentSourceCount
+                AgentBatchHits = [int]$candidate.AgentBatchHits
+                ProbeManifestPath = $probeManifestPath
+                ProbeSources = if ($null -ne $probeManifest) { @($probeManifest.sources).Count } else { 0 }
+                ProbeCompleted = if ($null -ne $probeManifest) { [bool]$probeManifest.completed } else { $false }
+                ProbeVerifiedRanges = if ($null -ne $probeManifest) { @($probeManifest.verified_ranges).Count } else { 0 }
+            }
+            $candidateAttempts.Add($attempt) | Out-Null
+
+            if ($attempt.ProbeSources -gt 0 -or $attempt.ProbeCompleted -or $attempt.ProbeVerifiedRanges -gt 0) {
+                $selectedCandidate = $candidate
+                $agentTransferManifestPath = $probeManifestPath
+                break
+            }
+        }
+        @($candidateAttempts) | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM $candidateAttemptsPath
+
+        if ($null -eq $selectedCandidate) {
+            throw "No attempted common Kad result produced live sources within $CandidateSourceProbeTimeoutSeconds seconds. See $candidateAttemptsPath"
         }
 
         Set-Content -LiteralPath $harnessSelectedHashPath -Value $selectedCandidate.Hash -Encoding ascii
-        & $agentDownloadHelperPath `
-            -FileHash $selectedCandidate.Hash `
-            -FileName $selectedCandidate.Name `
-            -FileSize ([UInt64]$selectedCandidate.Size) `
-            -ControlUrl $agentSession.ControlUrl | Out-Null
-
-        $agentTransferManifestPath = Join-Path $agentTransferDir "resume-manifest.json"
         $agentTransferManifest = Wait-TransferManifestState `
             -ManifestPath $agentTransferManifestPath `
             -TimeoutSeconds $DownloadTimeoutSeconds
@@ -502,6 +568,7 @@ foreach ($mode in $modeDefinitions) {
             Success = $true
             Query = $Query
             SelectedCandidate = $selectedCandidate
+            CandidateAttemptsPath = $candidateAttemptsPath
             HarnessReadyState = $harnessSession.EmuleHarnessReadyState
             AgentControlUrl = $agentSession.ControlUrl
             AgentSearchStatus = $agentSearchSummary.Status
@@ -523,6 +590,7 @@ foreach ($mode in $modeDefinitions) {
             Error = $_.Exception.Message
             HarnessSessionDir = if ($harnessSession) { $harnessSession.SessionDir } else { $null }
             AgentSessionDir = if ($agentSession) { $agentSession.SessionDir } else { $null }
+            CandidateAttemptsPath = if (Test-Path -LiteralPath $candidateAttemptsPath) { $candidateAttemptsPath } else { $null }
             HarnessArtifactsRoot = $harnessArtifactRoot
             AgentArtifactsRoot = $agentArtifactRoot
         }) | Out-Null
