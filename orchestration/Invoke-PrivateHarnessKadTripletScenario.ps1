@@ -51,6 +51,31 @@ function Wait-AgentControlReady {
     throw "Agent stats endpoint did not become ready at $StatsUrl within $TimeoutSeconds seconds"
 }
 
+function Wait-AgentKadBootstrapReady {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StatsUrl,
+        [int]$TimeoutSeconds = 180,
+        [int]$MinimumPeersConnected = 1
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $response = Invoke-RestMethod -Uri $StatsUrl -TimeoutSec 10
+            if ($null -ne $response -and [int]$response.peers_connected -ge $MinimumPeersConnected) {
+                return $response
+            }
+        }
+        catch {
+        }
+
+        Start-Sleep -Seconds 2
+    }
+
+    throw "Agent Kad bootstrap did not become ready at $StatsUrl within $TimeoutSeconds seconds"
+}
+
 function Wait-CoordinatorReady {
     param(
         [Parameter(Mandatory = $true)]
@@ -227,6 +252,55 @@ function Wait-HarnessContactReady {
     throw "Harness session $($HarnessSession.OracleProfileRoot) did not validate any Kad contact within $TimeoutSeconds seconds"
 }
 
+function Invoke-AgentManualPublishWhenReady {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SeedScriptPath,
+        [Parameter(Mandatory = $true)]
+        [string]$ControlUrl,
+        [Parameter(Mandatory = $true)]
+        [string]$Ed2kHash,
+        [Parameter(Mandatory = $true)]
+        [string]$CanonicalName,
+        [Parameter(Mandatory = $true)]
+        [UInt64]$Size,
+        [UInt32]$SourceCount = 1,
+        [int]$TimeoutSeconds = 180
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastError = $null
+    while ((Get-Date) -lt $deadline) {
+        try {
+            & $SeedScriptPath `
+                -Ed2kHash $Ed2kHash `
+                -CanonicalName $CanonicalName `
+                -Size $Size `
+                -SourceCount $SourceCount `
+                -ControlUrl $ControlUrl | Out-Null
+            return
+        }
+        catch {
+            $lastError = $_
+            $message = [string]$_.Exception.Message
+            if (
+                $message -notmatch 'kad node is not bootstrapped yet' -and
+                $message -notmatch '\b501\b'
+            ) {
+                throw
+            }
+        }
+
+        Start-Sleep -Seconds 2
+    }
+
+    if ($null -ne $lastError) {
+        throw $lastError
+    }
+
+    throw "Agent manual Kad publish did not become ready within $TimeoutSeconds seconds"
+}
+
 function Get-HarnessPublishSummary {
     param(
         [Parameter(Mandatory = $true)]
@@ -331,7 +405,7 @@ function Get-SearchMatchedNames {
         }
     }
 
-    return @($names.ToArray() | Sort-Object)
+    return @($names | Sort-Object)
 }
 
 function Test-SearchContainsRequiredFiles {
@@ -410,6 +484,12 @@ function Copy-IfExists {
 
 $toolingRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $manifest = Get-Content -Raw $ScenarioManifestPath | ConvertFrom-Json
+$agentBootstrapReadyContacts = if ($null -ne $manifest.agent.bootstrapReadyContacts) {
+    [int]$manifest.agent.bootstrapReadyContacts
+}
+else {
+    10
+}
 
 if (-not $env:OVERLORD_TMP_DIR) {
     throw "OVERLORD_TMP_DIR is not set"
@@ -539,6 +619,7 @@ try {
             -ServerUdpPort ([UInt16]$harness.serverUdpPort) `
             -WebPort ([UInt16]$harness.webPort) `
             -KadUdpKey ([UInt32]$harness.kadUdpKey) `
+            -KadIdHex $harness.kadIdHex `
             -EnableKademlia $true `
             -EnableEd2k $false `
             -ResetTransientState
@@ -576,16 +657,23 @@ try {
         -ControlPort ([UInt16]$manifest.agent.controlPort) `
         -KadPort ([UInt16]$manifest.agent.kadPort) `
         -Ed2kPort ([UInt16]$manifest.agent.ed2kPort) `
-        -P2pBindIp $manifest.agent.p2pBindIp
+        -P2pBindIp $manifest.agent.p2pBindIp `
+        -KadBootstrapReadyContacts ([UInt32]$agentBootstrapReadyContacts)
 
     $agentStats = Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl -TimeoutSeconds 180
+    $agentStats = Wait-AgentKadBootstrapReady `
+        -StatsUrl $agentSession.StatsUrl `
+        -TimeoutSeconds 180 `
+        -MinimumPeersConnected $agentBootstrapReadyContacts
 
-    & $agentSeedScriptPath `
+    Invoke-AgentManualPublishWhenReady `
+        -SeedScriptPath $agentSeedScriptPath `
         -Ed2kHash $manifest.agent.manualPublish.hash `
         -CanonicalName $manifest.agent.manualPublish.canonicalName `
         -Size ([UInt64]$manifest.agent.manualPublish.size) `
         -SourceCount ([UInt32]$manifest.agent.manualPublish.sourceCount) `
-        -ControlUrl $agentSession.ControlUrl | Out-Null
+        -ControlUrl $agentSession.ControlUrl `
+        -TimeoutSeconds $AgentPublishTimeoutSeconds
 
     $agentStats = Wait-AgentManualPublish -StatsUrl $agentSession.StatsUrl -TimeoutSeconds $AgentPublishTimeoutSeconds
     $agentStats | ConvertTo-Json -Depth 12 | Set-Content -Encoding utf8NoBOM $agentStatsPath

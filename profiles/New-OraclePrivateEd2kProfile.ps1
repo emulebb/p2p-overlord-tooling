@@ -23,6 +23,7 @@ param(
     [UInt16]$ServerUdpPort = 0,
     [UInt16]$WebPort = 47101,
     [UInt32]$KadUdpKey = 4206201,
+    [string]$KadIdHex,
     [bool]$EnableKademlia = $true,
     [bool]$EnableEd2k = $true,
     [switch]$ResetTransientState
@@ -30,6 +31,65 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+function Resolve-KadIdHexOverride {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProfileRoot,
+        [string]$KadIdHex
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($KadIdHex)) {
+        return $KadIdHex
+    }
+
+    $mapJson = $env:OVERLORD_ORACLE_PRIVATE_KAD_ID_MAP_JSON
+    if ([string]::IsNullOrWhiteSpace($mapJson)) {
+        return $null
+    }
+
+    $map = $mapJson | ConvertFrom-Json -AsHashtable
+    $profileName = Split-Path -Leaf $ProfileRoot
+    if ($map.ContainsKey($profileName)) {
+        return [string]$map[$profileName]
+    }
+
+    return $null
+}
+
+function Write-PreferencesKadDat {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$KadIdHex
+    )
+
+    $normalizedHex = ($KadIdHex -replace '\s+', '').ToUpperInvariant()
+    if ($normalizedHex.Length -ne 32 -or $normalizedHex -notmatch '^[0-9A-F]{32}$') {
+        throw "KadIdHex must be exactly 32 hex characters"
+    }
+
+    $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    try {
+        $writer = [System.IO.BinaryWriter]::new($stream)
+        try {
+            $writer.Write([UInt32]0)
+            $writer.Write([UInt16]0)
+            for ($chunkIndex = 0; $chunkIndex -lt 4; $chunkIndex++) {
+                $chunkHex = $normalizedHex.Substring($chunkIndex * 8, 8)
+                $writer.Write([UInt32]::Parse($chunkHex, [System.Globalization.NumberStyles]::HexNumber))
+            }
+            $writer.Write([byte]0)
+        }
+        finally {
+            $writer.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
 
 function Get-PreferencesContent {
     param(
@@ -104,11 +164,16 @@ foreach ($path in @($resolvedProfileRoot, $configRoot, $logsRoot, $incomingRoot,
 }
 
 $preferencesPath = Join-Path $configRoot "preferences.ini"
+[string]$resolvedKadIdHex = Resolve-KadIdHexOverride -ProfileRoot $resolvedProfileRoot -KadIdHex $KadIdHex
 [System.IO.File]::WriteAllText(
     $preferencesPath,
     (Get-PreferencesContent -BindAddr $BindAddr -TcpPort $TcpPort -UdpPort $UdpPort -ServerUdpPort $ServerUdpPort -WebPort $WebPort -KadUdpKey $KadUdpKey -EnableKademlia $EnableKademlia -EnableEd2k $EnableEd2k),
     (New-Object System.Text.ASCIIEncoding)
 )
+
+if (-not [string]::IsNullOrWhiteSpace($resolvedKadIdHex)) {
+    Write-PreferencesKadDat -Path (Join-Path $configRoot "preferencesKad.dat") -KadIdHex $resolvedKadIdHex
+}
 
 if ($ResetTransientState) {
     foreach ($path in @($logsRoot, $incomingRoot, $tempRoot)) {

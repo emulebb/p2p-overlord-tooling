@@ -18,6 +18,7 @@ param(
     [UInt16]$KadPort = 41120,
     [UInt16]$Ed2kPort = 41121,
     [string]$P2pBindIp = "127.0.0.1",
+    [UInt32]$KadBootstrapReadyContacts = 10,
     [switch]$DisableKad,
     [string]$ServerHost,
     [UInt16]$ServerPort = 0,
@@ -99,6 +100,7 @@ selection_confirmed = true
 listen_port = $KadPort
 nodes_dat_path = "$($stateRoot.Replace('\', '/'))/overlord-kad.nodes.dat"
 bootstrap_nodes = $bootstrapNodesValue
+bootstrap_min_routing_contacts = $KadBootstrapReadyContacts
 search_timeout_secs = 45
 store_timeout_secs = 140
 republish_interval_secs = 18000
@@ -177,6 +179,7 @@ max_files = 7
     KadPort = $KadPort
     Ed2kPort = $Ed2kPort
     P2pBindIp = $P2pBindIp
+    KadBootstrapReadyContacts = $KadBootstrapReadyContacts
     OracleBootstrapNode = $OracleBootstrapNode
     KadDisabled = [bool]$DisableKad
     ServerHost = if ([string]::IsNullOrWhiteSpace($ServerHost)) { $null } else { $ServerHost }
