@@ -17,8 +17,9 @@ param(
     [string]$EmuleHarnessBuildConfig = "Debug",
     [int]$SearchTimeoutSeconds = 240,
     [int]$DownloadTimeoutSeconds = 900,
-    [int]$CandidateAttemptCount = 5,
-    [int]$CandidateSourceProbeTimeoutSeconds = 45,
+    [int]$CandidateAttemptCount = 12,
+    [int]$CandidateSourceProbeTimeoutSeconds = 60,
+    [int]$SuccessfulDownloadCount = 2,
     [UInt64]$MaxCandidateSizeBytes = 16777216,
     [string]$InterfaceAlias = "hide.me",
     [switch]$KeepSessionsRunning
@@ -125,6 +126,81 @@ function Wait-FileCompleted {
     }
 
     throw "File $Path did not reach size $ExpectedSize within $TimeoutSeconds seconds"
+}
+
+function Get-HarnessTempPartPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProfileRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$FileHash
+    )
+
+    $downloadsPath = Join-Path $ProfileRoot "config\\downloads.txt"
+    if (-not (Test-Path -LiteralPath $downloadsPath)) {
+        return $null
+    }
+
+    $normalizedHash = $FileHash.ToUpperInvariant()
+    foreach ($line in Get-Content -LiteralPath $downloadsPath) {
+        if ($line -notmatch [regex]::Escape($normalizedHash)) {
+            continue
+        }
+
+        $columns = $line -split "`t", 2
+        if ($columns.Count -lt 1 -or [string]::IsNullOrWhiteSpace($columns[0])) {
+            continue
+        }
+
+        return (Join-Path $ProfileRoot ("Temp\\{0}" -f $columns[0].Trim()))
+    }
+
+    return $null
+}
+
+function Wait-HarnessDownloadCompleted {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProfileRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$FileHash,
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedName,
+        [Parameter(Mandatory = $true)]
+        [UInt64]$ExpectedSize,
+        [int]$TimeoutSeconds = 300
+    )
+
+    $incomingPath = Join-Path $ProfileRoot ("Incoming\\{0}" -f $ExpectedName)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path -LiteralPath $incomingPath) {
+            $incomingItem = Get-Item -LiteralPath $incomingPath
+            if ([UInt64]$incomingItem.Length -eq $ExpectedSize) {
+                return [pscustomobject]@{
+                    Path = $incomingItem.FullName
+                    Length = [UInt64]$incomingItem.Length
+                    CompletionKind = "incoming"
+                }
+            }
+        }
+
+        $tempPartPath = Get-HarnessTempPartPath -ProfileRoot $ProfileRoot -FileHash $FileHash
+        if ($tempPartPath -and (Test-Path -LiteralPath $tempPartPath)) {
+            $tempItem = Get-Item -LiteralPath $tempPartPath
+            if ([UInt64]$tempItem.Length -eq $ExpectedSize) {
+                return [pscustomobject]@{
+                    Path = $tempItem.FullName
+                    Length = [UInt64]$tempItem.Length
+                    CompletionKind = "temp-part"
+                }
+            }
+        }
+
+        Start-Sleep -Seconds 2
+    }
+
+    throw "Harness download for $FileHash did not reach size $ExpectedSize in Incoming or Temp within $TimeoutSeconds seconds"
 }
 
 function Get-LastHarnessSearchSnapshot {
@@ -390,12 +466,14 @@ foreach ($mode in $modeDefinitions) {
     $harnessArtifactRoot = Join-Path $modeRoot "harness-artifacts"
     $agentArtifactRoot = Join-Path $modeRoot "agent-artifacts"
     $agentSearchRoot = Join-Path $modeRoot "agent-search"
+    $harnessDownloadsRoot = Join-Path $harnessArtifactRoot "downloads"
+    $agentDownloadsRoot = Join-Path $agentArtifactRoot "downloads"
     $harnessSearchPath = Join-Path $modeRoot "emule-harness-kad-search.jsonl"
     $harnessSelectedHashPath = Join-Path $modeRoot "selected-hash.txt"
     $candidateAttemptsPath = Join-Path $modeRoot "candidate-attempts.json"
     $upnpBeforePath = Join-Path $modeRoot "miniupnpc-before.txt"
     $upnpAfterPath = Join-Path $modeRoot "miniupnpc-after.txt"
-    foreach ($path in @($modeRoot, $harnessArtifactRoot, $agentArtifactRoot, $agentSearchRoot)) {
+    foreach ($path in @($modeRoot, $harnessArtifactRoot, $agentArtifactRoot, $agentSearchRoot, $harnessDownloadsRoot, $agentDownloadsRoot)) {
         New-Item -ItemType Directory -Path $path -Force | Out-Null
     }
 
@@ -472,8 +550,7 @@ foreach ($mode in $modeDefinitions) {
             -MaxCandidates $CandidateAttemptCount
 
         $candidateAttempts = [System.Collections.Generic.List[object]]::new()
-        $selectedCandidate = $null
-        $agentTransferManifestPath = $null
+        $completedDownloads = [System.Collections.Generic.List[object]]::new()
         foreach ($candidate in @($candidateList)) {
             $agentTransferDir = Join-Path $agentSession.TransferRoot $candidate.Hash.ToLowerInvariant()
             if (Test-Path -LiteralPath $agentTransferDir) {
@@ -503,30 +580,79 @@ foreach ($mode in $modeDefinitions) {
                 ProbeSources = if ($null -ne $probeManifest) { @($probeManifest.sources).Count } else { 0 }
                 ProbeCompleted = if ($null -ne $probeManifest) { [bool]$probeManifest.completed } else { $false }
                 ProbeVerifiedRanges = if ($null -ne $probeManifest) { @($probeManifest.verified_ranges).Count } else { 0 }
+                DownloadSucceeded = $false
             }
-            $candidateAttempts.Add($attempt) | Out-Null
 
             if ($attempt.ProbeSources -gt 0 -or $attempt.ProbeCompleted -or $attempt.ProbeVerifiedRanges -gt 0) {
-                $selectedCandidate = $candidate
-                $agentTransferManifestPath = $probeManifestPath
-                break
+                Set-Content -LiteralPath $harnessSelectedHashPath -Value $candidate.Hash -Encoding ascii
+                $agentTransferManifest = Wait-TransferManifestState `
+                    -ManifestPath $probeManifestPath `
+                    -TimeoutSeconds $DownloadTimeoutSeconds
+
+                $harnessDownloadState = Wait-HarnessDownloadCompleted `
+                    -ProfileRoot $profileRoot `
+                    -FileHash $candidate.Hash `
+                    -ExpectedName $candidate.Name `
+                    -ExpectedSize ([UInt64]$candidate.Size) `
+                    -TimeoutSeconds $DownloadTimeoutSeconds
+
+                $candidateAgentArtifactRoot = Join-Path $agentDownloadsRoot $candidate.Hash.ToLowerInvariant()
+                New-Item -ItemType Directory -Path $candidateAgentArtifactRoot -Force | Out-Null
+                $transferCollection = & $collectTransferHelperPath `
+                    -TransferRoot $agentSession.TransferRoot `
+                    -FileHash $candidate.Hash `
+                    -DestinationRoot $candidateAgentArtifactRoot
+
+                $candidateHarnessArtifactRoot = Join-Path $harnessDownloadsRoot $candidate.Hash.ToLowerInvariant()
+                New-Item -ItemType Directory -Path $candidateHarnessArtifactRoot -Force | Out-Null
+                Copy-Item -LiteralPath $harnessDownloadState.Path -Destination (Join-Path $candidateHarnessArtifactRoot $candidate.Name) -Force
+
+                $attempt = [pscustomobject]@{
+                    Hash = $attempt.Hash
+                    Name = $attempt.Name
+                    Size = $attempt.Size
+                    HarnessSourceCount = $attempt.HarnessSourceCount
+                    HarnessCompleteSourceCount = $attempt.HarnessCompleteSourceCount
+                    AgentSourceCount = $attempt.AgentSourceCount
+                    AgentBatchHits = $attempt.AgentBatchHits
+                    ProbeManifestPath = $attempt.ProbeManifestPath
+                    ProbeSources = $attempt.ProbeSources
+                    ProbeCompleted = $attempt.ProbeCompleted
+                    ProbeVerifiedRanges = $attempt.ProbeVerifiedRanges
+                    DownloadSucceeded = $true
+                    HarnessDownloadedPath = $harnessDownloadState.Path
+                    HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
+                    HarnessCompletionKind = $harnessDownloadState.CompletionKind
+                    AgentTransferManifestPath = $probeManifestPath
+                    AgentTransferCompleted = [bool]$agentTransferManifest.completed
+                    AgentTransferCollectedRoot = $transferCollection.DestinationRoot
+                }
+
+                $completedDownloads.Add([pscustomobject]@{
+                    Hash = $candidate.Hash
+                    Name = $candidate.Name
+                    Size = [UInt64]$candidate.Size
+                    HarnessDownloadedPath = $harnessDownloadState.Path
+                    HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
+                    HarnessCompletionKind = $harnessDownloadState.CompletionKind
+                    AgentTransferManifestPath = $probeManifestPath
+                    AgentTransferCompleted = [bool]$agentTransferManifest.completed
+                    AgentTransferCollectedRoot = $transferCollection.DestinationRoot
+                }) | Out-Null
+
+                if ($completedDownloads.Count -ge $SuccessfulDownloadCount) {
+                    $candidateAttempts.Add($attempt) | Out-Null
+                    break
+                }
             }
+
+            $candidateAttempts.Add($attempt) | Out-Null
         }
         @($candidateAttempts) | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM $candidateAttemptsPath
 
-        if ($null -eq $selectedCandidate) {
-            throw "No attempted common Kad result produced live sources within $CandidateSourceProbeTimeoutSeconds seconds. See $candidateAttemptsPath"
+        if ($completedDownloads.Count -lt $SuccessfulDownloadCount) {
+            throw "Only $($completedDownloads.Count) common Kad results completed download in mode '$($mode.Id)' within $CandidateAttemptCount attempts. See $candidateAttemptsPath"
         }
-
-        Set-Content -LiteralPath $harnessSelectedHashPath -Value $selectedCandidate.Hash -Encoding ascii
-        $agentTransferManifest = Wait-TransferManifestState `
-            -ManifestPath $agentTransferManifestPath `
-            -TimeoutSeconds $DownloadTimeoutSeconds
-
-        $harnessDownloadedFile = Wait-FileCompleted `
-            -Path (Join-Path $profileRoot ("Incoming\{0}" -f $selectedCandidate.Name)) `
-            -ExpectedSize ([UInt64]$selectedCandidate.Size) `
-            -TimeoutSeconds $DownloadTimeoutSeconds
 
         if (-not $KeepSessionsRunning) {
             if ($harnessSession) {
@@ -558,26 +684,20 @@ foreach ($mode in $modeDefinitions) {
         )) {
             Copy-IfExists -Path $path -DestinationRoot $agentArtifactRoot
         }
-        & $collectTransferHelperPath `
-            -TransferRoot $agentSession.TransferRoot `
-            -FileHash $selectedCandidate.Hash `
-            -DestinationRoot $agentArtifactRoot | Out-Null
 
         $modeResults.Add([pscustomobject]@{
             Mode = $mode.Id
             Success = $true
             Query = $Query
-            SelectedCandidate = $selectedCandidate
+            SuccessfulDownloadCount = $SuccessfulDownloadCount
+            CompletedDownloadCount = $completedDownloads.Count
+            CompletedDownloads = @($completedDownloads)
             CandidateAttemptsPath = $candidateAttemptsPath
             HarnessReadyState = $harnessSession.EmuleHarnessReadyState
             AgentControlUrl = $agentSession.ControlUrl
             AgentSearchStatus = $agentSearchSummary.Status
             HarnessSearchResultCount = [int]$harnessSnapshot.result_count
             AgentSearchResultCount = [int]$agentSearchSummary.ResultCount
-            HarnessDownloadedPath = $harnessDownloadedFile.FullName
-            HarnessDownloadedSize = [UInt64]$harnessDownloadedFile.Length
-            AgentTransferManifestPath = $agentTransferManifestPath
-            AgentTransferCompleted = [bool]$agentTransferManifest.completed
             HarnessArtifactsRoot = $harnessArtifactRoot
             AgentArtifactsRoot = $agentArtifactRoot
         }) | Out-Null
