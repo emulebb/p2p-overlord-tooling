@@ -54,3 +54,8 @@ tooling-repo notes in `./AGENTS.md`.
   resolves the eMule harness runtime from `%EMULE_WORKSPACE_ROOT%`, and writes
   run artifacts under
   `%OVERLORD_TMP_DIR%`.
+- `.\overlord-tooling.ps1 run-realnet-emule-harness-ed2k-server-roundtrip`
+  pins both runtimes to one reachable live ED2K server, transfers a
+  deterministic binary from the eMule harness to the agent, restarts the agent,
+  and verifies that a fresh eMule harness profile can download the same file
+  back over the live server path.

@@ -8,12 +8,11 @@ Starts one minimized eMule harness for a private Kad+ED2K run.
 param(
     [Parameter(Mandatory = $true)]
     [string]$ProfileRoot,
-    [Parameter(Mandatory = $true)]
     [string]$SeedFilePath,
-    [Parameter(Mandatory = $true)]
     [string]$ExportLinkPath,
-    [Parameter(Mandatory = $true)]
     [string]$AgentBootstrapNode,
+    [string]$ExportSourceIp,
+    [string]$DownloadLinkPath,
     [ValidateSet("Debug", "Release")]
     [string]$BuildConfig = "Debug",
     [switch]$SkipRuntimeCleanup
@@ -89,7 +88,7 @@ if (-not (Test-Path -LiteralPath $cleanupHelperPath)) {
 if (-not (Test-Path -LiteralPath $readyReaderPath -PathType Leaf)) {
     throw "eMule harness ready-file reader not found at $readyReaderPath"
 }
-if (-not (Test-Path -LiteralPath $SeedFilePath)) {
+if (-not [string]::IsNullOrWhiteSpace($SeedFilePath) -and -not (Test-Path -LiteralPath $SeedFilePath)) {
     throw "Seed file not found at $SeedFilePath"
 }
 
@@ -118,19 +117,32 @@ foreach ($path in @($readyFile, $ExportLinkPath, $statusLogPath)) {
 }
 
 $traceLinesBefore = if (Test-Path -LiteralPath $traceLogPath) { @(Get-Content $traceLogPath).Count } else { 0 }
+$emuleHarnessArgs = @(
+    "-AutoStart",
+    "-configdir=""$profile""",
+    "-readyfile=""$readyFile""",
+    "-ignoreinstances"
+)
+if (-not [string]::IsNullOrWhiteSpace($AgentBootstrapNode)) {
+    $emuleHarnessArgs += ('-bootstrap="{0}"' -f $AgentBootstrapNode)
+}
+if (-not [string]::IsNullOrWhiteSpace($SeedFilePath)) {
+    $emuleHarnessArgs += ('-sharefile="{0}"' -f $SeedFilePath)
+}
+if (-not [string]::IsNullOrWhiteSpace($ExportLinkPath)) {
+    $emuleHarnessArgs += ('-exportlinkfile="{0}"' -f $ExportLinkPath)
+}
+if (-not [string]::IsNullOrWhiteSpace($ExportSourceIp)) {
+    $emuleHarnessArgs += ('-exportsourceip="{0}"' -f $ExportSourceIp)
+}
+if (-not [string]::IsNullOrWhiteSpace($DownloadLinkPath)) {
+    $emuleHarnessArgs += ('-downloadlinkfile="{0}"' -f $DownloadLinkPath)
+}
+
 $emuleHarnessProcess = Start-Process `
     -FilePath $emuleHarnessExePath `
     -WorkingDirectory $emuleHarnessDir `
-    -ArgumentList @(
-        "-AutoStart",
-        "-configdir=""$profile""",
-        "-bootstrap=""$AgentBootstrapNode""",
-        "-readyfile=""$readyFile""",
-        "-sharefile=""$SeedFilePath""",
-        "-exportlinkfile=""$ExportLinkPath""",
-        "-exportsourceip=""127.0.0.1""",
-        "-ignoreinstances"
-    ) `
+    -ArgumentList $emuleHarnessArgs `
     -PassThru `
     -WindowStyle Minimized
 
@@ -170,6 +182,7 @@ $metadata = [pscustomobject]@{
     EmuleHarnessReadyState = $readyState
     SeedFilePath = $SeedFilePath
     ExportLinkPath = $ExportLinkPath
+    DownloadLinkPath = $DownloadLinkPath
     ReadyFile = $readyFile
     StatusLogPath = $statusLogPath
     TraceLogPath = $traceLogPath

@@ -26,6 +26,7 @@ param(
     [string]$KadIdHex,
     [bool]$EnableKademlia = $true,
     [bool]$EnableEd2k = $true,
+    [bool]$EnableUpnp = $false,
     [switch]$ResetTransientState
 )
 
@@ -108,7 +109,9 @@ function Get-PreferencesContent {
         [Parameter(Mandatory = $true)]
         [bool]$EnableKademlia,
         [Parameter(Mandatory = $true)]
-        [bool]$EnableEd2k
+        [bool]$EnableEd2k,
+        [Parameter(Mandatory = $true)]
+        [bool]$EnableUpnp
     )
 
 @"
@@ -136,7 +139,7 @@ AddServersFromServer=0
 AddServersFromClient=0
 NetworkKademlia=$(if ($EnableKademlia) { 1 } else { 0 })
 NetworkED2K=$(if ($EnableEd2k) { 1 } else { 0 })
-OpenPortsOnStartUp=0
+OpenPortsOnStartUp=$(if ($EnableUpnp) { 1 } else { 0 })
 EnableScheduler=0
 KadUDPKey=$KadUdpKey
 CreateCrashDump=0
@@ -148,11 +151,11 @@ CryptLayerSupported=0
 [WebServer]
 Enabled=0
 Port=$WebPort
-WebUseUPnP=0
+WebUseUPnP=$(if ($EnableUpnp) { 1 } else { 0 })
 
 [UPnP]
-EnableUPnP=0
-CloseUPnPOnExit=0
+EnableUPnP=$(if ($EnableUpnp) { 1 } else { 0 })
+CloseUPnPOnExit=$(if ($EnableUpnp) { 1 } else { 0 })
 "@
 }
 
@@ -170,7 +173,7 @@ $preferencesPath = Join-Path $configRoot "preferences.ini"
 [string]$resolvedKadIdHex = Resolve-KadIdHexOverride -ProfileRoot $resolvedProfileRoot -KadIdHex $KadIdHex
 [System.IO.File]::WriteAllText(
     $preferencesPath,
-    (Get-PreferencesContent -BindAddr $BindAddr -TcpPort $TcpPort -UdpPort $UdpPort -ServerUdpPort $ServerUdpPort -WebPort $WebPort -KadUdpKey $KadUdpKey -EnableKademlia $EnableKademlia -EnableEd2k $EnableEd2k),
+    (Get-PreferencesContent -BindAddr $BindAddr -TcpPort $TcpPort -UdpPort $UdpPort -ServerUdpPort $ServerUdpPort -WebPort $WebPort -KadUdpKey $KadUdpKey -EnableKademlia $EnableKademlia -EnableEd2k $EnableEd2k -EnableUpnp $EnableUpnp),
     (New-Object System.Text.ASCIIEncoding)
 )
 
@@ -217,4 +220,5 @@ if ($ResetTransientState) {
     TempRoot = $tempRoot
     EnableKademlia = $EnableKademlia
     EnableEd2k = $EnableEd2k
+    EnableUpnp = $EnableUpnp
 }

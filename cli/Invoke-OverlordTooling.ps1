@@ -29,6 +29,7 @@ function Show-ToolingHelp {
             [ordered]@{ name = "run-kad-startup-hello-publish"; description = "Run the first paired eMule harness and agent Kad startup, HELLO, and publish scenario" }
             [ordered]@{ name = "run-private-emule-harness-ed2k-download"; description = "Run a private local eMule harness Kad source publish plus native ED2K download scenario" }
             [ordered]@{ name = "run-private-emule-harness-ed2k-server-download"; description = "Run a private local eMule harness and agent ED2K download through a local goed2k-server" }
+            [ordered]@{ name = "run-realnet-emule-harness-ed2k-server-roundtrip"; description = "Run a real-network ED2K server roundtrip: eMule harness to agent, then agent back to a fresh eMule harness profile" }
             [ordered]@{ name = "run-private-harness-kad-triplet"; description = "Run a local Kad cluster with three eMule harness peers plus one agent, including publish and search" }
             [ordered]@{ name = "validate-ed2k-server-triplet"; description = "Run focused local triplet validation for multi-file, multi-source, and callback-limit ED2K server cases" }
         )
@@ -108,6 +109,7 @@ $seedImportScriptPath = Join-Path $repoRoot "orchestration\Import-EmuleHarnessSe
 $scenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-KadStartupHelloPublishScenario.ps1"
 $privateEd2kScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateEmuleHarnessEd2kDownloadScenario.ps1"
 $privateEd2kServerScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateEmuleHarnessEd2kServerDownloadScenario.ps1"
+$realnetEd2kServerRoundtripScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-RealnetEmuleHarnessEd2kServerRoundtripScenario.ps1"
 $privateHarnessKadTripletScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateHarnessKadTripletScenario.ps1"
 $tripletValidationScriptPath = Join-Path $repoRoot "orchestration\Invoke-ValidateEd2kServerTriplet.ps1"
 $command = "help"
@@ -197,6 +199,16 @@ switch ($Command.ToLowerInvariant()) {
         $namedArgs = $invocationArgs.Named
         $positionalArgs = $invocationArgs.Positional
         & $privateEd2kServerScenarioRunnerScriptPath @namedArgs @positionalArgs
+    }
+    "run-realnet-emule-harness-ed2k-server-roundtrip" {
+        if (-not (Test-Path $realnetEd2kServerRoundtripScenarioRunnerScriptPath)) {
+            throw "Realnet ED2K server roundtrip runner not found at $realnetEd2kServerRoundtripScenarioRunnerScriptPath"
+        }
+
+        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
+        $namedArgs = $invocationArgs.Named
+        $positionalArgs = $invocationArgs.Positional
+        & $realnetEd2kServerRoundtripScenarioRunnerScriptPath @namedArgs @positionalArgs
     }
     "run-private-harness-kad-triplet" {
         if (-not (Test-Path $privateHarnessKadTripletScenarioRunnerScriptPath)) {

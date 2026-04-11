@@ -9,7 +9,17 @@ param(
     [int]$InterfaceIndex = 0,
     [string]$InterfaceAlias = "hide.me",
     [int]$CapturePort = 41000,
-    [string]$SessionPrefix = "parity-agent"
+    [string]$SessionPrefix = "parity-agent",
+    [string]$ServerIp,
+    [int]$ServerPort = 0,
+    [int]$ServerUdpFlags = 0,
+    [int]$ServerUdpKey = 0,
+    [int]$ServerUdpKeyIp = 0,
+    [int]$ServerTcpObfuscationPort = 0,
+    [int]$ServerUdpObfuscationPort = 0,
+    [int]$ServerSessionRotationSeconds = 0,
+    [int]$ServerConnectTimeoutSeconds = 8,
+    [int]$ServerReconnectIntervalSeconds = 5
 )
 
 Set-StrictMode -Version Latest
@@ -32,6 +42,7 @@ $launchHelperPath = Join-Path $PSScriptRoot "helper-agent-launch-debug.ps1"
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $refreshNetworkingHelperPath = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"
+$setTargetServerHelperPath = Join-Path $PSScriptRoot "helper-agent-set-target-server-entry.ps1"
 $networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
 
 if (-not (Test-Path $launchHelperPath)) {
@@ -45,6 +56,9 @@ if (-not (Test-Path $cleanupHelperPath)) {
 }
 if (-not (Test-Path $refreshNetworkingHelperPath)) {
     throw "Agent networking refresh helper not found at $refreshNetworkingHelperPath"
+}
+if (-not (Test-Path $setTargetServerHelperPath)) {
+    throw "Agent target-server helper not found at $setTargetServerHelperPath"
 }
 if (-not (Test-Path $networkResolverPath)) {
     throw "Network adapter resolver not found at $networkResolverPath"
@@ -85,6 +99,22 @@ $InterfaceIndex = Resolve-DumpcapInterfaceIndex `
     -DumpcapPath $dumpcapPath
 
 $networkingRefresh = & $refreshNetworkingHelperPath -InterfaceAlias $resolvedInterfaceAlias
+
+$targetServerSelection = $null
+if (-not [string]::IsNullOrWhiteSpace($ServerIp) -and $ServerPort -gt 0) {
+    $targetServerSelection = & $setTargetServerHelperPath `
+        -ServerIp $ServerIp `
+        -ServerPort $ServerPort `
+        -UdpFlags $ServerUdpFlags `
+        -UdpKey $ServerUdpKey `
+        -UdpKeyIp $ServerUdpKeyIp `
+        -TcpObfuscationPort $ServerTcpObfuscationPort `
+        -UdpObfuscationPort $ServerUdpObfuscationPort `
+        -SessionRotationSeconds $ServerSessionRotationSeconds `
+        -ConnectTimeoutSeconds $ServerConnectTimeoutSeconds `
+        -ReconnectIntervalSeconds $ServerReconnectIntervalSeconds `
+        -ConfigPath $networkingRefresh.TempConfigPath
+}
 
 & $cleanupHelperPath -CapturePort $CapturePort | Out-Null
 
@@ -166,6 +196,10 @@ try {
         InterfaceFallbackUsed = $resolvedAdapter.UsedFallback
         NetworkingPath = $networkingRefresh.NetworkingPath
         NetworkingBindIp = $networkingRefresh.ResolvedP2pBindIp
+        AgentStateRoot = $networkingRefresh.AgentStateRoot
+        AgentLogRoot = $networkingRefresh.AgentLogRoot
+        TransferRoot = (Join-Path $networkingRefresh.AgentStateRoot "overlord-ed2k-transfer")
+        TargetServer = $targetServerSelection
         ControlPort = $networkingRefresh.ControlListenPort
         KadPort = $networkingRefresh.KadListenPort
         Ed2kPort = $networkingRefresh.Ed2kListenPort

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.server.emule-harness.agent.roundtrip.realnet.v1",
+  "description": "Real-network ED2K server roundtrip transfer: eMule harness seeds a deterministic binary to the agent, then the agent re-offers the same file and a fresh eMule harness profile downloads it back.",
+  "interfaceAlias": "hide.me",
+  "seedBundleId": "canonical",
+  "serverSelection": {
+    "maxCandidates": 32,
+    "connectTimeoutMilliseconds": 5000
+  },
+  "harnessSeeder": {
+    "tcpPort": 46671,
+    "udpPort": 46673,
+    "serverUdpPort": 0,
+    "webPort": 47111
+  },
+  "harnessDownloader": {
+    "tcpPort": 46681,
+    "udpPort": 46683,
+    "serverUdpPort": 0,
+    "webPort": 47121
+  },
+  "agent": {
+    "controlPort": 13301,
+    "kadPort": 41000,
+    "ed2kPort": 41001,
+    "capturePort": 41000
+  },
+  "file": {
+    "name": "ubuntu-linux-real-server-roundtrip.bin",
+    "sizeBytes": 262144,
+    "pattern": "ubuntu-linux-ed2k-roundtrip"
+  },
+  "timeouts": {
+    "agentDownloadSeconds": 480,
+    "harnessDownloadSeconds": 480,
+    "initialPublishDelaySeconds": 25,
+    "agentRepublishDelaySeconds": 25,
+    "harnessReadySeconds": 90
+  }
+}
