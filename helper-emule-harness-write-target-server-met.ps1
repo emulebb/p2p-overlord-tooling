@@ -4,7 +4,7 @@
 Writes a minimal runtime server.met containing a single ED2K server entry.
 
 .DESCRIPTION
-This is useful for deterministic oracle parity sessions where the local eMule
+This is useful for deterministic eMule harness parity sessions where the local eMule
 profile should auto-connect to one known server without depending on a larger
 rotating server list.
 #>
@@ -25,7 +25,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $resolvedDestinationPath = if ([string]::IsNullOrWhiteSpace($DestinationPath)) {
-    $oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+    $oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1")
     Join-Path $oracleHarnessDebugDir "config\server.met"
 } else {
     [System.IO.Path]::GetFullPath($DestinationPath)

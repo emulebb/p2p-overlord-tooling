@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Extracts only the new oracle trace window and publish-related lines for a session.
+Extracts only the new eMule harness trace window and publish-related lines for a session.
 #>
 
 [CmdletBinding()]
@@ -13,7 +13,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$metadataPath = Join-Path $SessionDir "oracle-session.json"
+$metadataPath = Join-Path $SessionDir "emule-harness-session.json"
 if (-not (Test-Path $metadataPath)) {
     throw "Session metadata not found at $metadataPath"
 }
@@ -26,9 +26,9 @@ if (-not (Test-Path $traceLogPath)) {
 
 $startLine = [int]$metadata.TraceLinesBefore
 $newLines = Get-Content $traceLogPath | Select-Object -Skip $startLine
-$allPath = Join-Path $SessionDir "oracle-trace-new.log"
-$publishPath = Join-Path $SessionDir "oracle-publish-trace.log"
-$interestingPath = Join-Path $SessionDir "oracle-interesting-trace.log"
+$allPath = Join-Path $SessionDir "emule-harness-trace-new.log"
+$publishPath = Join-Path $SessionDir "emule-harness-publish-trace.log"
+$interestingPath = Join-Path $SessionDir "emule-harness-interesting-trace.log"
 
 $newLines | Set-Content -Encoding utf8NoBOM $allPath
 $publishLines = $newLines | Where-Object {

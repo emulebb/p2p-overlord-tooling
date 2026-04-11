@@ -1,11 +1,11 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Sets the oracle's ED2K and Kad network mode flags in preferences.ini.
+Sets the eMule harness's ED2K and Kad network mode flags in preferences.ini.
 
 .DESCRIPTION
 This helper updates only the runtime-local debug preferences file used by the
-oracle build. It is intended for parity sessions where ED2K and Kad need to be
+eMule harness build. It is intended for parity sessions where ED2K and Kad need to be
 enabled or disabled in a repeatable way without editing the file manually.
 #>
 
@@ -26,7 +26,7 @@ $ErrorActionPreference = "Stop"
 $runtimeRoot = if ($ProfileRoot) {
     [System.IO.Path]::GetFullPath($ProfileRoot)
 } else {
-    & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+    & (Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1")
 }
 $preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
 if (-not (Test-Path $preferencesPath)) {

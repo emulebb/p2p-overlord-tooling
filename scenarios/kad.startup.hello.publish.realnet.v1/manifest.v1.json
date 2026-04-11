@@ -1,14 +1,14 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "kad.startup.hello.publish.realnet.v1",
-  "description": "Paired oracle and agent real-network Kad startup, HELLO, and manual publish validation run.",
+  "description": "Paired eMule harness and agent real-network Kad startup, HELLO, and manual publish validation run.",
   "requiredMilestoneIds": [
     "seed-bundle-ready",
-    "oracle-profile-materialized",
-    "oracle-started",
+    "emule-harness-profile-materialized",
+    "emule-harness-started",
     "agent-started",
     "manual-publish-triggered",
-    "oracle-artifacts-captured",
+    "emule-harness-artifacts-captured",
     "agent-artifacts-captured"
   ],
   "seedBundle": {
@@ -18,7 +18,7 @@
       "server.met"
     ]
   },
-  "oracle": {
+  "emuleHarness": {
     "dynamicPreferenceKeys": {
       "BindAddr": "eMule",
       "Port": "eMule",
@@ -67,12 +67,12 @@
       "description": "Canonical nodes.dat and server.met are available from the local untracked seed bundle."
     },
     {
-      "id": "oracle-profile-materialized",
-      "description": "A scenario-owned oracle profile root with a minimal preferences.ini was created for the run."
+      "id": "emule-harness-profile-materialized",
+      "description": "A scenario-owned eMule harness profile root with a minimal preferences.ini was created for the run."
     },
     {
-      "id": "oracle-started",
-      "description": "The oracle launched with an explicit profile-root override."
+      "id": "emule-harness-started",
+      "description": "The eMule harness launched with an explicit profile-root override."
     },
     {
       "id": "agent-started",
@@ -83,8 +83,8 @@
       "description": "A deterministic manual publish batch was posted to the agent."
     },
     {
-      "id": "oracle-artifacts-captured",
-      "description": "The oracle produced UDP and trace artifacts for startup, HELLO, and publish evidence."
+      "id": "emule-harness-artifacts-captured",
+      "description": "The eMule harness produced UDP and trace artifacts for startup, HELLO, and publish evidence."
     },
     {
       "id": "agent-artifacts-captured",
@@ -92,7 +92,7 @@
     },
     {
       "id": "udp-parity-compared",
-      "description": "The oracle and agent UDP dumps were compared for HELLO and publish-related opcodes."
+      "description": "The eMule harness and agent UDP dumps were compared for HELLO and publish-related opcodes."
     }
   ]
 }

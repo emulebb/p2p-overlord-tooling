@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Enables the oracle's verbose and debug preference flags that are useful for Kad parity work.
+Enables the eMule harness's verbose and debug preference flags that are useful for Kad parity work.
 #>
 
 [CmdletBinding()]
@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 $runtimeRoot = if ($ProfileRoot) {
     [System.IO.Path]::GetFullPath($ProfileRoot)
 } else {
-    & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+    & (Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1")
 }
 $preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
 if (-not (Test-Path $preferencesPath)) {

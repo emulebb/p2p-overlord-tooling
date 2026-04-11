@@ -1,13 +1,13 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Runs focused local validation of the oracle + goed2k-server + agent triplet.
+Runs focused local validation of the eMule harness + goed2k-server + agent triplet.
 #>
 
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")]
-    [string]$OracleBuildConfig = "Debug"
+    [string]$EmuleHarnessBuildConfig = "Debug"
 )
 
 Set-StrictMode -Version Latest
@@ -225,7 +225,7 @@ function Copy-IfExists {
     }
 }
 
-function New-OraclePrivateProfile {
+function New-EmuleHarnessPrivateProfile {
     param(
         [string]$ProfileScriptPath,
         [string]$ProfileRoot,
@@ -249,7 +249,7 @@ function New-OraclePrivateProfile {
         -ResetTransientState
 }
 
-function Start-OraclePeer {
+function Start-EmuleHarnessPeer {
     param(
         [string]$ProfileScriptPath,
         [string]$ServerMetWriterPath,
@@ -266,11 +266,11 @@ function Start-OraclePeer {
         [string]$ExportLinkPath,
         [string]$ServerHost,
         [UInt16]$ServerPort,
-        [string]$OracleBuildConfig,
+        [string]$EmuleHarnessBuildConfig,
         [switch]$SkipRuntimeCleanup
     )
 
-    $profile = New-OraclePrivateProfile `
+    $profile = New-EmuleHarnessPrivateProfile `
         -ProfileScriptPath $ProfileScriptPath `
         -ProfileRoot $ProfileRoot `
         -BindAddr $BindAddr `
@@ -287,7 +287,7 @@ function Start-OraclePeer {
         New-SeedPdfFile -Path $SeedFilePath -MarkerText $SeedMarkerText -RepeatCount $SeedRepeatCount
     }
     if (-not (Test-Path -LiteralPath $SeedFilePath)) {
-        throw "Oracle seed file was not materialized at $SeedFilePath"
+        throw "eMule harness seed file was not materialized at $SeedFilePath"
     }
 
     $session = & $StartScriptPath `
@@ -295,7 +295,7 @@ function Start-OraclePeer {
         -SeedFilePath $SeedFilePath `
         -ExportLinkPath $ExportLinkPath `
         -AgentBootstrapNode "127.0.0.1:1" `
-        -BuildConfig $OracleBuildConfig `
+        -BuildConfig $EmuleHarnessBuildConfig `
         -SkipRuntimeCleanup:$SkipRuntimeCleanup
 
     Wait-Path -Path $ExportLinkPath -TimeoutSeconds 90
@@ -313,12 +313,12 @@ function Invoke-TestMultiFilePublishSearch {
     param(
         [string]$TestRoot,
         [hashtable]$Paths,
-        [string]$OracleBuildConfig
+        [string]$EmuleHarnessBuildConfig
     )
 
     $serverSession = $null
     $agentSession = $null
-    $oracles = @()
+    $emuleHarnesses = @()
     $probeTerm = "triplet-multi"
     $artifactsRoot = Join-Path $TestRoot "artifacts"
     New-Item -ItemType Directory -Path $artifactsRoot -Force | Out-Null
@@ -333,14 +333,14 @@ function Invoke-TestMultiFilePublishSearch {
             -AdminToken "local-goed2k-token" `
             -SourceCatalogPath $catalogPath
 
-        $seedA = Join-Path $TestRoot "oracle-a\Incoming\triplet-multi-alpha.pdf"
-        $seedB = Join-Path $TestRoot "oracle-b\Incoming\triplet-multi-beta.pdf"
+        $seedA = Join-Path $TestRoot "emule-harness-a\Incoming\triplet-multi-alpha.pdf"
+        $seedB = Join-Path $TestRoot "emule-harness-b\Incoming\triplet-multi-beta.pdf"
 
-        $oracles += Start-OraclePeer `
+        $emuleHarnesses += Start-EmuleHarnessPeer `
             -ProfileScriptPath $Paths.Profile `
             -ServerMetWriterPath $Paths.ServerMetWriter `
-            -StartScriptPath $Paths.OracleStart `
-            -ProfileRoot (Join-Path $TestRoot "oracle-a") `
+            -StartScriptPath $Paths.EmuleHarnessStart `
+            -ProfileRoot (Join-Path $TestRoot "emule-harness-a") `
             -BindAddr "127.0.0.1" `
             -TcpPort 46062 `
             -UdpPort 46072 `
@@ -349,17 +349,17 @@ function Invoke-TestMultiFilePublishSearch {
             -SeedFilePath $seedA `
             -SeedMarkerText "triplet multi alpha" `
             -SeedRepeatCount 384 `
-            -ExportLinkPath (Join-Path $TestRoot "oracle-a\seed.ed2k") `
+            -ExportLinkPath (Join-Path $TestRoot "emule-harness-a\seed.ed2k") `
             -ServerHost "127.0.0.1" `
             -ServerPort 46161 `
-            -OracleBuildConfig $OracleBuildConfig `
+            -EmuleHarnessBuildConfig $EmuleHarnessBuildConfig `
             -SkipRuntimeCleanup
 
-        $oracles += Start-OraclePeer `
+        $emuleHarnesses += Start-EmuleHarnessPeer `
             -ProfileScriptPath $Paths.Profile `
             -ServerMetWriterPath $Paths.ServerMetWriter `
-            -StartScriptPath $Paths.OracleStart `
-            -ProfileRoot (Join-Path $TestRoot "oracle-b") `
+            -StartScriptPath $Paths.EmuleHarnessStart `
+            -ProfileRoot (Join-Path $TestRoot "emule-harness-b") `
             -BindAddr "127.0.0.1" `
             -TcpPort 46064 `
             -UdpPort 46074 `
@@ -368,18 +368,18 @@ function Invoke-TestMultiFilePublishSearch {
             -SeedFilePath $seedB `
             -SeedMarkerText "triplet multi beta" `
             -SeedRepeatCount 448 `
-            -ExportLinkPath (Join-Path $TestRoot "oracle-b\seed.ed2k") `
+            -ExportLinkPath (Join-Path $TestRoot "emule-harness-b\seed.ed2k") `
             -ServerHost "127.0.0.1" `
             -ServerPort 46161 `
-            -OracleBuildConfig $OracleBuildConfig `
+            -EmuleHarnessBuildConfig $EmuleHarnessBuildConfig `
             -SkipRuntimeCleanup
 
         $published = @()
-        foreach ($oracle in $oracles) {
+        foreach ($emuleHarness in $emuleHarnesses) {
             $published += Wait-GoEd2kFileState `
                 -BaseUrl $serverSession.AdminBaseUrl `
                 -AdminToken $serverSession.AdminToken `
-                -FileHash $oracle.Link.FileHash `
+                -FileHash $emuleHarness.Link.FileHash `
                 -ExpectedSources 1 `
                 -TimeoutSeconds 180
         }
@@ -401,10 +401,10 @@ function Invoke-TestMultiFilePublishSearch {
             -Pattern "ED2K search results.*count=2.*triplet-multi" `
             -TimeoutSeconds 90
 
-        foreach ($oracle in $oracles) {
-            Copy-IfExists -Path $oracle.Session.ExportLinkPath -DestinationRoot $artifactsRoot
-            Copy-IfExists -Path $oracle.Session.OracleEd2kTcpDumpPath -DestinationRoot $artifactsRoot
-            Copy-IfExists -Path $oracle.Session.StatusLogPath -DestinationRoot $artifactsRoot
+        foreach ($emuleHarness in $emuleHarnesses) {
+            Copy-IfExists -Path $emuleHarness.Session.ExportLinkPath -DestinationRoot $artifactsRoot
+            Copy-IfExists -Path $emuleHarness.Session.EmuleHarnessEd2kTcpDumpPath -DestinationRoot $artifactsRoot
+            Copy-IfExists -Path $emuleHarness.Session.StatusLogPath -DestinationRoot $artifactsRoot
         }
         Copy-IfExists -Path $agentSession.AgentLogPath -DestinationRoot $artifactsRoot
 
@@ -412,8 +412,8 @@ function Invoke-TestMultiFilePublishSearch {
             name = "multi_file_publish_search"
             passed = $true
             probeTerm = $probeTerm
-            publishedHashes = @($oracles | ForEach-Object { $_.Link.FileHash })
-            publishedNames = @($oracles | ForEach-Object { $_.Link.FileName })
+            publishedHashes = @($emuleHarnesses | ForEach-Object { $_.Link.FileHash })
+            publishedNames = @($emuleHarnesses | ForEach-Object { $_.Link.FileName })
             agentSearchLine = $searchLine
         }
     }
@@ -421,10 +421,10 @@ function Invoke-TestMultiFilePublishSearch {
         if ($agentSession) {
             Stop-AgentSessionWithRestore -Session $agentSession -StopScriptPath $Paths.AgentStop
         }
-        for ($index = $oracles.Count - 1; $index -ge 0; $index--) {
-            $oracle = $oracles[$index]
-            if ($oracle -and $oracle.Session) {
-                & $Paths.OracleStop -SessionDir $oracle.Session.SessionDir | Out-Null
+        for ($index = $emuleHarnesses.Count - 1; $index -ge 0; $index--) {
+            $emuleHarness = $emuleHarnesses[$index]
+            if ($emuleHarness -and $emuleHarness.Session) {
+                & $Paths.EmuleHarnessStop -SessionDir $emuleHarness.Session.SessionDir | Out-Null
             }
         }
         if ($serverSession) {
@@ -433,16 +433,16 @@ function Invoke-TestMultiFilePublishSearch {
     }
 }
 
-function Invoke-TestTwoOracleSameHash {
+function Invoke-TestTwoEmuleHarnessSameHash {
     param(
         [string]$TestRoot,
         [hashtable]$Paths,
-        [string]$OracleBuildConfig
+        [string]$EmuleHarnessBuildConfig
     )
 
     $serverSession = $null
     $agentSession = $null
-    $oracles = @()
+    $emuleHarnesses = @()
     $artifactsRoot = Join-Path $TestRoot "artifacts"
     New-Item -ItemType Directory -Path $artifactsRoot -Force | Out-Null
 
@@ -457,14 +457,14 @@ function Invoke-TestTwoOracleSameHash {
             -SourceCatalogPath $catalogPath
 
         $sharedName = "triplet-shared-source.pdf"
-        $seedA = Join-Path $TestRoot "oracle-a\Incoming\$sharedName"
-        $seedB = Join-Path $TestRoot "oracle-b\Incoming\$sharedName"
+        $seedA = Join-Path $TestRoot "emule-harness-a\Incoming\$sharedName"
+        $seedB = Join-Path $TestRoot "emule-harness-b\Incoming\$sharedName"
 
-        $oracles += Start-OraclePeer `
+        $emuleHarnesses += Start-EmuleHarnessPeer `
             -ProfileScriptPath $Paths.Profile `
             -ServerMetWriterPath $Paths.ServerMetWriter `
-            -StartScriptPath $Paths.OracleStart `
-            -ProfileRoot (Join-Path $TestRoot "oracle-a") `
+            -StartScriptPath $Paths.EmuleHarnessStart `
+            -ProfileRoot (Join-Path $TestRoot "emule-harness-a") `
             -BindAddr "127.0.0.1" `
             -TcpPort 46162 `
             -UdpPort 46172 `
@@ -473,17 +473,17 @@ function Invoke-TestTwoOracleSameHash {
             -SeedFilePath $seedA `
             -SeedMarkerText "triplet shared source" `
             -SeedRepeatCount 512 `
-            -ExportLinkPath (Join-Path $TestRoot "oracle-a\seed.ed2k") `
+            -ExportLinkPath (Join-Path $TestRoot "emule-harness-a\seed.ed2k") `
             -ServerHost "127.0.0.1" `
             -ServerPort 46261 `
-            -OracleBuildConfig $OracleBuildConfig `
+            -EmuleHarnessBuildConfig $EmuleHarnessBuildConfig `
             -SkipRuntimeCleanup
 
-        $oracles += Start-OraclePeer `
+        $emuleHarnesses += Start-EmuleHarnessPeer `
             -ProfileScriptPath $Paths.Profile `
             -ServerMetWriterPath $Paths.ServerMetWriter `
-            -StartScriptPath $Paths.OracleStart `
-            -ProfileRoot (Join-Path $TestRoot "oracle-b") `
+            -StartScriptPath $Paths.EmuleHarnessStart `
+            -ProfileRoot (Join-Path $TestRoot "emule-harness-b") `
             -BindAddr "127.0.0.1" `
             -TcpPort 46164 `
             -UdpPort 46174 `
@@ -492,13 +492,13 @@ function Invoke-TestTwoOracleSameHash {
             -SeedFilePath $seedB `
             -SeedMarkerText "triplet shared source" `
             -SeedRepeatCount 512 `
-            -ExportLinkPath (Join-Path $TestRoot "oracle-b\seed.ed2k") `
+            -ExportLinkPath (Join-Path $TestRoot "emule-harness-b\seed.ed2k") `
             -ServerHost "127.0.0.1" `
             -ServerPort 46261 `
-            -OracleBuildConfig $OracleBuildConfig `
+            -EmuleHarnessBuildConfig $EmuleHarnessBuildConfig `
             -SkipRuntimeCleanup
 
-        $sharedLink = $oracles[0].Link
+        $sharedLink = $emuleHarnesses[0].Link
         $published = Wait-GoEd2kFileState `
             -BaseUrl $serverSession.AdminBaseUrl `
             -AdminToken $serverSession.AdminToken `
@@ -552,10 +552,10 @@ function Invoke-TestTwoOracleSameHash {
         if ($agentSession) {
             Stop-AgentSessionWithRestore -Session $agentSession -StopScriptPath $Paths.AgentStop
         }
-        for ($index = $oracles.Count - 1; $index -ge 0; $index--) {
-            $oracle = $oracles[$index]
-            if ($oracle -and $oracle.Session) {
-                & $Paths.OracleStop -SessionDir $oracle.Session.SessionDir | Out-Null
+        for ($index = $emuleHarnesses.Count - 1; $index -ge 0; $index--) {
+            $emuleHarness = $emuleHarnesses[$index]
+            if ($emuleHarness -and $emuleHarness.Session) {
+                & $Paths.EmuleHarnessStop -SessionDir $emuleHarness.Session.SessionDir | Out-Null
             }
         }
         if ($serverSession) {
@@ -661,10 +661,10 @@ if (-not $env:OVERLORD_TMP_DIR) {
 }
 
 $paths = @{
-    Profile = Join-Path $toolingRoot "profiles\New-OraclePrivateEd2kProfile.ps1"
-    ServerMetWriter = Join-Path $toolingRoot "helper-oracle-write-target-server-met.ps1"
-    OracleStart = Join-Path $toolingRoot "helper-oracle-start-private-ed2k-session.ps1"
-    OracleStop = Join-Path $toolingRoot "helper-oracle-stop-parity-session.ps1"
+    Profile = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
+    ServerMetWriter = Join-Path $toolingRoot "helper-emule-harness-write-target-server-met.ps1"
+    EmuleHarnessStart = Join-Path $toolingRoot "helper-emule-harness-start-private-ed2k-session.ps1"
+    EmuleHarnessStop = Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"
     AgentStart = Join-Path $toolingRoot "helper-agent-start-private-ed2k-session.ps1"
     AgentStop = Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"
     AgentEnrich = Join-Path $toolingRoot "helper-agent-post-enrich-download.ps1"
@@ -687,8 +687,8 @@ $results = @()
 $failed = $null
 
 try {
-    $results += Invoke-TestMultiFilePublishSearch -TestRoot (Join-Path $artifactRoot "multi-file") -Paths $paths -OracleBuildConfig $OracleBuildConfig
-    $results += Invoke-TestTwoOracleSameHash -TestRoot (Join-Path $artifactRoot "same-hash") -Paths $paths -OracleBuildConfig $OracleBuildConfig
+    $results += Invoke-TestMultiFilePublishSearch -TestRoot (Join-Path $artifactRoot "multi-file") -Paths $paths -EmuleHarnessBuildConfig $EmuleHarnessBuildConfig
+    $results += Invoke-TestTwoEmuleHarnessSameHash -TestRoot (Join-Path $artifactRoot "same-hash") -Paths $paths -EmuleHarnessBuildConfig $EmuleHarnessBuildConfig
     $results += Invoke-TestLowIdCallbackFailure -TestRoot (Join-Path $artifactRoot "callback") -Paths $paths
 }
 catch {

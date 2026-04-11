@@ -1,14 +1,14 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Runs a deterministic private oracle-to-agent ED2K download through a local goed2k-server.
+Runs a deterministic private eMule harness-to-agent ED2K download through a local goed2k-server.
 #>
 
 [CmdletBinding()]
 param(
-    [string]$ScenarioManifestPath = (Join-Path $PSScriptRoot "..\scenarios\ed2k.server.oracle.agent.private.v1\manifest.v1.json"),
+    [string]$ScenarioManifestPath = (Join-Path $PSScriptRoot "..\scenarios\ed2k.server.emule-harness.agent.private.v1\manifest.v1.json"),
     [ValidateSet("Debug", "Release")]
-    [string]$OracleBuildConfig = "Debug",
+    [string]$EmuleHarnessBuildConfig = "Debug",
     [int]$ServerPublishTimeoutSeconds = 180,
     [int]$DownloadTimeoutSeconds = 300,
     [switch]$KeepSessionsRunning
@@ -176,25 +176,25 @@ if (-not $env:OVERLORD_TMP_DIR) {
 
 $runId = "{0}-{1}" -f $manifest.scenarioId, (Get-Date -Format "yyyyMMdd-HHmmss")
 $artifactRoot = Join-Path $env:OVERLORD_TMP_DIR ("overlord-tooling\runs\{0}\{1}" -f $manifest.scenarioId, $runId)
-$oracleProfileRoot = Join-Path $artifactRoot "oracle-profile"
-$oracleSeedPath = Join-Path $oracleProfileRoot "Incoming\$($manifest.oracle.seedFileName)"
-$oracleLinkPath = Join-Path $oracleProfileRoot "seed.ed2k"
+$emuleHarnessProfileRoot = Join-Path $artifactRoot "emule-harness-profile"
+$emuleHarnessSeedPath = Join-Path $emuleHarnessProfileRoot "Incoming\$($manifest.emuleHarness.seedFileName)"
+$emuleHarnessLinkPath = Join-Path $emuleHarnessProfileRoot "seed.ed2k"
 $agentScenarioRoot = Join-Path $artifactRoot "agent"
 $serverScenarioRoot = Join-Path $artifactRoot "goed2k-server"
 $runManifestPath = Join-Path $artifactRoot "run-manifest.json"
 $runSummaryPath = Join-Path $artifactRoot "run-summary.json"
-$oracleArtifactsRoot = Join-Path $artifactRoot "oracle-artifacts"
+$emuleHarnessArtifactsRoot = Join-Path $artifactRoot "emule-harness-artifacts"
 $agentArtifactsRoot = Join-Path $artifactRoot "agent-artifacts"
 $serverArtifactsRoot = Join-Path $artifactRoot "server-artifacts"
 
-foreach ($path in @($artifactRoot, $oracleArtifactsRoot, $agentArtifactsRoot, $serverArtifactsRoot)) {
+foreach ($path in @($artifactRoot, $emuleHarnessArtifactsRoot, $agentArtifactsRoot, $serverArtifactsRoot)) {
     New-Item -ItemType Directory -Path $path -Force | Out-Null
 }
 
-$profileScriptPath = Join-Path $toolingRoot "profiles\New-OraclePrivateEd2kProfile.ps1"
-$oracleServerMetWriterPath = Join-Path $toolingRoot "helper-oracle-write-target-server-met.ps1"
-$oracleStartScriptPath = Join-Path $toolingRoot "helper-oracle-start-private-ed2k-session.ps1"
-$oracleStopScriptPath = Join-Path $toolingRoot "helper-oracle-stop-parity-session.ps1"
+$profileScriptPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
+$oracleServerMetWriterPath = Join-Path $toolingRoot "helper-emule-harness-write-target-server-met.ps1"
+$emuleHarnessStartScriptPath = Join-Path $toolingRoot "helper-emule-harness-start-private-ed2k-session.ps1"
+$emuleHarnessStopScriptPath = Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"
 $agentStartScriptPath = Join-Path $toolingRoot "helper-agent-start-private-ed2k-session.ps1"
 $agentStopScriptPath = Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"
 $serverStartScriptPath = Join-Path $toolingRoot "helper-goed2k-start-private-session.ps1"
@@ -205,8 +205,8 @@ $collectTransferScriptPath = Join-Path $toolingRoot "helper-agent-collect-ed2k-t
 foreach ($requiredPath in @(
     $profileScriptPath,
     $oracleServerMetWriterPath,
-    $oracleStartScriptPath,
-    $oracleStopScriptPath,
+    $emuleHarnessStartScriptPath,
+    $emuleHarnessStopScriptPath,
     $agentStartScriptPath,
     $agentStopScriptPath,
     $serverStartScriptPath,
@@ -220,18 +220,18 @@ foreach ($requiredPath in @(
 }
 
 $profile = & $profileScriptPath `
-    -ProfileRoot $oracleProfileRoot `
-    -BindAddr $manifest.oracle.bindAddr `
-    -TcpPort ([UInt16]$manifest.oracle.tcpPort) `
-    -UdpPort ([UInt16]$manifest.oracle.udpPort) `
-    -ServerUdpPort ([UInt16]$manifest.oracle.serverUdpPort) `
-    -WebPort ([UInt16]$manifest.oracle.webPort) `
-    -KadUdpKey ([UInt32]$manifest.oracle.kadUdpKey) `
+    -ProfileRoot $emuleHarnessProfileRoot `
+    -BindAddr $manifest.emuleHarness.bindAddr `
+    -TcpPort ([UInt16]$manifest.emuleHarness.tcpPort) `
+    -UdpPort ([UInt16]$manifest.emuleHarness.udpPort) `
+    -ServerUdpPort ([UInt16]$manifest.emuleHarness.serverUdpPort) `
+    -WebPort ([UInt16]$manifest.emuleHarness.webPort) `
+    -KadUdpKey ([UInt32]$manifest.emuleHarness.kadUdpKey) `
     -EnableKademlia $false `
     -EnableEd2k $true `
     -ResetTransientState
 
-New-SeedPdfFile -Path $oracleSeedPath -RepeatCount ([int]$manifest.oracle.seedRepeatCount)
+New-SeedPdfFile -Path $emuleHarnessSeedPath -RepeatCount ([int]$manifest.emuleHarness.seedRepeatCount)
 
 $oracleServerMetPath = Join-Path $profile.ProfileRoot "config\server.met"
 $runManifest = [ordered]@{
@@ -245,9 +245,9 @@ $runManifest = [ordered]@{
         tcpPort = [UInt16]$manifest.server.tcpPort
         adminPort = [UInt16]$manifest.server.adminPort
     }
-    oracle = [ordered]@{
+    emuleHarness = [ordered]@{
         profileRoot = $profile.ProfileRoot
-        seedFilePath = $oracleSeedPath
+        seedFilePath = $emuleHarnessSeedPath
         serverMetPath = $oracleServerMetPath
     }
     agent = [ordered]@{
@@ -257,7 +257,7 @@ $runManifest = [ordered]@{
 $runManifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8NoBOM $runManifestPath
 
 $serverSession = $null
-$oracleSession = $null
+$emuleHarnessSession = $null
 $agentSession = $null
 $parsedLink = $null
 $publishedFile = $null
@@ -283,15 +283,15 @@ try {
         -ServerPort ([int]$manifest.server.tcpPort) `
         -DestinationPath $oracleServerMetPath | Out-Null
 
-    $oracleSession = & $oracleStartScriptPath `
+    $emuleHarnessSession = & $emuleHarnessStartScriptPath `
         -ProfileRoot $profile.ProfileRoot `
-        -SeedFilePath $oracleSeedPath `
-        -ExportLinkPath $oracleLinkPath `
+        -SeedFilePath $emuleHarnessSeedPath `
+        -ExportLinkPath $emuleHarnessLinkPath `
         -AgentBootstrapNode "127.0.0.1:1" `
-        -BuildConfig $OracleBuildConfig
+        -BuildConfig $EmuleHarnessBuildConfig
 
-    Wait-Path -Path $oracleLinkPath -TimeoutSeconds 60
-    $parsedLink = Parse-Ed2kLinkFile -Path $oracleLinkPath
+    Wait-Path -Path $emuleHarnessLinkPath -TimeoutSeconds 60
+    $parsedLink = Parse-Ed2kLinkFile -Path $emuleHarnessLinkPath
     $publishedFile = Wait-GoEd2kFileAvailable `
         -BaseUrl $serverSession.AdminBaseUrl `
         -AdminToken $serverSession.AdminToken `
@@ -325,15 +325,15 @@ try {
         -DestinationRoot $agentArtifactsRoot
 
     foreach ($path in @(
-        $oracleSession.ExportLinkPath,
-        $oracleSession.TraceLogPath,
-        $oracleSession.VerboseLogPath,
-        $oracleSession.StatusLogPath,
-        $oracleSession.OracleUdpDumpPath,
-        $oracleSession.OracleEd2kTcpDumpPath
+        $emuleHarnessSession.ExportLinkPath,
+        $emuleHarnessSession.TraceLogPath,
+        $emuleHarnessSession.VerboseLogPath,
+        $emuleHarnessSession.StatusLogPath,
+        $emuleHarnessSession.EmuleHarnessUdpDumpPath,
+        $emuleHarnessSession.EmuleHarnessEd2kTcpDumpPath
     )) {
         if ($path -and (Test-Path -LiteralPath $path)) {
-            Copy-Item -LiteralPath $path -Destination (Join-Path $oracleArtifactsRoot (Split-Path -Leaf $path)) -Force
+            Copy-Item -LiteralPath $path -Destination (Join-Path $emuleHarnessArtifactsRoot (Split-Path -Leaf $path)) -Force
         }
     }
 
@@ -389,8 +389,8 @@ finally {
         if ($serverSession) {
             & $serverStopScriptPath -SessionDir $serverSession.SessionDir | Out-Null
         }
-        if ($oracleSession) {
-            & $oracleStopScriptPath -SessionDir $oracleSession.SessionDir | Out-Null
+        if ($emuleHarnessSession) {
+            & $emuleHarnessStopScriptPath -SessionDir $emuleHarnessSession.SessionDir | Out-Null
         }
         if ($agentSession) {
             & $agentStopScriptPath -SessionDir $agentSession.SessionDir | Out-Null

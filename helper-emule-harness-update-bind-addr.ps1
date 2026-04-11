@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Updates the oracle preferences BindAddr to the current preferred IPv4 address.
+Updates the eMule harness preferences BindAddr to the current preferred IPv4 address.
 #>
 
 [CmdletBinding()]
@@ -17,7 +17,7 @@ $networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.p
 $runtimeRoot = if ($ProfileRoot) {
     [System.IO.Path]::GetFullPath($ProfileRoot)
 } else {
-    & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+    & (Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1")
 }
 $resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
 $preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"

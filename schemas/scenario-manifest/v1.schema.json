@@ -8,7 +8,7 @@
     "scenarioId",
     "description",
     "seedBundle",
-    "oracle",
+    "emuleHarness",
     "agent",
     "milestones"
   ],
@@ -46,7 +46,7 @@
       },
       "additionalProperties": true
     },
-    "oracle": {
+    "emuleHarness": {
       "type": "object",
       "required": [
         "dynamicPreferenceKeys",

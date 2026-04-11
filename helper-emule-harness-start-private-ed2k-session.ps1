@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Starts one minimized eMule oracle for a private Kad+ED2K run.
+Starts one minimized eMule harness for a private Kad+ED2K run.
 #>
 
 [CmdletBinding()]
@@ -40,10 +40,10 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
     throw "OVERLORD_TMP_DIR is not set"
 }
 
-$readyReaderPath = Join-Path $PSScriptRoot "helper-oracle-read-ready-file.ps1"
-$cleanupHelperPath = Join-Path $PSScriptRoot "helper-oracle-clean-runtime.ps1"
+$readyReaderPath = Join-Path $PSScriptRoot "helper-emule-harness-read-ready-file.ps1"
+$cleanupHelperPath = Join-Path $PSScriptRoot "helper-emule-harness-clean-runtime.ps1"
 
-function Resolve-OracleHarnessDir {
+function Resolve-EmuleHarnessDir {
     param(
         [Parameter(Mandatory = $true)]
         [ValidateSet("Debug", "Release")]
@@ -77,17 +77,17 @@ function Resolve-OracleHarnessDir {
     return $harnessDir
 }
 
-$oracleHarnessDir = Resolve-OracleHarnessDir -Configuration $BuildConfig
-$oracleExePath = Join-Path $oracleHarnessDir "eMule_v072a_parity.exe"
+$emuleHarnessDir = Resolve-EmuleHarnessDir -Configuration $BuildConfig
+$emuleHarnessExePath = Join-Path $emuleHarnessDir "eMule_v072a_parity.exe"
 
-if (-not (Test-Path -LiteralPath $oracleExePath)) {
-    throw "eMule harness executable not found at $oracleExePath — run helper-oracle-build-debug.ps1 first"
+if (-not (Test-Path -LiteralPath $emuleHarnessExePath)) {
+    throw "eMule harness executable not found at $emuleHarnessExePath — run helper-emule-harness-build-debug.ps1 first"
 }
 if (-not (Test-Path -LiteralPath $cleanupHelperPath)) {
-    throw "Oracle cleanup helper not found at $cleanupHelperPath"
+    throw "eMule harness cleanup helper not found at $cleanupHelperPath"
 }
 if (-not (Test-Path -LiteralPath $readyReaderPath -PathType Leaf)) {
-    throw "Oracle ready-file reader not found at $readyReaderPath"
+    throw "eMule harness ready-file reader not found at $readyReaderPath"
 }
 if (-not (Test-Path -LiteralPath $SeedFilePath)) {
     throw "Seed file not found at $SeedFilePath"
@@ -96,7 +96,7 @@ if (-not (Test-Path -LiteralPath $SeedFilePath)) {
 $profile = [System.IO.Path]::GetFullPath($ProfileRoot)
 $readyFile = Join-Path $profile "harness.ready"
 $logsRoot = Join-Path $profile "logs"
-$traceLogPath = Join-Path $logsRoot "oracle-kad-trace.log"
+$traceLogPath = Join-Path $logsRoot "emule-harness-kad-trace.log"
 $verboseLogPath = Join-Path $logsRoot "eMule_Verbose.log"
 $statusLogPath = Join-Path $profile "status.log"
 
@@ -104,10 +104,10 @@ if (-not $SkipRuntimeCleanup) {
     & $cleanupHelperPath -CapturePort 0 | Out-Null
 }
 
-$sessionName = "private-oracle-{0}" -f (Get-Date -Format "yyyyMMdd-HHmmss")
+$sessionName = "private-emule-harness-{0}" -f (Get-Date -Format "yyyyMMdd-HHmmss")
 $sessionDir = Join-Path $tmpDir $sessionName
 New-Item -ItemType Directory -Path $sessionDir -Force | Out-Null
-$metadataPath = Join-Path $sessionDir "oracle-session.json"
+$metadataPath = Join-Path $sessionDir "emule-harness-session.json"
 $sessionStartUtc = (Get-Date).ToUniversalTime()
 $readyState = $null
 
@@ -118,9 +118,9 @@ foreach ($path in @($readyFile, $ExportLinkPath, $statusLogPath)) {
 }
 
 $traceLinesBefore = if (Test-Path -LiteralPath $traceLogPath) { @(Get-Content $traceLogPath).Count } else { 0 }
-$oracleProcess = Start-Process `
-    -FilePath $oracleExePath `
-    -WorkingDirectory $oracleHarnessDir `
+$emuleHarnessProcess = Start-Process `
+    -FilePath $emuleHarnessExePath `
+    -WorkingDirectory $emuleHarnessDir `
     -ArgumentList @(
         "-AutoStart",
         "-configdir=""$profile""",
@@ -142,21 +142,21 @@ while ((Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 250
 }
 if (-not (Test-Path -LiteralPath $readyFile)) {
-    & $cleanupHelperPath -CapturePort 0 -OraclePids @($oracleProcess.Id) | Out-Null
-    throw "Timed out waiting for oracle readiness marker at $readyFile"
+    & $cleanupHelperPath -CapturePort 0 -EmuleHarnessPids @($emuleHarnessProcess.Id) | Out-Null
+    throw "Timed out waiting for eMule harness readiness marker at $readyFile"
 }
 
 $readyState = & $readyReaderPath -Path $readyFile
 if ((Normalize-DirectoryPath -Path $readyState.ProfileRoot) -ne (Normalize-DirectoryPath -Path $profile)) {
-    & $cleanupHelperPath -CapturePort 0 -OraclePids @($oracleProcess.Id) | Out-Null
-    throw "Oracle reported profile root '$($readyState.ProfileRoot)' instead of '$profile'"
+    & $cleanupHelperPath -CapturePort 0 -EmuleHarnessPids @($emuleHarnessProcess.Id) | Out-Null
+    throw "eMule harness reported profile root '$($readyState.ProfileRoot)' instead of '$profile'"
 }
 
-$udpDumpPath = Get-ChildItem -LiteralPath $logsRoot -Filter "oracle-udp-dump-*.jsonl" -ErrorAction SilentlyContinue |
+$udpDumpPath = Get-ChildItem -LiteralPath $logsRoot -Filter "emule-harness-udp-dump-*.jsonl" -ErrorAction SilentlyContinue |
     Where-Object { $_.LastWriteTimeUtc -ge $sessionStartUtc.AddSeconds(-5) } |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1 -ExpandProperty FullName
-$ed2kDumpPath = Get-ChildItem -LiteralPath $logsRoot -Filter "oracle-ed2k-tcp-dump-*.jsonl" -ErrorAction SilentlyContinue |
+$ed2kDumpPath = Get-ChildItem -LiteralPath $logsRoot -Filter "emule-harness-ed2k-tcp-dump-*.jsonl" -ErrorAction SilentlyContinue |
     Where-Object { $_.LastWriteTimeUtc -ge $sessionStartUtc.AddSeconds(-5) } |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1 -ExpandProperty FullName
@@ -164,10 +164,10 @@ $ed2kDumpPath = Get-ChildItem -LiteralPath $logsRoot -Filter "oracle-ed2k-tcp-du
 $metadata = [pscustomobject]@{
     SessionDir = $sessionDir
     SessionName = $sessionName
-    OraclePid = $oracleProcess.Id
-    OracleExePath = $oracleExePath
-    OracleProfileRoot = $profile
-    OracleReadyState = $readyState
+    EmuleHarnessPid = $emuleHarnessProcess.Id
+    EmuleHarnessExePath = $emuleHarnessExePath
+    EmuleHarnessProfileRoot = $profile
+    EmuleHarnessReadyState = $readyState
     SeedFilePath = $SeedFilePath
     ExportLinkPath = $ExportLinkPath
     ReadyFile = $readyFile
@@ -178,8 +178,8 @@ $metadata = [pscustomobject]@{
     CapturePath = $null
     CapturePort = 0
     PacketDumpPath = $udpDumpPath
-    OracleUdpDumpPath = $udpDumpPath
-    OracleEd2kTcpDumpPath = $ed2kDumpPath
+    EmuleHarnessUdpDumpPath = $udpDumpPath
+    EmuleHarnessEd2kTcpDumpPath = $ed2kDumpPath
     AgentBootstrapNode = $AgentBootstrapNode
     StartedAtUtc = $sessionStartUtc.ToString("o")
 }

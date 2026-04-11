@@ -1,11 +1,11 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Stops oracle parity runtime processes and waits for them to exit.
+Stops eMule harness parity runtime processes and waits for them to exit.
 
 .DESCRIPTION
-Terminates the distinct parity oracle process, legacy local oracle names, and
-associated dumpcap capture processes for a given UDP capture port. The helper
+Terminates the distinct parity eMule harness process, associated local runtime
+names, and dumpcap capture processes for a given UDP capture port. The helper
 verifies that all targeted processes are gone before returning so new runs do
 not inherit stale runtime state.
 #>
@@ -14,7 +14,7 @@ not inherit stale runtime state.
 param(
     [int]$CapturePort = 0,
     [AllowEmptyCollection()]
-    [int[]]$OraclePids = @(),
+    [int[]]$EmuleHarnessPids = @(),
     [AllowEmptyCollection()]
     [int[]]$DumpcapPids = @(),
     [int]$WaitTimeoutSeconds = 15
@@ -23,7 +23,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Get-OracleProcessNames {
+function Get-EmuleHarnessProcessNames {
     @("eMule_v072a_parity")
 }
 
@@ -71,17 +71,17 @@ function Stop-DumpcapCapturePort {
 function Test-NoProcessesRemain {
     param(
         [Parameter(Mandatory = $true)]
-        [string[]]$OracleNames,
+        [string[]]$EmuleHarnessNames,
         [AllowEmptyCollection()]
-        [int[]]$OracleIds,
+        [int[]]$EmuleHarnessIds,
         [AllowEmptyCollection()]
         [int[]]$CaptureIds
     )
 
-    $resolvedOracleIds = Get-ValidProcessIds -Ids $OracleIds
+    $resolvedEmuleHarnessIds = Get-ValidProcessIds -Ids $EmuleHarnessIds
     $resolvedCaptureIds = Get-ValidProcessIds -Ids $CaptureIds
 
-    foreach ($processId in $resolvedOracleIds) {
+    foreach ($processId in $resolvedEmuleHarnessIds) {
         if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
             return $false
         }
@@ -94,8 +94,8 @@ function Test-NoProcessesRemain {
     }
 
     # Pre-launch cleanup (no specific PIDs): wait for all name-matched processes to be gone
-    if ($resolvedOracleIds.Count -eq 0) {
-        if (@(Get-Process -Name $OracleNames -ErrorAction SilentlyContinue).Count -gt 0) {
+    if ($resolvedEmuleHarnessIds.Count -eq 0) {
+        if (@(Get-Process -Name $EmuleHarnessNames -ErrorAction SilentlyContinue).Count -gt 0) {
             return $false
         }
     }
@@ -103,35 +103,35 @@ function Test-NoProcessesRemain {
     return $true
 }
 
-$oracleProcessNames = Get-OracleProcessNames
+$emuleHarnessProcessNames = Get-EmuleHarnessProcessNames
 Stop-ProcessIds -Ids $DumpcapPids
 if ($CapturePort -gt 0) {
     Stop-DumpcapCapturePort -Port $CapturePort
 }
 
-Stop-ProcessIds -Ids $OraclePids
-# Pre-launch cleanup only: if no PIDs were provided, kill any leftover oracle by name
-if ((Get-ValidProcessIds -Ids $OraclePids).Count -eq 0) {
-    foreach ($name in $oracleProcessNames) {
+Stop-ProcessIds -Ids $EmuleHarnessPids
+# Pre-launch cleanup only: if no PIDs were provided, kill any leftover eMule harness by name
+if ((Get-ValidProcessIds -Ids $EmuleHarnessPids).Count -eq 0) {
+    foreach ($name in $emuleHarnessProcessNames) {
         Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force
     }
 }
 
 $deadline = (Get-Date).AddSeconds($WaitTimeoutSeconds)
 while ((Get-Date) -lt $deadline) {
-    if (Test-NoProcessesRemain -OracleNames $oracleProcessNames -OracleIds $OraclePids -CaptureIds $DumpcapPids) {
+    if (Test-NoProcessesRemain -EmuleHarnessNames $emuleHarnessProcessNames -EmuleHarnessIds $EmuleHarnessPids -CaptureIds $DumpcapPids) {
         break
     }
     Start-Sleep -Milliseconds 250
 }
 
-if (-not (Test-NoProcessesRemain -OracleNames $oracleProcessNames -OracleIds $OraclePids -CaptureIds $DumpcapPids)) {
-    throw "Oracle runtime cleanup did not fully terminate the targeted processes"
+if (-not (Test-NoProcessesRemain -EmuleHarnessNames $emuleHarnessProcessNames -EmuleHarnessIds $EmuleHarnessPids -CaptureIds $DumpcapPids)) {
+    throw "eMule harness runtime cleanup did not fully terminate the targeted processes"
 }
 
 [pscustomobject]@{
     CapturePort = $CapturePort
-    OraclePids = Get-ValidProcessIds -Ids $OraclePids
+    EmuleHarnessPids = Get-ValidProcessIds -Ids $EmuleHarnessPids
     DumpcapPids = Get-ValidProcessIds -Ids $DumpcapPids
     CleanedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
 }

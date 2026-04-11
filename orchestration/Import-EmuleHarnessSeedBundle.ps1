@@ -1,11 +1,11 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Imports canonical oracle seed files into an untracked local seed bundle.
+Imports canonical eMule harness seed files into an untracked local seed bundle.
 
 .DESCRIPTION
 Copies the operator-supplied `nodes.dat` and `server.met` into
-`overlord-tooling/.local/oracle-seeds/<bundle-id>/` and writes a machine-readable
+`overlord-tooling/.local/emule-harness-seeds/<bundle-id>/` and writes a machine-readable
 manifest with file hashes. Source paths are intentionally not persisted.
 #>
 
@@ -22,7 +22,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$seedRoot = Join-Path $repoRoot ".local\oracle-seeds\$BundleId"
+$seedRoot = Join-Path $repoRoot ".local\emule-harness-seeds\$BundleId"
 
 if (-not (Test-Path $NodesDatPath)) {
     throw "nodes.dat not found at the supplied path"
@@ -40,7 +40,7 @@ Copy-Item -LiteralPath $NodesDatPath -Destination $nodesTargetPath -Force
 Copy-Item -LiteralPath $ServerMetPath -Destination $serverTargetPath -Force
 
 $manifest = [ordered]@{
-    schemaVersion = "oracle-seed-bundle/v1"
+    schemaVersion = "emule-harness-seed-bundle/v1"
     bundleId = $BundleId
     importedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     files = @(

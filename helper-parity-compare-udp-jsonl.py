@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compare oracle and agent UDP JSONL dumps by actual wire mode and opcode.
+Compare eMule harness and agent UDP JSONL dumps by actual wire mode and opcode.
 """
 
 from __future__ import annotations
@@ -48,9 +48,9 @@ OPCODE_NAME_BY_HEX = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compare oracle and agent UDP JSONL packet dumps."
+        description="Compare eMule harness and agent UDP JSONL packet dumps."
     )
-    parser.add_argument("--oracle", required=True, help="Path to the oracle JSONL dump")
+    parser.add_argument("--emule-harness", required=True, help="Path to the eMule harness JSONL dump")
     parser.add_argument("--agent", required=True, help="Path to the agent JSONL dump")
     parser.add_argument(
         "--opcodes",
@@ -87,8 +87,8 @@ def normalize_record(source: str, record: dict) -> dict:
         receiver_verify_key = as_int(receiver_verify_key)
         if not raw_obfuscated:
             transport_mode = "plaintext"
-        elif source == "oracle":
-            transport_mode = infer_oracle_transport_mode(record.get("wire_hex", ""))
+        elif source == "emuleHarness":
+            transport_mode = infer_emule_harness_transport_mode(record.get("wire_hex", ""))
         elif receiver_valid or (receiver_verify_key is not None and receiver_verify_key > 0):
             transport_mode = "receiver_verify_key"
         else:
@@ -139,7 +139,7 @@ def normalize_hex_key(value: str) -> str:
     return value.upper()
 
 
-def infer_oracle_transport_mode(wire_hex: str) -> str:
+def infer_emule_harness_transport_mode(wire_hex: str) -> str:
     if len(wire_hex) < 2:
         return "node_id"
     first_byte = int(wire_hex[:2], 16)
@@ -190,17 +190,17 @@ def render_side(name: str, buckets: dict[tuple[str, str, str], Counter]) -> list
     return lines
 
 
-def render_parity(oracle_buckets: dict, agent_buckets: dict) -> list[str]:
+def render_parity(emule_harness_buckets: dict, agent_buckets: dict) -> list[str]:
     lines = ["parity matrix:"]
-    all_keys = sorted(set(oracle_buckets) | set(agent_buckets))
+    all_keys = sorted(set(emule_harness_buckets) | set(agent_buckets))
     if not all_keys:
         lines.append("  <none>")
         return lines
     for key in all_keys:
-        oracle_count = oracle_buckets.get(key, Counter()).get("count", 0)
+        emule_harness_count = emule_harness_buckets.get(key, Counter()).get("count", 0)
         agent_count = agent_buckets.get(key, Counter()).get("count", 0)
         lines.append(
-            f"  direction={key[0]} mode={key[1]} opcode={key[2]} oracle={oracle_count} agent={agent_count}"
+            f"  direction={key[0]} mode={key[1]} opcode={key[2]} emule_harness={emule_harness_count} agent={agent_count}"
         )
     return lines
 
@@ -208,17 +208,17 @@ def render_parity(oracle_buckets: dict, agent_buckets: dict) -> list[str]:
 def main() -> int:
     args = parse_args()
     keep_opcodes = set(args.opcodes)
-    oracle_records = load_records(Path(args.oracle), "oracle")
+    emule_harness_records = load_records(Path(args.emule_harness), "emuleHarness")
     agent_records = load_records(Path(args.agent), "agent")
 
-    oracle_buckets = bucket_records(oracle_records, keep_opcodes)
+    emule_harness_buckets = bucket_records(emule_harness_records, keep_opcodes)
     agent_buckets = bucket_records(agent_records, keep_opcodes)
 
-    for line in render_side("oracle", oracle_buckets):
+    for line in render_side("emuleHarness", emule_harness_buckets):
         print(line)
     for line in render_side("agent", agent_buckets):
         print(line)
-    for line in render_parity(oracle_buckets, agent_buckets):
+    for line in render_parity(emule_harness_buckets, agent_buckets):
         print(line)
     return 0
 

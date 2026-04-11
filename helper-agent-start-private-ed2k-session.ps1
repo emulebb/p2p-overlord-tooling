@@ -1,14 +1,14 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Starts a private local-only agent session for one oracle download scenario.
+Starts a private local-only agent session for one eMule harness download scenario.
 #>
 
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string]$ScenarioRoot,
-    [string]$OracleBootstrapNode,
+    [string]$EmuleHarnessBootstrapNode,
     [UInt16]$ControlPort = 13301,
     [UInt16]$KadPort = 41120,
     [UInt16]$Ed2kPort = 41121,
@@ -53,7 +53,7 @@ foreach ($requiredPath in @($cleanupHelperPath, $configWriterPath, $launchHelper
 
 $configWriterParams = @{
     ScenarioRoot = $ScenarioRoot
-    OracleBootstrapNode = $OracleBootstrapNode
+    EmuleHarnessBootstrapNode = $EmuleHarnessBootstrapNode
     ControlPort = $ControlPort
     KadPort = $KadPort
     Ed2kPort = $Ed2kPort

@@ -1,10 +1,10 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Materializes a scenario-owned oracle profile root from a scenario manifest.
+Materializes a scenario-owned eMule harness profile root from a scenario manifest.
 
 .DESCRIPTION
-Creates the profile-root layout expected by the instrumented oracle and writes a
+Creates the profile-root layout expected by the instrumented eMule harness and writes a
 minimal `preferences.ini` containing only the manifest-owned seeded keys plus
 the allowed per-run overrides.
 #>
@@ -47,10 +47,10 @@ function ConvertTo-IniString {
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $manifest = Get-Content -Raw $ScenarioManifestPath | ConvertFrom-Json -AsHashtable
-$seedRoot = Join-Path $repoRoot ".local\oracle-seeds\$SeedBundleId"
+$seedRoot = Join-Path $repoRoot ".local\emule-harness-seeds\$SeedBundleId"
 
 if (-not (Test-Path $seedRoot)) {
-    throw "Local oracle seed bundle '$SeedBundleId' was not found under $seedRoot"
+    throw "Local eMule harness seed bundle '$SeedBundleId' was not found under $seedRoot"
 }
 
 $nodesSourcePath = Join-Path $seedRoot "nodes.dat"
@@ -96,16 +96,16 @@ if ($PSBoundParameters.ContainsKey("ServerUdpPort")) {
 }
 
 $preferenceSections = [ordered]@{}
-foreach ($sectionName in $manifest.oracle.seededPreferenceDefaults.Keys) {
+foreach ($sectionName in $manifest.emuleHarness.seededPreferenceDefaults.Keys) {
     $entries = [ordered]@{}
-    foreach ($entryName in $manifest.oracle.seededPreferenceDefaults[$sectionName].Keys) {
-        $entries[$entryName] = [string]$manifest.oracle.seededPreferenceDefaults[$sectionName][$entryName]
+    foreach ($entryName in $manifest.emuleHarness.seededPreferenceDefaults[$sectionName].Keys) {
+        $entries[$entryName] = [string]$manifest.emuleHarness.seededPreferenceDefaults[$sectionName][$entryName]
     }
     $preferenceSections[$sectionName] = $entries
 }
 
 foreach ($overrideName in $dynamicOverrides.Keys) {
-    $targetSection = $manifest.oracle.dynamicPreferenceKeys[$overrideName]
+    $targetSection = $manifest.emuleHarness.dynamicPreferenceKeys[$overrideName]
     if (-not $targetSection) {
         throw "Scenario manifest does not declare a target section for dynamic preference '$overrideName'"
     }
@@ -127,7 +127,7 @@ Copy-Item -LiteralPath $nodesSourcePath -Destination (Join-Path $profileConfigRo
 Copy-Item -LiteralPath $serverSourcePath -Destination (Join-Path $profileConfigRoot "server.met") -Force
 
 $profileManifest = [ordered]@{
-    schemaVersion = "oracle-profile/v1"
+    schemaVersion = "emule-harness-profile/v1"
     scenarioId = $manifest.scenarioId
     profileRoot = $resolvedProfileRoot
     seedBundleId = $SeedBundleId
@@ -154,7 +154,7 @@ $profileManifest = [ordered]@{
     }
 }
 
-$profileManifestPath = Join-Path $resolvedProfileRoot "oracle-profile.json"
+$profileManifestPath = Join-Path $resolvedProfileRoot "emule-harness-profile.json"
 $profileManifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8NoBOM $profileManifestPath
 
 [pscustomobject]@{

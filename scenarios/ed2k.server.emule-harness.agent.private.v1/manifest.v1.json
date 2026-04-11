@@ -1,7 +1,7 @@
 {
   "schemaVersion": "scenario-manifest/v1",
-  "scenarioId": "ed2k.server.oracle.agent.private.v1",
-  "description": "Private local oracle and agent ED2K download routed through a local goed2k-server.",
+  "scenarioId": "ed2k.server.emule-harness.agent.private.v1",
+  "description": "Private local eMule harness and agent ED2K download routed through a local goed2k-server.",
   "server": {
     "host": "127.0.0.1",
     "tcpPort": 42161,
@@ -10,7 +10,7 @@
     "adminToken": "local-goed2k-token",
     "enableObfuscation": false
   },
-  "oracle": {
+  "emuleHarness": {
     "bindAddr": "127.0.0.1",
     "tcpPort": 42062,
     "udpPort": 42072,

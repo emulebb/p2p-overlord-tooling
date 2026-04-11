@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Writes a local-only agent config for a private oracle download scenario.
+Writes a local-only agent config for a private eMule harness download scenario.
 
 .DESCRIPTION
 Overwrites the runtime config consumed by the existing Windows debug launcher so
@@ -13,7 +13,7 @@ stores all logs and transfer manifests under a scenario-owned root.
 param(
     [Parameter(Mandatory = $true)]
     [string]$ScenarioRoot,
-    [string]$OracleBootstrapNode,
+    [string]$EmuleHarnessBootstrapNode,
     [UInt16]$ControlPort = 13301,
     [UInt16]$KadPort = 41120,
     [UInt16]$Ed2kPort = 41121,
@@ -57,10 +57,10 @@ if (Test-Path -LiteralPath $configPath) {
 }
 
 $obfuscationEnabled = if ($EnableObfuscation) { "true" } else { "false" }
-$bootstrapNodesValue = if ($DisableKad -or [string]::IsNullOrWhiteSpace($OracleBootstrapNode)) {
+$bootstrapNodesValue = if ($DisableKad -or [string]::IsNullOrWhiteSpace($EmuleHarnessBootstrapNode)) {
     "[]"
 } else {
-    '["{0}"]' -f $OracleBootstrapNode
+    '["{0}"]' -f $EmuleHarnessBootstrapNode
 }
 $serverEndpointsValue = "[]"
 $serverEntriesValue = "[]"
@@ -180,7 +180,7 @@ max_files = 7
     Ed2kPort = $Ed2kPort
     P2pBindIp = $P2pBindIp
     KadBootstrapReadyContacts = $KadBootstrapReadyContacts
-    OracleBootstrapNode = $OracleBootstrapNode
+    EmuleHarnessBootstrapNode = $EmuleHarnessBootstrapNode
     KadDisabled = [bool]$DisableKad
     ServerHost = if ([string]::IsNullOrWhiteSpace($ServerHost)) { $null } else { $ServerHost }
     ServerPort = if ($ServerPort -gt 0) { $ServerPort } else { $null }

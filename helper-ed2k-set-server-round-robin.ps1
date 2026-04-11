@@ -7,7 +7,7 @@ Loads ED2K server endpoints from a bundled server.met file and applies them to l
 This helper parses the classic `server.met` binary format, preserves the
 server-side metadata needed for ED2K obfuscation parity, rewrites the local
 agent runtime config to use those servers in-order, and optionally mirrors the
-same file into the oracle debug profile so both sides round-robin through the
+same file into the eMule harness debug profile so both sides round-robin through the
 same pool.
 #>
 
@@ -19,7 +19,7 @@ param(
     [int]$SessionRotationSeconds = 45,
     [int]$ConnectTimeoutSeconds = 8,
     [int]$ReconnectIntervalSeconds = 5,
-    [switch]$SkipOracleSync
+    [switch]$SkipEmuleHarnessSync
 )
 
 Set-StrictMode -Version Latest
@@ -322,14 +322,14 @@ $content = Set-TomlIntegerKey -Content $content -SectionName "p2p.ed2k" -Key "re
     (New-Object System.Text.UTF8Encoding($false))
 )
 
-if (-not $SkipOracleSync) {
+if (-not $SkipEmuleHarnessSync) {
     Copy-Item -LiteralPath $SourcePath -Destination $oracleServerMetPath -Force
 }
 
 [pscustomobject]@{
     SourcePath = $SourcePath
     AgentConfigPath = $AgentConfigPath
-    OracleServerMetPath = if ($SkipOracleSync) { $null } else { $oracleServerMetPath }
+    EmuleHarnessServerMetPath = if ($SkipEmuleHarnessSync) { $null } else { $oracleServerMetPath }
     ServerCount = @($selectedEndpoints).Count
     SessionRotationSeconds = $SessionRotationSeconds
     ConnectTimeoutSeconds = $ConnectTimeoutSeconds

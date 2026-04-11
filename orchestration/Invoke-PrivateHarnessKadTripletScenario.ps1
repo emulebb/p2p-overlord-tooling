@@ -194,7 +194,7 @@ function Wait-HarnessPublishReady {
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $tracePattern = 'event=(publish_|search_storefile_prepare|search_storekeyword_prepare|search_storesource_prepare)'
-    $verbosePattern = 'Oracle publish gate ready|Oracle publish start family='
+    $verbosePattern = 'eMule harness publish gate ready|eMule harness publish start family='
     while ((Get-Date) -lt $deadline) {
         $lines = @(Get-NewHarnessTraceLines -HarnessSession $HarnessSession)
         $publishLines = @($lines | Where-Object { $_ -match $tracePattern })
@@ -223,7 +223,7 @@ function Wait-HarnessPublishReady {
         Start-Sleep -Seconds 2
     }
 
-    throw "Harness session $($HarnessSession.OracleProfileRoot) did not emit publish-ready trace markers within $TimeoutSeconds seconds"
+    throw "Harness session $($HarnessSession.EmuleHarnessProfileRoot) did not emit publish-ready trace markers within $TimeoutSeconds seconds"
 }
 
 function Wait-HarnessContactReady {
@@ -249,7 +249,7 @@ function Wait-HarnessContactReady {
         Start-Sleep -Seconds 2
     }
 
-    throw "Harness session $($HarnessSession.OracleProfileRoot) did not validate any Kad contact within $TimeoutSeconds seconds"
+    throw "Harness session $($HarnessSession.EmuleHarnessProfileRoot) did not validate any Kad contact within $TimeoutSeconds seconds"
 }
 
 function Invoke-AgentManualPublishWhenReady {
@@ -308,7 +308,7 @@ function Get-HarnessPublishSummary {
     )
 
     $tracePattern = 'event=(publish_|search_storefile_prepare|search_storekeyword_prepare|search_storesource_prepare)'
-    $verbosePattern = 'Oracle publish gate ready|Oracle publish start family='
+    $verbosePattern = 'eMule harness publish gate ready|eMule harness publish start family='
     $traceLines = @(Get-NewHarnessTraceLines -HarnessSession $HarnessSession)
     $tracePublishLines = @($traceLines | Where-Object { $_ -match $tracePattern })
     $verbosePublishLines = @()
@@ -515,12 +515,12 @@ foreach ($path in @($artifactRoot, $harnessArtifactRoot, $agentArtifactRoot, $co
     New-Item -ItemType Directory -Path $path -Force | Out-Null
 }
 
-$buildScriptPath = Join-Path $toolingRoot "helper-oracle-build-debug.ps1"
-$harnessDirResolverPath = Join-Path $toolingRoot "helper-oracle-resolve-harness-debug-dir.ps1"
-$profileScriptPath = Join-Path $toolingRoot "profiles\New-OraclePrivateEd2kProfile.ps1"
-$harnessStartScriptPath = Join-Path $toolingRoot "helper-oracle-start-private-ed2k-session.ps1"
-$harnessStopScriptPath = Join-Path $toolingRoot "helper-oracle-stop-parity-session.ps1"
-$harnessCleanupScriptPath = Join-Path $toolingRoot "helper-oracle-clean-runtime.ps1"
+$buildScriptPath = Join-Path $toolingRoot "helper-emule-harness-build-debug.ps1"
+$harnessDirResolverPath = Join-Path $toolingRoot "helper-emule-harness-resolve-harness-debug-dir.ps1"
+$profileScriptPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
+$harnessStartScriptPath = Join-Path $toolingRoot "helper-emule-harness-start-private-ed2k-session.ps1"
+$harnessStopScriptPath = Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"
+$harnessCleanupScriptPath = Join-Path $toolingRoot "helper-emule-harness-clean-runtime.ps1"
 $agentStartScriptPath = Join-Path $toolingRoot "helper-agent-start-private-ed2k-session.ps1"
 $agentStopScriptPath = Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"
 $agentSeedScriptPath = Join-Path $toolingRoot "helper-agent-post-seed-popular.ps1"
@@ -653,7 +653,7 @@ try {
     $firstHarnessBootstrap = "{0}:{1}" -f $manifest.harnesses[0].bindAddr, [UInt16]$manifest.harnesses[0].udpPort
     $agentSession = & $agentStartScriptPath `
         -ScenarioRoot (Join-Path $artifactRoot "agent-runtime") `
-        -OracleBootstrapNode $firstHarnessBootstrap `
+        -EmuleHarnessBootstrapNode $firstHarnessBootstrap `
         -ControlPort ([UInt16]$manifest.agent.controlPort) `
         -KadPort ([UInt16]$manifest.agent.kadPort) `
         -Ed2kPort ([UInt16]$manifest.agent.ed2kPort) `
@@ -738,8 +738,8 @@ try {
             $session.TraceLogPath,
             $session.VerboseLogPath,
             $session.StatusLogPath,
-            $session.OracleUdpDumpPath,
-            $session.OracleEd2kTcpDumpPath
+            $session.EmuleHarnessUdpDumpPath,
+            $session.EmuleHarnessEd2kTcpDumpPath
         )) {
             Copy-IfExists -Path $path -DestinationRoot $destinationRoot
         }

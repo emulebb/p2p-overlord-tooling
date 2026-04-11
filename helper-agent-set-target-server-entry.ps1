@@ -5,7 +5,7 @@ Pins the agent runtime ED2K config to a single metadata-rich server entry.
 
 .DESCRIPTION
 This helper is for deterministic parity sessions where the agent must connect to
-one known ED2K server and preserve oracle-observed metadata such as UDP flags
+one known ED2K server and preserve eMule harness-observed metadata such as UDP flags
 and obfuscation ports. It updates both `server_entries` and the legacy
 `server_endpoints` array in the live runtime TOML config.
 #>

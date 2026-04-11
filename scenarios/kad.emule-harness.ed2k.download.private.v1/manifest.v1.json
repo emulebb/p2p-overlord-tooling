@@ -1,8 +1,8 @@
 {
   "schemaVersion": "scenario-manifest/v1",
-  "scenarioId": "kad.oracle.ed2k.download.private.v1",
-  "description": "Private local oracle-to-agent Kad source discovery followed by native ED2K download.",
-  "oracle": {
+  "scenarioId": "kad.emule-harness.ed2k.download.private.v1",
+  "description": "Private local eMule harness-to-agent Kad source discovery followed by native ED2K download.",
+  "emuleHarness": {
     "bindAddr": "127.0.0.1",
     "tcpPort": 42062,
     "udpPort": 42072,

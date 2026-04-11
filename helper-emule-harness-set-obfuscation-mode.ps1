@@ -1,13 +1,13 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Sets the oracle debug build's protocol obfuscation preferences.
+Sets the eMule harness debug build's protocol obfuscation preferences.
 
 .DESCRIPTION
-This helper updates the runtime-local debug `preferences.ini` used by the oracle
+This helper updates the runtime-local debug `preferences.ini` used by the eMule harness
  build so parity runs can switch between the common "obfuscated preferred" mode
  and a fully plaintext mode. The selected crypt flags influence both ED2K TCP
- and Kad UDP behavior in the oracle code paths.
+ and Kad UDP behavior in the eMule harness code paths.
 #>
 
 [CmdletBinding()]
@@ -23,7 +23,7 @@ $ErrorActionPreference = "Stop"
 $runtimeRoot = if ($ProfileRoot) {
     [System.IO.Path]::GetFullPath($ProfileRoot)
 } else {
-    & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+    & (Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1")
 }
 $preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
 if (-not (Test-Path $preferencesPath)) {

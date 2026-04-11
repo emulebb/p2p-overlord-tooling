@@ -1,14 +1,14 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Starts a fresh oracle parity session using the rebuilt distinct parity oracle executable.
+Starts a fresh eMule harness parity session using the rebuilt distinct parity eMule harness executable.
 #>
 
 [CmdletBinding()]
 param(
     [string]$InterfaceAlias = "hide.me",
     [int]$CapturePort = 0,
-    [string]$SessionPrefix = "parity-oracle",
+    [string]$SessionPrefix = "parity-emule-harness",
     [int]$WaitAfterLaunchSeconds = 0,
     [string]$ProfileRoot
 )
@@ -26,7 +26,7 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
 } else {
     throw "OVERLORD_TMP_DIR is not set"
 }
-$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1")
 
 function Resolve-DumpcapInterfaceIndex {
     param(
@@ -49,7 +49,7 @@ function Resolve-DumpcapInterfaceIndex {
     throw "Could not map interface '$AdapterAlias' to a dumpcap device index"
 }
 
-function Resolve-OracleCapturePort {
+function Resolve-EmuleHarnessCapturePort {
     param(
         [Parameter(Mandatory = $true)]
         [string]$PreferencesPath,
@@ -62,7 +62,7 @@ function Resolve-OracleCapturePort {
     }
 
     if (-not (Test-Path $PreferencesPath)) {
-        throw "Oracle preferences not found at $PreferencesPath"
+        throw "eMule harness preferences not found at $PreferencesPath"
     }
 
     $configuredPortLine = Get-Content $PreferencesPath |
@@ -112,7 +112,7 @@ function Get-PreferencesValue {
     return ($matchedLine -replace "^(?:$escapedKey)=", "")
 }
 
-function Get-ExpectedOracleReadyState {
+function Get-ExpectedEmuleHarnessReadyState {
     param(
         [Parameter(Mandatory = $true)]
         [string]$PreferencesPath,
@@ -135,12 +135,12 @@ function Get-ExpectedOracleReadyState {
     }
 }
 
-function Wait-OracleReadyFile {
+function Wait-EmuleHarnessReadyFile {
     param(
         [Parameter(Mandatory = $true)]
         [string]$ReadyFilePath,
         [Parameter(Mandatory = $true)]
-        [System.Diagnostics.Process]$OracleProcess,
+        [System.Diagnostics.Process]$EmuleHarnessProcess,
         [int]$TimeoutSeconds = 90
     )
 
@@ -149,23 +149,23 @@ function Wait-OracleReadyFile {
         if (Test-Path -LiteralPath $ReadyFilePath -PathType Leaf) {
             return
         }
-        if (-not (Get-Process -Id $OracleProcess.Id -ErrorAction SilentlyContinue)) {
-            throw "Parity oracle process (PID $($OracleProcess.Id)) exited before writing $ReadyFilePath"
+        if (-not (Get-Process -Id $EmuleHarnessProcess.Id -ErrorAction SilentlyContinue)) {
+            throw "Parity eMule harness process (PID $($EmuleHarnessProcess.Id)) exited before writing $ReadyFilePath"
         }
         Start-Sleep -Milliseconds 250
     }
 
-    throw "Timed out waiting for oracle readiness marker at $ReadyFilePath"
+    throw "Timed out waiting for eMule harness readiness marker at $ReadyFilePath"
 }
 
-function Assert-OracleReadyState {
+function Assert-EmuleHarnessReadyState {
     param(
         [Parameter(Mandatory = $true)]
         [object]$ExpectedState,
         [Parameter(Mandatory = $true)]
         [object]$ReadyState,
         [Parameter(Mandatory = $true)]
-        [int]$ExpectedOraclePid,
+        [int]$ExpectedEmuleHarnessPid,
         [Parameter(Mandatory = $true)]
         [int]$ExpectedCapturePort
     )
@@ -175,7 +175,7 @@ function Assert-OracleReadyState {
     if ($ReadyState.State -ne "ready") {
         $mismatches.Add("state=$($ReadyState.State)") | Out-Null
     }
-    if ($ReadyState.Pid -ne $ExpectedOraclePid) {
+    if ($ReadyState.Pid -ne $ExpectedEmuleHarnessPid) {
         $mismatches.Add("pid=$($ReadyState.Pid)") | Out-Null
     }
     if ((Normalize-DirectoryPath -Path $ReadyState.ProfileRoot) -ne $ExpectedState.ProfileRoot) {
@@ -213,20 +213,20 @@ function Assert-OracleReadyState {
     }
 
     if ($mismatches.Count -gt 0) {
-        throw "Oracle readiness validation failed: $($mismatches -join '; ')"
+        throw "eMule harness readiness validation failed: $($mismatches -join '; ')"
     }
 }
 
-$buildHelperPath = Join-Path $PSScriptRoot "helper-oracle-build-debug.ps1"
-$cleanupHelperPath = Join-Path $PSScriptRoot "helper-oracle-clean-runtime.ps1"
-$readyReaderPath = Join-Path $PSScriptRoot "helper-oracle-read-ready-file.ps1"
+$buildHelperPath = Join-Path $PSScriptRoot "helper-emule-harness-build-debug.ps1"
+$cleanupHelperPath = Join-Path $PSScriptRoot "helper-emule-harness-clean-runtime.ps1"
+$readyReaderPath = Join-Path $PSScriptRoot "helper-emule-harness-read-ready-file.ps1"
 $networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
 $runtimeRoot = if ($ProfileRoot) {
     [System.IO.Path]::GetFullPath($ProfileRoot)
 } else {
     $oracleHarnessDebugDir
 }
-$traceLogPath = Join-Path $runtimeRoot "logs\oracle-kad-trace.log"
+$traceLogPath = Join-Path $runtimeRoot "logs\emule-harness-kad-trace.log"
 $verboseLogPath = Join-Path $runtimeRoot "logs\eMule_Verbose.log"
 $packetDumpDir = Join-Path $runtimeRoot "logs"
 $preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
@@ -235,19 +235,19 @@ $oracleWorkDir = $oracleHarnessDebugDir
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 
 if (-not (Test-Path $buildHelperPath)) {
-    throw "Oracle build helper not found at $buildHelperPath"
+    throw "eMule harness build helper not found at $buildHelperPath"
 }
 if (-not (Test-Path $cleanupHelperPath)) {
-    throw "Oracle cleanup helper not found at $cleanupHelperPath"
+    throw "eMule harness cleanup helper not found at $cleanupHelperPath"
 }
 if (-not (Test-Path -LiteralPath $readyReaderPath -PathType Leaf)) {
-    throw "Oracle ready-file reader not found at $readyReaderPath"
+    throw "eMule harness ready-file reader not found at $readyReaderPath"
 }
 if (-not (Test-Path -LiteralPath $networkResolverPath -PathType Leaf)) {
     throw "Network adapter resolver not found at $networkResolverPath"
 }
 if (-not (Test-Path $preferencesPath)) {
-    throw "Oracle preferences not found at $preferencesPath"
+    throw "eMule harness preferences not found at $preferencesPath"
 }
 if (-not (Test-Path $dumpcapPath)) {
     throw "dumpcap.exe not found at $dumpcapPath"
@@ -257,8 +257,8 @@ New-Item -ItemType Directory -Path $traceLogDir -Force | Out-Null
 
 $resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
 $resolvedInterfaceAlias = [string]$resolvedAdapter.InterfaceAlias
-$expectedReadyState = Get-ExpectedOracleReadyState -PreferencesPath $preferencesPath -RuntimeRoot $runtimeRoot
-$CapturePort = Resolve-OracleCapturePort -PreferencesPath $preferencesPath -RequestedCapturePort $CapturePort
+$expectedReadyState = Get-ExpectedEmuleHarnessReadyState -PreferencesPath $preferencesPath -RuntimeRoot $runtimeRoot
+$CapturePort = Resolve-EmuleHarnessCapturePort -PreferencesPath $preferencesPath -RequestedCapturePort $CapturePort
 $dumpcapInterfaceIndex = Resolve-DumpcapInterfaceIndex -AdapterAlias $resolvedInterfaceAlias -DumpcapPath $dumpcapPath
 
 $prelaunchCleanupArgs = @{
@@ -266,21 +266,21 @@ $prelaunchCleanupArgs = @{
 }
 & $cleanupHelperPath @prelaunchCleanupArgs | Out-Null
 $buildResult = & $buildHelperPath | Select-Object -Last 1
-$oracleExePath = $buildResult.RuntimeExePath
-if (-not $oracleExePath -or -not (Test-Path $oracleExePath)) {
-    throw "Parity oracle executable was not produced by the build helper"
+$emuleHarnessExePath = $buildResult.RuntimeExePath
+if (-not $emuleHarnessExePath -or -not (Test-Path $emuleHarnessExePath)) {
+    throw "Parity eMule harness executable was not produced by the build helper"
 }
 
 $sessionName = "{0}-{1}" -f $SessionPrefix, (Get-Date -Format "yyyyMMdd-HHmmss")
 $sessionDir = Join-Path $tmpDir $sessionName
 New-Item -ItemType Directory -Path $sessionDir -Force | Out-Null
 
-$pcapPath = Join-Path $sessionDir ("oracle-{0}.pcapng" -f $CapturePort)
-$metadataPath = Join-Path $sessionDir "oracle-session.json"
+$pcapPath = Join-Path $sessionDir ("emule-harness-{0}.pcapng" -f $CapturePort)
+$metadataPath = Join-Path $sessionDir "emule-harness-session.json"
 $dumpcapStdoutPath = Join-Path $sessionDir "dumpcap-stdout.log"
 $dumpcapStderrPath = Join-Path $sessionDir "dumpcap-stderr.log"
 $sessionStartUtc = (Get-Date).ToUniversalTime()
-$oracleProcess = $null
+$emuleHarnessProcess = $null
 $dumpcap = $null
 $readyState = $null
 
@@ -332,8 +332,8 @@ try {
         throw "dumpcap did not create capture file at $pcapPath within 15 seconds"
     }
 
-    $oracleProcess = Start-Process `
-        -FilePath $oracleExePath `
+    $emuleHarnessProcess = Start-Process `
+        -FilePath $emuleHarnessExePath `
         -ArgumentList @(
             "-configdir=""$runtimeRoot""",
             "-readyfile=""$readyFilePath""",
@@ -343,15 +343,15 @@ try {
         -PassThru `
         -WindowStyle Hidden
 
-    Wait-OracleReadyFile -ReadyFilePath $readyFilePath -OracleProcess $oracleProcess
+    Wait-EmuleHarnessReadyFile -ReadyFilePath $readyFilePath -EmuleHarnessProcess $emuleHarnessProcess
     $readyState = & $readyReaderPath -Path $readyFilePath
-    Assert-OracleReadyState -ExpectedState $expectedReadyState -ReadyState $readyState -ExpectedOraclePid $oracleProcess.Id -ExpectedCapturePort $CapturePort
+    Assert-EmuleHarnessReadyState -ExpectedState $expectedReadyState -ReadyState $readyState -ExpectedEmuleHarnessPid $emuleHarnessProcess.Id -ExpectedCapturePort $CapturePort
 
     if ($WaitAfterLaunchSeconds -gt 0) {
         Start-Sleep -Seconds $WaitAfterLaunchSeconds
     }
 
-    $packetDumpPath = Get-ChildItem -Path $packetDumpDir -Filter 'oracle-udp-dump-*.jsonl' -ErrorAction SilentlyContinue |
+    $packetDumpPath = Get-ChildItem -Path $packetDumpDir -Filter 'emule-harness-udp-dump-*.jsonl' -ErrorAction SilentlyContinue |
         Where-Object { $_.LastWriteTimeUtc -ge $sessionStartUtc.AddSeconds(-5) } |
         Sort-Object LastWriteTimeUtc -Descending |
         Select-Object -First 1 -ExpandProperty FullName
@@ -374,11 +374,11 @@ try {
         DumpcapPid = $dumpcap.Id
         DumpcapStdoutPath = $dumpcapStdoutPath
         DumpcapStderrPath = $dumpcapStderrPath
-        OracleExePath = $oracleExePath
-        OracleProfileRoot = $runtimeRoot
-        OracleReadyFilePath = $readyFilePath
-        OracleReadyState = $readyState
-        OraclePid = $oracleProcess.Id
+        EmuleHarnessExePath = $emuleHarnessExePath
+        EmuleHarnessProfileRoot = $runtimeRoot
+        EmuleHarnessReadyFilePath = $readyFilePath
+        EmuleHarnessReadyState = $readyState
+        EmuleHarnessPid = $emuleHarnessProcess.Id
         StartedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     }
 
@@ -389,8 +389,8 @@ catch {
     $cleanupArgs = @{
         CapturePort = $CapturePort
     }
-    if ($oracleProcess) {
-        $cleanupArgs.OraclePids = @($oracleProcess.Id)
+    if ($emuleHarnessProcess) {
+        $cleanupArgs.EmuleHarnessPids = @($emuleHarnessProcess.Id)
     }
     if ($dumpcap) {
         $cleanupArgs.DumpcapPids = @($dumpcap.Id)

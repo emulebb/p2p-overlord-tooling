@@ -9,7 +9,8 @@ Product runtime logic remains in:
 - `../p2p-overlord-agents`
 - `../p2p-overlord-be`
 
-Use the shared workspace rules from `../AGENTS.md` and the tooling-repo notes in `./AGENTS.md`.
+Use the shared workspace policy from `docs/WORKSPACE_POLICY.md` and the
+tooling-repo notes in `./AGENTS.md`.
 
 ## Layout
 
@@ -22,11 +23,13 @@ Use the shared workspace rules from `../AGENTS.md` and the tooling-repo notes in
 - `normalizers/` trace normalization and post-processing
 - `reports/` summary generation
 - `subsystems/` subsystem-specific tooling modules
-- legacy `helper-*.ps1` scripts remain as compatibility wrappers while the platform surface grows
+- legacy `helper-*.ps1` scripts remain acceptable thin wrappers while the
+  platform surface grows
 
 ## Docs
 
 - [Tooling Docs](docs/README.md)
+- [Workspace Policy](docs/WORKSPACE_POLICY.md)
 - [PowerShell Mistakes](docs/POWERSHELL_MISTAKES.md)
 
 ## Guards
@@ -39,14 +42,15 @@ Use the shared workspace rules from `../AGENTS.md` and the tooling-repo notes in
 
 ## Deterministic Harness
 
-- `.\overlord-tooling.ps1 import-oracle-seeds -NodesDatPath <path> -ServerMetPath <path>`
+- `.\overlord-tooling.ps1 import-emule-harness-seeds -NodesDatPath <path> -ServerMetPath <path>`
   copies the local canonical `nodes.dat` and `server.met` into the untracked
-  `.local/oracle-seeds/canonical/` bundle without persisting the source paths.
+  `.local/emule-harness-seeds/canonical/` bundle without persisting the source paths.
 - `.\overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1`
-  prints the first paired oracle+agent scenario contract.
+  prints the first paired eMule harness and agent scenario contract.
 - `.\overlord-tooling.ps1 run-kad-startup-hello-publish` materializes a
-  scenario-owned oracle profile with a manifest-owned minimal `preferences.ini`,
-  launches the oracle with an explicit profile-root override, launches the
-  agent, triggers a deterministic manual publish, resolves the oracle runtime
-  from `%EMULE_WORKSPACE_ROOT%`, and writes run artifacts under
+  scenario-owned eMule harness profile with a manifest-owned minimal
+  `preferences.ini`, launches the eMule harness with an explicit profile-root
+  override, launches the agent, triggers a deterministic manual publish,
+  resolves the eMule harness runtime from `%EMULE_WORKSPACE_ROOT%`, and writes
+  run artifacts under
   `%OVERLORD_TMP_DIR%`.

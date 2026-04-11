@@ -24,11 +24,11 @@ function Show-ToolingHelp {
             [ordered]@{ name = "layout"; description = "Show the platform directory layout" }
             [ordered]@{ name = "paths"; description = "Show canonical workspace and repo paths" }
             [ordered]@{ name = "guard-tracked-files"; description = "Fail when tracked files contain local user-profile paths or configured personal-name filename leaks" }
-            [ordered]@{ name = "import-oracle-seeds"; description = "Import local nodes.dat and server.met into the untracked canonical oracle seed bundle" }
+            [ordered]@{ name = "import-emule-harness-seeds"; description = "Import local nodes.dat and server.met into the untracked canonical eMule harness seed bundle" }
             [ordered]@{ name = "show-scenario"; description = "Print a scenario manifest" }
-            [ordered]@{ name = "run-kad-startup-hello-publish"; description = "Run the first paired oracle+agent Kad startup, HELLO, and publish scenario" }
-            [ordered]@{ name = "run-private-oracle-ed2k-download"; description = "Run a private local oracle Kad source publish plus native ED2K download scenario" }
-            [ordered]@{ name = "run-private-oracle-ed2k-server-download"; description = "Run a private local oracle+agent ED2K download through a local goed2k-server" }
+            [ordered]@{ name = "run-kad-startup-hello-publish"; description = "Run the first paired eMule harness and agent Kad startup, HELLO, and publish scenario" }
+            [ordered]@{ name = "run-private-emule-harness-ed2k-download"; description = "Run a private local eMule harness Kad source publish plus native ED2K download scenario" }
+            [ordered]@{ name = "run-private-emule-harness-ed2k-server-download"; description = "Run a private local eMule harness and agent ED2K download through a local goed2k-server" }
             [ordered]@{ name = "run-private-harness-kad-triplet"; description = "Run a local Kad cluster with three eMule harness peers plus one agent, including publish and search" }
             [ordered]@{ name = "validate-ed2k-server-triplet"; description = "Run focused local triplet validation for multi-file, multi-source, and callback-limit ED2K server cases" }
         )
@@ -104,10 +104,10 @@ function ConvertTo-ScriptInvocationArgs {
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $workspaceRoot = Resolve-Path (Join-Path $repoRoot "..")
 $guardScriptPath = Join-Path $repoRoot "orchestration\Invoke-TrackedFilePrivacyGuard.ps1"
-$seedImportScriptPath = Join-Path $repoRoot "orchestration\Import-OracleSeedBundle.ps1"
+$seedImportScriptPath = Join-Path $repoRoot "orchestration\Import-EmuleHarnessSeedBundle.ps1"
 $scenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-KadStartupHelloPublishScenario.ps1"
-$privateEd2kScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateOracleEd2kDownloadScenario.ps1"
-$privateEd2kServerScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateOracleEd2kServerDownloadScenario.ps1"
+$privateEd2kScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateEmuleHarnessEd2kDownloadScenario.ps1"
+$privateEd2kServerScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateEmuleHarnessEd2kServerDownloadScenario.ps1"
 $privateHarnessKadTripletScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateHarnessKadTripletScenario.ps1"
 $tripletValidationScriptPath = Join-Path $repoRoot "orchestration\Invoke-ValidateEd2kServerTriplet.ps1"
 $command = "help"
@@ -145,9 +145,9 @@ switch ($Command.ToLowerInvariant()) {
         $positionalArgs = $invocationArgs.Positional
         & $guardScriptPath -RepoRoot $repoRoot @namedArgs @positionalArgs
     }
-    "import-oracle-seeds" {
+    "import-emule-harness-seeds" {
         if (-not (Test-Path $seedImportScriptPath)) {
-            throw "Oracle seed import helper not found at $seedImportScriptPath"
+            throw "eMule harness seed import helper not found at $seedImportScriptPath"
         }
 
         $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
@@ -178,7 +178,7 @@ switch ($Command.ToLowerInvariant()) {
         $positionalArgs = $invocationArgs.Positional
         & $scenarioRunnerScriptPath @namedArgs @positionalArgs
     }
-    "run-private-oracle-ed2k-download" {
+    "run-private-emule-harness-ed2k-download" {
         if (-not (Test-Path $privateEd2kScenarioRunnerScriptPath)) {
             throw "Private ED2K scenario runner not found at $privateEd2kScenarioRunnerScriptPath"
         }
@@ -188,7 +188,7 @@ switch ($Command.ToLowerInvariant()) {
         $positionalArgs = $invocationArgs.Positional
         & $privateEd2kScenarioRunnerScriptPath @namedArgs @positionalArgs
     }
-    "run-private-oracle-ed2k-server-download" {
+    "run-private-emule-harness-ed2k-server-download" {
         if (-not (Test-Path $privateEd2kServerScenarioRunnerScriptPath)) {
             throw "Private ED2K server scenario runner not found at $privateEd2kServerScenarioRunnerScriptPath"
         }

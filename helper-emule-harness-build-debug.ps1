@@ -21,7 +21,7 @@ if (-not (Test-Path -LiteralPath $workspaceScriptPath -PathType Leaf)) {
     throw "Canonical eMule-build workspace entrypoint not found at $workspaceScriptPath"
 }
 
-$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-oracle-resolve-harness-debug-dir.ps1")
+$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1")
 $buildArguments = @(
     '-NoLogo'
     '-NoProfile'

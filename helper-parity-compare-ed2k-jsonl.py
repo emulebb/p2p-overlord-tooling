@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compare oracle and agent ED2K JSONL dumps by flow, transport mode, state IDs,
+Compare eMule harness and agent ED2K JSONL dumps by flow, transport mode, state IDs,
 and per-trace state-machine sequences.
 """
 
@@ -15,9 +15,9 @@ from pathlib import Path
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compare oracle and agent ED2K JSONL packet dumps."
+        description="Compare eMule harness and agent ED2K JSONL packet dumps."
     )
-    parser.add_argument("--oracle", required=True, help="Path to the oracle JSONL dump")
+    parser.add_argument("--emule-harness", required=True, help="Path to the eMule harness JSONL dump")
     parser.add_argument("--agent", required=True, help="Path to the agent JSONL dump")
     parser.add_argument(
         "--flow",
@@ -101,17 +101,17 @@ def render_sequence_summary(name: str, sequences: Counter, limit: int) -> list[s
     return lines
 
 
-def render_parity(oracle_buckets: dict, agent_buckets: dict) -> list[str]:
+def render_parity(emule_harness_buckets: dict, agent_buckets: dict) -> list[str]:
     lines = ["state parity matrix:"]
-    all_keys = sorted(set(oracle_buckets) | set(agent_buckets))
+    all_keys = sorted(set(emule_harness_buckets) | set(agent_buckets))
     if not all_keys:
         lines.append("  <none>")
         return lines
     for key in all_keys:
-        oracle_count = oracle_buckets.get(key, Counter()).get("count", 0)
+        emule_harness_count = emule_harness_buckets.get(key, Counter()).get("count", 0)
         agent_count = agent_buckets.get(key, Counter()).get("count", 0)
         lines.append(
-            f"  flow={key[0]} mode={key[1]} state={key[2]} oracle={oracle_count} agent={agent_count}"
+            f"  flow={key[0]} mode={key[1]} state={key[2]} emule_harness={emule_harness_count} agent={agent_count}"
         )
     return lines
 
@@ -119,21 +119,21 @@ def render_parity(oracle_buckets: dict, agent_buckets: dict) -> list[str]:
 def main() -> int:
     args = parse_args()
     keep_flows = set(args.flow)
-    oracle_records = load_records(Path(args.oracle), "oracle", keep_flows)
+    emule_harness_records = load_records(Path(args.emule_harness), "emuleHarness", keep_flows)
     agent_records = load_records(Path(args.agent), "agent", keep_flows)
 
-    oracle_buckets = bucket_states(oracle_records)
+    emule_harness_buckets = bucket_states(emule_harness_records)
     agent_buckets = bucket_states(agent_records)
-    oracle_sequences = build_trace_sequences(oracle_records)
+    emule_harness_sequences = build_trace_sequences(emule_harness_records)
     agent_sequences = build_trace_sequences(agent_records)
 
-    for line in render_state_buckets("oracle", oracle_buckets):
+    for line in render_state_buckets("emuleHarness", emule_harness_buckets):
         print(line)
     for line in render_state_buckets("agent", agent_buckets):
         print(line)
-    for line in render_parity(oracle_buckets, agent_buckets):
+    for line in render_parity(emule_harness_buckets, agent_buckets):
         print(line)
-    for line in render_sequence_summary("oracle", oracle_sequences, args.limit):
+    for line in render_sequence_summary("emuleHarness", emule_harness_sequences, args.limit):
         print(line)
     for line in render_sequence_summary("agent", agent_sequences, args.limit):
         print(line)

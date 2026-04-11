@@ -1,10 +1,10 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Runs the first deterministic Kad oracle+agent parity scenario.
+Runs the first deterministic Kad eMule harness and agent parity scenario.
 
 .DESCRIPTION
-Creates a scenario-owned oracle profile, launches the oracle with an explicit
+Creates a scenario-owned eMule harness profile, launches the eMule harness with an explicit
 profile-root override, launches the agent, triggers a deterministic manual
 publish, captures artifacts, and writes run manifest and summary JSON files.
 #>
@@ -15,12 +15,12 @@ param(
     [string]$SeedBundleId = "canonical",
     [string]$InterfaceAlias = "hide.me",
     [string]$BindAddr,
-    [int]$OracleTcpPort = 46671,
-    [int]$OracleUdpPort = 46673,
-    [int]$OracleServerUdpPort = 0,
+    [int]$EmuleHarnessTcpPort = 46671,
+    [int]$EmuleHarnessUdpPort = 46673,
+    [int]$EmuleHarnessServerUdpPort = 0,
     [int]$AgentInterfaceIndex = 0,
     [int]$AgentCapturePort = 41000,
-    [int]$OracleWarmupSeconds = 20,
+    [int]$EmuleHarnessWarmupSeconds = 20,
     [int]$PublishObserveSeconds = 20,
     [int]$PublishReadyTimeoutSeconds = 180,
     [switch]$KeepSessionsRunning
@@ -74,13 +74,13 @@ function Set-MilestonePassed {
     $MilestoneMap[$Id].details = $Details
 }
 
-function Get-OracleTraceSlice {
+function Get-EmuleHarnessTraceSlice {
     param(
         [Parameter(Mandatory = $true)]
         [string]$SessionDir
     )
 
-    $metadataPath = Join-Path $SessionDir "oracle-session.json"
+    $metadataPath = Join-Path $SessionDir "emule-harness-session.json"
     $metadata = Get-Content -Raw $metadataPath | ConvertFrom-Json
     $tracePath = $metadata.TraceLogPath
     if (-not (Test-Path $tracePath)) {
@@ -94,7 +94,7 @@ function Get-OracleTraceSlice {
         }
     }
 
-    $slicePath = Join-Path $SessionDir "oracle-trace-new.log"
+    $slicePath = Join-Path $SessionDir "emule-harness-trace-new.log"
     $traceLines = Get-Content $tracePath | Select-Object -Skip ([int]$metadata.TraceLinesBefore)
     $traceLines | Set-Content -Encoding utf8NoBOM $slicePath
 
@@ -228,13 +228,13 @@ function Test-MilestonesPassed {
     return $true
 }
 
-function Resolve-OracleRuntimeExePath {
+function Resolve-EmuleHarnessRuntimeExePath {
     param(
         [Parameter(Mandatory = $true)]
         [string]$ToolingRoot
     )
 
-    $resolverPath = Join-Path $ToolingRoot "helper-oracle-resolve-harness-debug-dir.ps1"
+    $resolverPath = Join-Path $ToolingRoot "helper-emule-harness-resolve-harness-debug-dir.ps1"
     $harnessDebugDir = & $resolverPath
     return (Join-Path $harnessDebugDir "eMule_v072a_parity.exe")
 }
@@ -255,9 +255,9 @@ if (-not $env:OVERLORD_LOG_DIR) {
 }
 
 $requiredPaths = @(
-    (Join-Path $toolingRoot "profiles\\New-OracleProfile.ps1"),
-    (Join-Path $toolingRoot "helper-oracle-start-parity-session.ps1"),
-    (Join-Path $toolingRoot "helper-oracle-stop-parity-session.ps1"),
+    (Join-Path $toolingRoot "profiles\\New-EmuleHarnessProfile.ps1"),
+    (Join-Path $toolingRoot "helper-emule-harness-start-parity-session.ps1"),
+    (Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"),
     (Join-Path $toolingRoot "helper-agent-start-parity-session.ps1"),
     (Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"),
     (Join-Path $toolingRoot "helper-agent-post-seed-popular.ps1"),
@@ -282,7 +282,7 @@ if (Test-Path $lockPath) {
 
 $runId = "{0}-{1}" -f $manifest.scenarioId, (Get-Date -Format "yyyyMMdd-HHmmss")
 $artifactRoot = Join-Path $env:OVERLORD_TMP_DIR ("overlord-tooling\runs\{0}\{1}" -f $manifest.scenarioId, $runId)
-$oracleProfileRoot = Join-Path $artifactRoot "oracle-profile"
+$emuleHarnessProfileRoot = Join-Path $artifactRoot "emule-harness-profile"
 $manifestPath = Join-Path $artifactRoot "run-manifest.json"
 $summaryPath = Join-Path $artifactRoot "run-summary.json"
 $parityOutputPath = Join-Path $artifactRoot "udp-parity.txt"
@@ -292,16 +292,16 @@ New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
 "lock" | Set-Content -Encoding utf8NoBOM $lockPath
 
 $milestoneMap = New-MilestoneMap -Milestones $manifest.milestones
-$oracleSession = $null
+$emuleHarnessSession = $null
 $agentSession = $null
-$oracleTraceSlice = $null
+$emuleHarnessTraceSlice = $null
 $agentPublishArtifacts = $null
 $agentSessionMetadata = $null
-$oracleStopScriptPath = Join-Path $toolingRoot "helper-oracle-stop-parity-session.ps1"
+$emuleHarnessStopScriptPath = Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"
 $agentStopScriptPath = Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"
 
 try {
-    $seedRoot = Join-Path $toolingRoot ".local\oracle-seeds\$SeedBundleId"
+    $seedRoot = Join-Path $toolingRoot ".local\emule-harness-seeds\$SeedBundleId"
     foreach ($requiredFile in @($manifest.seedBundle.requiredFiles)) {
         $requiredPath = Join-Path $seedRoot $requiredFile
         if (-not (Test-Path $requiredPath)) {
@@ -310,18 +310,18 @@ try {
     }
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "seed-bundle-ready" -Details "Using local seed bundle '$SeedBundleId' from $seedRoot"
 
-    $profileScriptPath = Join-Path $toolingRoot "profiles\New-OracleProfile.ps1"
+    $profileScriptPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessProfile.ps1"
     $profile = & $profileScriptPath `
         -ScenarioManifestPath $ScenarioManifestPath `
-        -ProfileRoot $oracleProfileRoot `
+        -ProfileRoot $emuleHarnessProfileRoot `
         -SeedBundleId $SeedBundleId `
         -BindAddr $bindAddrValue `
-        -TcpPort $OracleTcpPort `
-        -UdpPort $OracleUdpPort `
-        -ServerUdpPort $OracleServerUdpPort
-    Set-MilestonePassed -MilestoneMap $milestoneMap -Id "oracle-profile-materialized" -Details "Profile root created at $($profile.ProfileRoot)"
+        -TcpPort $EmuleHarnessTcpPort `
+        -UdpPort $EmuleHarnessUdpPort `
+        -ServerUdpPort $EmuleHarnessServerUdpPort
+    Set-MilestonePassed -MilestoneMap $milestoneMap -Id "emule-harness-profile-materialized" -Details "Profile root created at $($profile.ProfileRoot)"
 
-    $oracleRuntimeExePath = Resolve-OracleRuntimeExePath -ToolingRoot $toolingRoot
+    $emuleHarnessRuntimeExePath = Resolve-EmuleHarnessRuntimeExePath -ToolingRoot $toolingRoot
     $runManifest = [ordered]@{
         schemaVersion = "run-manifest/v1"
         scenarioId = $manifest.scenarioId
@@ -330,34 +330,34 @@ try {
         artifactRoot = $artifactRoot
         requiredMilestoneIds = $requiredMilestoneIds
         binary = [ordered]@{
-            oracle = $oracleRuntimeExePath
+            emuleHarness = $emuleHarnessRuntimeExePath
         }
         inputs = [ordered]@{
             requestedInterfaceAlias = $InterfaceAlias
             interfaceAlias = $resolvedInterfaceAlias
             interfaceFallbackUsed = $resolvedAdapter.UsedFallback
             bindAddr = $bindAddrValue
-            oracleTcpPort = $OracleTcpPort
-            oracleUdpPort = $OracleUdpPort
-            oracleServerUdpPort = $OracleServerUdpPort
+            emuleHarnessTcpPort = $EmuleHarnessTcpPort
+            emuleHarnessUdpPort = $EmuleHarnessUdpPort
+            emuleHarnessServerUdpPort = $EmuleHarnessServerUdpPort
             seedBundleId = $SeedBundleId
             scenarioManifestPath = (Resolve-Path $ScenarioManifestPath).Path
         }
         artifacts = [ordered]@{
-            oracleProfileRoot = $profile.ProfileRoot
-            oracleProfileManifestPath = $profile.ProfileManifestPath
+            emuleHarnessProfileRoot = $profile.ProfileRoot
+            emuleHarnessProfileManifestPath = $profile.ProfileManifestPath
         }
     }
     $runManifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8NoBOM $manifestPath
 
-    $oracleStartScriptPath = Join-Path $toolingRoot "helper-oracle-start-parity-session.ps1"
-    $oracleSession = & $oracleStartScriptPath `
+    $emuleHarnessStartScriptPath = Join-Path $toolingRoot "helper-emule-harness-start-parity-session.ps1"
+    $emuleHarnessSession = & $emuleHarnessStartScriptPath `
         -InterfaceAlias $resolvedInterfaceAlias `
-        -CapturePort $OracleUdpPort `
+        -CapturePort $EmuleHarnessUdpPort `
         -SessionPrefix $runId `
-        -WaitAfterLaunchSeconds $OracleWarmupSeconds `
+        -WaitAfterLaunchSeconds $EmuleHarnessWarmupSeconds `
         -ProfileRoot $profile.ProfileRoot
-    Set-MilestonePassed -MilestoneMap $milestoneMap -Id "oracle-started" -Details "Oracle launched with profile root $($profile.ProfileRoot)"
+    Set-MilestonePassed -MilestoneMap $milestoneMap -Id "emule-harness-started" -Details "eMule harness launched with profile root $($profile.ProfileRoot)"
 
     $agentStartScriptPath = Join-Path $toolingRoot "helper-agent-start-parity-session.ps1"
     $agentSession = & $agentStartScriptPath `
@@ -388,29 +388,29 @@ try {
     $agentPublishArtifacts = & $agentExtractScriptPath -SessionDir $agentSession.SessionDir
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "agent-artifacts-captured" -Details "Agent publish log saved to $($agentPublishArtifacts.PublishLogPath)"
 
-    $oracleTraceSlice = Get-OracleTraceSlice -SessionDir $oracleSession.SessionDir
-    if ($oracleSession.PacketDumpPath -or $oracleTraceSlice.LineCount -gt 0) {
-        $oracleArtifactDetails = if ($oracleSession.PacketDumpPath -and $oracleTraceSlice.LineCount -gt 0) {
-            "Oracle UDP dump and trace slice captured"
-        } elseif ($oracleSession.PacketDumpPath) {
-            "Oracle UDP dump captured at $($oracleSession.PacketDumpPath)"
+    $emuleHarnessTraceSlice = Get-EmuleHarnessTraceSlice -SessionDir $emuleHarnessSession.SessionDir
+    if ($emuleHarnessSession.PacketDumpPath -or $emuleHarnessTraceSlice.LineCount -gt 0) {
+        $emuleHarnessArtifactDetails = if ($emuleHarnessSession.PacketDumpPath -and $emuleHarnessTraceSlice.LineCount -gt 0) {
+            "eMule harness UDP dump and trace slice captured"
+        } elseif ($emuleHarnessSession.PacketDumpPath) {
+            "eMule harness UDP dump captured at $($emuleHarnessSession.PacketDumpPath)"
         } else {
-            "Oracle trace slice saved to $($oracleTraceSlice.SlicePath)"
+            "eMule harness trace slice saved to $($emuleHarnessTraceSlice.SlicePath)"
         }
-        Set-MilestonePassed -MilestoneMap $milestoneMap -Id "oracle-artifacts-captured" -Details $oracleArtifactDetails
+        Set-MilestonePassed -MilestoneMap $milestoneMap -Id "emule-harness-artifacts-captured" -Details $emuleHarnessArtifactDetails
     }
 
     if (-not $KeepSessionsRunning) {
-        & $oracleStopScriptPath -SessionDir $oracleSession.SessionDir | Out-Null
+        & $emuleHarnessStopScriptPath -SessionDir $emuleHarnessSession.SessionDir | Out-Null
         & $agentStopScriptPath -SessionDir $agentSession.SessionDir | Out-Null
     }
 
     $agentSessionMetadataPath = Join-Path $agentSession.SessionDir "agent-session.json"
     $agentSessionMetadata = Get-Content -Raw $agentSessionMetadataPath | ConvertFrom-Json
-    if ($agentSessionMetadata.PacketDumpPath -and $oracleSession.PacketDumpPath) {
+    if ($agentSessionMetadata.PacketDumpPath -and $emuleHarnessSession.PacketDumpPath) {
         $compareToolPath = Join-Path $toolingRoot "helper-parity-compare-udp-jsonl.py"
         $compareOutput = & python $compareToolPath `
-            --oracle $oracleSession.PacketDumpPath `
+            --emule-harness $emuleHarnessSession.PacketDumpPath `
             --agent $agentSessionMetadata.PacketDumpPath `
             --opcodes KADEMLIA2_HELLO_REQ KADEMLIA2_HELLO_RES KADEMLIA2_HELLO_RES_ACK KADEMLIA2_PUBLISH_KEY_REQ KADEMLIA2_PUBLISH_SOURCE_REQ KADEMLIA2_PUBLISH_RES
         $compareOutput | Set-Content -Encoding utf8NoBOM $parityOutputPath
@@ -423,17 +423,17 @@ try {
         "failed"
     }
 
-    $oracleTraceLines = if ($oracleTraceSlice) { $oracleTraceSlice.LineCount } else { 0 }
-    $oracleHelloEvents = if ($oracleTraceSlice) { $oracleTraceSlice.HelloEvents } else { 0 }
-    $oraclePublishEvents = if ($oracleTraceSlice) { $oracleTraceSlice.PublishEvents } else { 0 }
-    $oraclePublishAccepts = if ($oracleTraceSlice) { $oracleTraceSlice.PublishAccepts } else { 0 }
+    $emuleHarnessTraceLines = if ($emuleHarnessTraceSlice) { $emuleHarnessTraceSlice.LineCount } else { 0 }
+    $emuleHarnessHelloEvents = if ($emuleHarnessTraceSlice) { $emuleHarnessTraceSlice.HelloEvents } else { 0 }
+    $emuleHarnessPublishEvents = if ($emuleHarnessTraceSlice) { $emuleHarnessTraceSlice.PublishEvents } else { 0 }
+    $emuleHarnessPublishAccepts = if ($emuleHarnessTraceSlice) { $emuleHarnessTraceSlice.PublishAccepts } else { 0 }
     $agentPublishLogLines = if ($agentPublishArtifacts) { $agentPublishArtifacts.PublishLineCount } else { 0 }
     $agentUdpDumpPresent = if ($agentSessionMetadata) { [bool]$agentSessionMetadata.PacketDumpPath } else { $false }
-    $oracleUdpDumpPresent = if ($oracleSession) { [bool]$oracleSession.PacketDumpPath } else { $false }
-    $oracleSessionDir = if ($oracleSession) { $oracleSession.SessionDir } else { $null }
+    $emuleHarnessUdpDumpPresent = if ($emuleHarnessSession) { [bool]$emuleHarnessSession.PacketDumpPath } else { $false }
+    $emuleHarnessSessionDir = if ($emuleHarnessSession) { $emuleHarnessSession.SessionDir } else { $null }
     $agentSessionDir = if ($agentSession) { $agentSession.SessionDir } else { $null }
-    $oraclePacketDumpPath = if ($oracleSession) { $oracleSession.PacketDumpPath } else { $null }
-    $oracleTraceSlicePath = if ($oracleTraceSlice) { $oracleTraceSlice.SlicePath } else { $null }
+    $emuleHarnessPacketDumpPath = if ($emuleHarnessSession) { $emuleHarnessSession.PacketDumpPath } else { $null }
+    $emuleHarnessTraceSlicePath = if ($emuleHarnessTraceSlice) { $emuleHarnessTraceSlice.SlicePath } else { $null }
     $agentPacketDumpPath = if ($agentSessionMetadata) { $agentSessionMetadata.PacketDumpPath } else { $null }
     $agentPublishLogPath = if ($agentPublishArtifacts) { $agentPublishArtifacts.PublishLogPath } else { $null }
     $udpParityPath = if (Test-Path $parityOutputPath) { $parityOutputPath } else { $null }
@@ -446,21 +446,21 @@ try {
         requiredMilestoneIds = $requiredMilestoneIds
         milestones = @($milestoneMap.Values)
         counters = [ordered]@{
-            oracleTraceLines = $oracleTraceLines
-            oracleHelloEvents = $oracleHelloEvents
-            oraclePublishEvents = $oraclePublishEvents
-            oraclePublishAccepts = $oraclePublishAccepts
+            emuleHarnessTraceLines = $emuleHarnessTraceLines
+            emuleHarnessHelloEvents = $emuleHarnessHelloEvents
+            emuleHarnessPublishEvents = $emuleHarnessPublishEvents
+            emuleHarnessPublishAccepts = $emuleHarnessPublishAccepts
             agentPublishLogLines = $agentPublishLogLines
             agentUdpDumpPresent = $agentUdpDumpPresent
-            oracleUdpDumpPresent = $oracleUdpDumpPresent
+            emuleHarnessUdpDumpPresent = $emuleHarnessUdpDumpPresent
         }
         artifactPaths = [ordered]@{
             runManifestPath = $manifestPath
-            oracleProfileRoot = $profile.ProfileRoot
-            oracleSessionDir = $oracleSessionDir
+            emuleHarnessProfileRoot = $profile.ProfileRoot
+            emuleHarnessSessionDir = $emuleHarnessSessionDir
             agentSessionDir = $agentSessionDir
-            oraclePacketDumpPath = $oraclePacketDumpPath
-            oracleTraceSlicePath = $oracleTraceSlicePath
+            emuleHarnessPacketDumpPath = $emuleHarnessPacketDumpPath
+            emuleHarnessTraceSlicePath = $emuleHarnessTraceSlicePath
             agentPacketDumpPath = $agentPacketDumpPath
             agentStatsPath = $agentStatsPath
             agentPublishLogPath = $agentPublishLogPath
@@ -500,9 +500,9 @@ finally {
             } catch {
             }
         }
-        if ($oracleSession -and (Test-Path $oracleSession.SessionDir)) {
+        if ($emuleHarnessSession -and (Test-Path $emuleHarnessSession.SessionDir)) {
             try {
-                & $oracleStopScriptPath -SessionDir $oracleSession.SessionDir | Out-Null
+                & $emuleHarnessStopScriptPath -SessionDir $emuleHarnessSession.SessionDir | Out-Null
             } catch {
             }
         }

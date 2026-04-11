@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Parses an oracle harness readiness marker into structured runtime state.
+Parses an eMule harness readiness marker into structured runtime state.
 #>
 
 [CmdletBinding()]

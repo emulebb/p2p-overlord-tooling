@@ -5,7 +5,7 @@ Summarizes protocol-shape signals for a Kad UDP capture.
 
 .DESCRIPTION
 Produces compact parity metrics that are useful when comparing captures from
-the Rust agent and the eMule oracle, including length histograms, visible
+the Rust agent and the eMule harness, including length histograms, visible
 plaintext Kad prefixes, and simple outbound-to-inbound size pairings.
 #>
 

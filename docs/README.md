@@ -4,6 +4,7 @@ Supporting notes for the workspace tooling platform.
 
 ## Read First
 
+- [Workspace Policy](./WORKSPACE_POLICY.md)
 - [PowerShell Mistakes](./POWERSHELL_MISTAKES.md)
 
 ## Platform Areas
@@ -28,11 +29,14 @@ Supporting notes for the workspace tooling platform.
 
 ## Harness Commands
 
-- `../overlord-tooling.ps1 import-oracle-seeds -NodesDatPath <path> -ServerMetPath <path>`
-  imports canonical oracle seed files into the untracked local seed bundle.
+- `../overlord-tooling.ps1 import-emule-harness-seeds -NodesDatPath <path> -ServerMetPath <path>`
+  imports canonical eMule harness seed files into the untracked local seed
+  bundle.
 - `../overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1`
-  prints the first paired oracle+agent deterministic scenario manifest.
+  prints the first paired eMule harness and agent deterministic scenario
+  manifest.
 - `../overlord-tooling.ps1 run-kad-startup-hello-publish`
-  runs the paired oracle+agent Kad startup, HELLO, and publish harness and
-  resolves the oracle runtime from `%EMULE_WORKSPACE_ROOT%` and writes JSON
-  manifests, summaries, and raw artifacts under `%OVERLORD_TMP_DIR%`.
+  runs the paired eMule harness and agent Kad startup, HELLO, and publish
+  harness, resolves the eMule harness runtime from `%EMULE_WORKSPACE_ROOT%`,
+  and writes JSON manifests, summaries, and raw artifacts under
+  `%OVERLORD_TMP_DIR%`.

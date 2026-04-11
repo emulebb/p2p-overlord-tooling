@@ -1,7 +1,7 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Materializes a deterministic local oracle profile for private Kad+ED2K runs.
+Materializes a deterministic local eMule harness profile for private Kad+ED2K runs.
 
 .DESCRIPTION
 Creates one clean-room experimental eMule profile rooted under a scenario-owned
@@ -43,7 +43,7 @@ function Resolve-KadIdHexOverride {
         return $KadIdHex
     }
 
-    $mapJson = $env:OVERLORD_ORACLE_PRIVATE_KAD_ID_MAP_JSON
+    $mapJson = $env:OVERLORD_EMULE_HARNESS_PRIVATE_KAD_ID_MAP_JSON
     if ([string]::IsNullOrWhiteSpace($mapJson)) {
         return $null
     }
