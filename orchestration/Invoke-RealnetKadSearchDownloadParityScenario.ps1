@@ -97,11 +97,14 @@ function Wait-TransferManifestState {
         Start-Sleep -Seconds 2
     }
 
-    if (Test-Path -LiteralPath $ManifestPath) {
-        return (Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json)
+    if (-not (Test-Path -LiteralPath $ManifestPath)) {
+        throw "Transfer manifest did not appear at $ManifestPath within $TimeoutSeconds seconds"
     }
 
-    throw "Transfer manifest did not appear at $ManifestPath within $TimeoutSeconds seconds"
+    $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
+    $verifiedRanges = @(Get-JsonObjectPropertyValue -Object $manifest -PropertyName "verified_ranges" -DefaultValue @())
+    $sources = @(Get-JsonObjectPropertyValue -Object $manifest -PropertyName "sources" -DefaultValue @())
+    throw "Transfer manifest at $ManifestPath did not complete within $TimeoutSeconds seconds (verified_ranges=$($verifiedRanges.Count) sources=$($sources.Count))"
 }
 
 function Wait-TransferManifestProbeState {
@@ -610,68 +613,89 @@ foreach ($mode in $modeDefinitions) {
                 ProbeCompleted = if ($null -ne $probeManifest) { [bool](Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "completed" -DefaultValue $false) } else { $false }
                 ProbeVerifiedRanges = if ($null -ne $probeManifest) { @(Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "verified_ranges" -DefaultValue @()).Count } else { 0 }
                 DownloadSucceeded = $false
+                DownloadError = $null
             }
 
             if ($attempt.ProbeSources -gt 0 -or $attempt.ProbeCompleted -or $attempt.ProbeVerifiedRanges -gt 0) {
-                Set-Content -LiteralPath $harnessSelectedHashPath -Value $candidate.Hash -Encoding ascii
-                $agentTransferManifest = Wait-TransferManifestState `
-                    -ManifestPath $probeManifestPath `
-                    -TimeoutSeconds $DownloadTimeoutSeconds
+                try {
+                    Set-Content -LiteralPath $harnessSelectedHashPath -Value $candidate.Hash -Encoding ascii
+                    $agentTransferManifest = Wait-TransferManifestState `
+                        -ManifestPath $probeManifestPath `
+                        -TimeoutSeconds $DownloadTimeoutSeconds
 
-                $harnessDownloadState = Wait-HarnessDownloadCompleted `
-                    -ProfileRoot $profileRoot `
-                    -FileHash $candidate.Hash `
-                    -ExpectedName $candidate.Name `
-                    -ExpectedSize ([UInt64]$candidate.Size) `
-                    -TimeoutSeconds $DownloadTimeoutSeconds
+                    $harnessDownloadState = Wait-HarnessDownloadCompleted `
+                        -ProfileRoot $profileRoot `
+                        -FileHash $candidate.Hash `
+                        -ExpectedName $candidate.Name `
+                        -ExpectedSize ([UInt64]$candidate.Size) `
+                        -TimeoutSeconds $DownloadTimeoutSeconds
 
-                $candidateAgentArtifactRoot = Join-Path $agentDownloadsRoot $candidate.Hash.ToLowerInvariant()
-                New-Item -ItemType Directory -Path $candidateAgentArtifactRoot -Force | Out-Null
-                $transferCollection = & $collectTransferHelperPath `
-                    -TransferRoot $agentSession.TransferRoot `
-                    -FileHash $candidate.Hash `
-                    -DestinationRoot $candidateAgentArtifactRoot
+                    $candidateAgentArtifactRoot = Join-Path $agentDownloadsRoot $candidate.Hash.ToLowerInvariant()
+                    New-Item -ItemType Directory -Path $candidateAgentArtifactRoot -Force | Out-Null
+                    $transferCollection = & $collectTransferHelperPath `
+                        -TransferRoot $agentSession.TransferRoot `
+                        -FileHash $candidate.Hash `
+                        -DestinationRoot $candidateAgentArtifactRoot
 
-                $candidateHarnessArtifactRoot = Join-Path $harnessDownloadsRoot $candidate.Hash.ToLowerInvariant()
-                New-Item -ItemType Directory -Path $candidateHarnessArtifactRoot -Force | Out-Null
-                Copy-Item -LiteralPath $harnessDownloadState.Path -Destination (Join-Path $candidateHarnessArtifactRoot $candidate.Name) -Force
+                    $candidateHarnessArtifactRoot = Join-Path $harnessDownloadsRoot $candidate.Hash.ToLowerInvariant()
+                    New-Item -ItemType Directory -Path $candidateHarnessArtifactRoot -Force | Out-Null
+                    Copy-Item -LiteralPath $harnessDownloadState.Path -Destination (Join-Path $candidateHarnessArtifactRoot $candidate.Name) -Force
 
-                $attempt = [pscustomobject]@{
-                    Hash = $attempt.Hash
-                    Name = $attempt.Name
-                    Size = $attempt.Size
-                    HarnessSourceCount = $attempt.HarnessSourceCount
-                    HarnessCompleteSourceCount = $attempt.HarnessCompleteSourceCount
-                    AgentSourceCount = $attempt.AgentSourceCount
-                    AgentBatchHits = $attempt.AgentBatchHits
-                    ProbeManifestPath = $attempt.ProbeManifestPath
-                    ProbeSources = $attempt.ProbeSources
-                    ProbeCompleted = $attempt.ProbeCompleted
-                    ProbeVerifiedRanges = $attempt.ProbeVerifiedRanges
-                    DownloadSucceeded = $true
-                    HarnessDownloadedPath = $harnessDownloadState.Path
-                    HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
-                    HarnessCompletionKind = $harnessDownloadState.CompletionKind
-                    AgentTransferManifestPath = $probeManifestPath
-                    AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
-                    AgentTransferCollectedRoot = $transferCollection.DestinationRoot
+                    $attempt = [pscustomobject]@{
+                        Hash = $attempt.Hash
+                        Name = $attempt.Name
+                        Size = $attempt.Size
+                        HarnessSourceCount = $attempt.HarnessSourceCount
+                        HarnessCompleteSourceCount = $attempt.HarnessCompleteSourceCount
+                        AgentSourceCount = $attempt.AgentSourceCount
+                        AgentBatchHits = $attempt.AgentBatchHits
+                        ProbeManifestPath = $attempt.ProbeManifestPath
+                        ProbeSources = $attempt.ProbeSources
+                        ProbeCompleted = $attempt.ProbeCompleted
+                        ProbeVerifiedRanges = $attempt.ProbeVerifiedRanges
+                        DownloadSucceeded = $true
+                        DownloadError = $null
+                        HarnessDownloadedPath = $harnessDownloadState.Path
+                        HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
+                        HarnessCompletionKind = $harnessDownloadState.CompletionKind
+                        AgentTransferManifestPath = $probeManifestPath
+                        AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
+                        AgentTransferCollectedRoot = $transferCollection.DestinationRoot
+                    }
+
+                    $completedDownloads.Add([pscustomobject]@{
+                        Hash = $candidate.Hash
+                        Name = $candidate.Name
+                        Size = [UInt64]$candidate.Size
+                        HarnessDownloadedPath = $harnessDownloadState.Path
+                        HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
+                        HarnessCompletionKind = $harnessDownloadState.CompletionKind
+                        AgentTransferManifestPath = $probeManifestPath
+                        AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
+                        AgentTransferCollectedRoot = $transferCollection.DestinationRoot
+                    }) | Out-Null
+
+                    if ($completedDownloads.Count -ge $SuccessfulDownloadCount) {
+                        $candidateAttempts.Add($attempt) | Out-Null
+                        break
+                    }
                 }
-
-                $completedDownloads.Add([pscustomobject]@{
-                    Hash = $candidate.Hash
-                    Name = $candidate.Name
-                    Size = [UInt64]$candidate.Size
-                    HarnessDownloadedPath = $harnessDownloadState.Path
-                    HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
-                    HarnessCompletionKind = $harnessDownloadState.CompletionKind
-                    AgentTransferManifestPath = $probeManifestPath
-                    AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
-                    AgentTransferCollectedRoot = $transferCollection.DestinationRoot
-                }) | Out-Null
-
-                if ($completedDownloads.Count -ge $SuccessfulDownloadCount) {
-                    $candidateAttempts.Add($attempt) | Out-Null
-                    break
+                catch {
+                    $attempt = [pscustomobject]@{
+                        Hash = $attempt.Hash
+                        Name = $attempt.Name
+                        Size = $attempt.Size
+                        HarnessSourceCount = $attempt.HarnessSourceCount
+                        HarnessCompleteSourceCount = $attempt.HarnessCompleteSourceCount
+                        AgentSourceCount = $attempt.AgentSourceCount
+                        AgentBatchHits = $attempt.AgentBatchHits
+                        ProbeManifestPath = $attempt.ProbeManifestPath
+                        ProbeSources = $attempt.ProbeSources
+                        ProbeCompleted = $attempt.ProbeCompleted
+                        ProbeVerifiedRanges = $attempt.ProbeVerifiedRanges
+                        DownloadSucceeded = $false
+                        DownloadError = $_.Exception.Message
+                    }
                 }
             }
 
