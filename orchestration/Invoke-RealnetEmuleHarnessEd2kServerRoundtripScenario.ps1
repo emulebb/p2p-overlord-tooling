@@ -130,9 +130,7 @@ function Add-Ed2kLinkSource {
     )
 
     $trimmedLink = $Link.Trim()
-    if ($trimmedLink -match '\|sources,') {
-        return $trimmedLink
-    }
+    $trimmedLink = $trimmedLink -replace '\|sources,[^|]*\|/$', ''
     if ($trimmedLink -notmatch '\|/$') {
         throw "ED2K link did not end with '|/' as expected: $trimmedLink"
     }
@@ -197,6 +195,17 @@ function Copy-IfExists {
 
     if ($Path -and (Test-Path -LiteralPath $Path)) {
         Copy-Item -LiteralPath $Path -Destination (Join-Path $DestinationRoot (Split-Path -Leaf $Path)) -Force
+    }
+}
+
+function Remove-DirectoryIfExists {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (Test-Path -LiteralPath $Path) {
+        Remove-Item -LiteralPath $Path -Recurse -Force
     }
 }
 
@@ -315,6 +324,21 @@ try {
     $seedFilePath = Join-Path $seederProfile.IncomingRoot $manifest.file.name
     New-DeterministicBinaryFile -Path $seedFilePath -SizeBytes ([UInt64]$manifest.file.sizeBytes) -Pattern ([string]$manifest.file.pattern)
 
+    $seederSession = & $startHarnessHelperPath `
+        -ProfileRoot $seederProfile.ProfileRoot `
+        -SeedFilePath $seedFilePath `
+        -ExportLinkPath $seedLinkPath `
+        -ExportSourceIp $bindAddr `
+        -BuildConfig $EmuleHarnessBuildConfig
+
+    Wait-Path -Path $seedLinkPath -TimeoutSeconds ([int]$manifest.timeouts.harnessReadySeconds)
+    $parsedLink = Parse-Ed2kLinkFile -Path $seedLinkPath
+    $agentDirectDownloadLink = Add-Ed2kLinkSource `
+        -Link $parsedLink.Link `
+        -SourceIp $bindAddr `
+        -SourceTcpPort ([UInt16]$manifest.harnessSeeder.tcpPort)
+    Remove-DirectoryIfExists -Path (Join-Path $env:OVERLORD_TMP_DIR ("agent-real-state\overlord-ed2k-transfer\{0}" -f $parsedLink.FileHash.ToLowerInvariant()))
+
     $agentStage1Session = & $startAgentHelperPath `
         -InterfaceAlias $resolvedAdapter.InterfaceAlias `
         -CapturePort ([int]$manifest.agent.capturePort) `
@@ -330,20 +354,6 @@ try {
         -ServerConnectTimeoutSeconds 8 `
         -ServerReconnectIntervalSeconds 5
     Wait-AgentControlReady -StatsUrl $agentStage1Session.StatsUrl -TimeoutSeconds 180
-
-    $seederSession = & $startHarnessHelperPath `
-        -ProfileRoot $seederProfile.ProfileRoot `
-        -SeedFilePath $seedFilePath `
-        -ExportLinkPath $seedLinkPath `
-        -ExportSourceIp $bindAddr `
-        -BuildConfig $EmuleHarnessBuildConfig
-
-    Wait-Path -Path $seedLinkPath -TimeoutSeconds ([int]$manifest.timeouts.harnessReadySeconds)
-    $parsedLink = Parse-Ed2kLinkFile -Path $seedLinkPath
-    $agentDirectDownloadLink = Add-Ed2kLinkSource `
-        -Link $parsedLink.Link `
-        -SourceIp $bindAddr `
-        -SourceTcpPort ([UInt16]$manifest.harnessSeeder.tcpPort)
 
     if ([int]$manifest.timeouts.initialPublishDelaySeconds -gt 0) {
         Start-Sleep -Seconds ([int]$manifest.timeouts.initialPublishDelaySeconds)
@@ -429,7 +439,7 @@ try {
         (Add-Ed2kLinkSource `
             -Link $parsedLink.Link `
             -SourceIp $bindAddr `
-            -SourceTcpPort ([UInt16]$manifest.agent.ed2kTcpPort)) + [Environment]::NewLine,
+            -SourceTcpPort ([UInt16]$manifest.agent.ed2kPort)) + [Environment]::NewLine,
         (New-Object System.Text.UTF8Encoding($false))
     )
     $harnessDirectDownloadLink = (Get-Content -LiteralPath $downloadLinkPath -Raw).Trim()
