@@ -70,6 +70,7 @@ function Get-FileRecordEd2kHash {
 function Add-UniqueString {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [System.Collections.Generic.List[string]]$Target,
         [string]$Value
     )
@@ -167,8 +168,11 @@ try {
         -Body ($payload | ConvertTo-Json -Depth 6) | Out-Null
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $contextTask = $null
     while ((Get-Date) -lt $deadline) {
-        $contextTask = $listener.GetContextAsync()
+        if ($null -eq $contextTask) {
+            $contextTask = $listener.GetContextAsync()
+        }
         if (-not $contextTask.Wait(1000)) {
             if ($status -in @("completed", "failed", "cancelled")) {
                 break
@@ -177,6 +181,7 @@ try {
         }
 
         $context = $contextTask.Result
+        $contextTask = $null
         try {
             $reader = [System.IO.StreamReader]::new($context.Request.InputStream, $context.Request.ContentEncoding)
             try {
