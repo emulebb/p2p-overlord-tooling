@@ -13,6 +13,9 @@ param(
     [string]$AgentBootstrapNode,
     [string]$ExportSourceIp,
     [string]$DownloadLinkPath,
+    [string]$SearchTerm,
+    [string]$SearchResultsPath,
+    [string]$SearchDownloadHashPath,
     [ValidateSet("Debug", "Release")]
     [string]$BuildConfig = "Debug",
     [switch]$SkipRuntimeCleanup
@@ -138,6 +141,15 @@ if (-not [string]::IsNullOrWhiteSpace($ExportSourceIp)) {
 if (-not [string]::IsNullOrWhiteSpace($DownloadLinkPath)) {
     $emuleHarnessArgs += ('-downloadlinkfile="{0}"' -f $DownloadLinkPath)
 }
+if (-not [string]::IsNullOrWhiteSpace($SearchTerm)) {
+    $emuleHarnessArgs += ('-searchterm="{0}"' -f $SearchTerm)
+}
+if (-not [string]::IsNullOrWhiteSpace($SearchResultsPath)) {
+    $emuleHarnessArgs += ('-searchresultsfile="{0}"' -f $SearchResultsPath)
+}
+if (-not [string]::IsNullOrWhiteSpace($SearchDownloadHashPath)) {
+    $emuleHarnessArgs += ('-searchdownloadhashfile="{0}"' -f $SearchDownloadHashPath)
+}
 
 $emuleHarnessProcess = Start-Process `
     -FilePath $emuleHarnessExePath `
@@ -183,6 +195,9 @@ $metadata = [pscustomobject]@{
     SeedFilePath = $SeedFilePath
     ExportLinkPath = $ExportLinkPath
     DownloadLinkPath = $DownloadLinkPath
+    SearchTerm = $SearchTerm
+    SearchResultsPath = $SearchResultsPath
+    SearchDownloadHashPath = $SearchDownloadHashPath
     ReadyFile = $readyFile
     StatusLogPath = $statusLogPath
     TraceLogPath = $traceLogPath
