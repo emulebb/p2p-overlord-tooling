@@ -186,7 +186,7 @@ function Select-CommonCandidate {
     }
 
     $candidates = foreach ($result in @($HarnessSnapshot.results)) {
-        $hash = [string]$result.hash
+        $hash = ([string]$result.hash).ToLowerInvariant()
         if ([string]::IsNullOrWhiteSpace($hash)) {
             continue
         }
