@@ -236,17 +236,19 @@ if ($null -eq $completedAtUtc -and $status -notin @("completed", "failed", "canc
 }
 
 $files = @(
-    foreach ($entry in $fileMap.Values) {
-        [pscustomobject]@{
-            Hash = [string]$entry.hash
-            Size = if ($null -ne $entry.size) { [UInt64]$entry.size } else { $null }
-            ContentType = if ([string]::IsNullOrWhiteSpace([string]$entry.contentType)) { $null } else { [string]$entry.contentType }
-            SourceCount = [int]$entry.sourceCount
-            BatchHits = [int]$entry.batchHits
-            Names = @($entry.names | Sort-Object)
+    @(
+        foreach ($entry in $fileMap.Values) {
+            [pscustomobject]@{
+                Hash = [string]$entry.hash
+                Size = if ($null -ne $entry.size) { [UInt64]$entry.size } else { $null }
+                ContentType = if ([string]::IsNullOrWhiteSpace([string]$entry.contentType)) { $null } else { [string]$entry.contentType }
+                SourceCount = [int]$entry.sourceCount
+                BatchHits = [int]$entry.batchHits
+                Names = @($entry.names | Sort-Object)
+            }
         }
-    }
-) | Sort-Object @{ Expression = "SourceCount"; Descending = $true }, @{ Expression = "Size"; Descending = $false }, @{ Expression = "Hash"; Descending = $false }
+    ) | Sort-Object @{ Expression = "SourceCount"; Descending = $true }, @{ Expression = "Size"; Descending = $false }, @{ Expression = "Hash"; Descending = $false }
+)
 
 $summary = [pscustomobject]@{
     Query = $Query
