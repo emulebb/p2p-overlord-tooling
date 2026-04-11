@@ -266,7 +266,8 @@ function Start-OraclePeer {
         [string]$ExportLinkPath,
         [string]$ServerHost,
         [UInt16]$ServerPort,
-        [string]$OracleBuildConfig
+        [string]$OracleBuildConfig,
+        [switch]$SkipRuntimeCleanup
     )
 
     $profile = New-OraclePrivateProfile `
@@ -294,7 +295,8 @@ function Start-OraclePeer {
         -SeedFilePath $SeedFilePath `
         -ExportLinkPath $ExportLinkPath `
         -AgentBootstrapNode "127.0.0.1:1" `
-        -BuildConfig $OracleBuildConfig
+        -BuildConfig $OracleBuildConfig `
+        -SkipRuntimeCleanup:$SkipRuntimeCleanup
 
     Wait-Path -Path $ExportLinkPath -TimeoutSeconds 90
     $link = Parse-Ed2kLinkFile -Path $ExportLinkPath
@@ -350,7 +352,8 @@ function Invoke-TestMultiFilePublishSearch {
             -ExportLinkPath (Join-Path $TestRoot "oracle-a\seed.ed2k") `
             -ServerHost "127.0.0.1" `
             -ServerPort 46161 `
-            -OracleBuildConfig $OracleBuildConfig
+            -OracleBuildConfig $OracleBuildConfig `
+            -SkipRuntimeCleanup
 
         $oracles += Start-OraclePeer `
             -ProfileScriptPath $Paths.Profile `
@@ -368,7 +371,8 @@ function Invoke-TestMultiFilePublishSearch {
             -ExportLinkPath (Join-Path $TestRoot "oracle-b\seed.ed2k") `
             -ServerHost "127.0.0.1" `
             -ServerPort 46161 `
-            -OracleBuildConfig $OracleBuildConfig
+            -OracleBuildConfig $OracleBuildConfig `
+            -SkipRuntimeCleanup
 
         $published = @()
         foreach ($oracle in $oracles) {
@@ -472,7 +476,8 @@ function Invoke-TestTwoOracleSameHash {
             -ExportLinkPath (Join-Path $TestRoot "oracle-a\seed.ed2k") `
             -ServerHost "127.0.0.1" `
             -ServerPort 46261 `
-            -OracleBuildConfig $OracleBuildConfig
+            -OracleBuildConfig $OracleBuildConfig `
+            -SkipRuntimeCleanup
 
         $oracles += Start-OraclePeer `
             -ProfileScriptPath $Paths.Profile `
@@ -490,7 +495,8 @@ function Invoke-TestTwoOracleSameHash {
             -ExportLinkPath (Join-Path $TestRoot "oracle-b\seed.ed2k") `
             -ServerHost "127.0.0.1" `
             -ServerPort 46261 `
-            -OracleBuildConfig $OracleBuildConfig
+            -OracleBuildConfig $OracleBuildConfig `
+            -SkipRuntimeCleanup
 
         $sharedLink = $oracles[0].Link
         $published = Wait-GoEd2kFileState `
