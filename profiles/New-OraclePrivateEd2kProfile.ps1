@@ -141,6 +141,9 @@ EnableScheduler=0
 KadUDPKey=$KadUdpKey
 CreateCrashDump=0
 Nick=eMule harness
+CryptLayerRequested=0
+CryptLayerRequired=0
+CryptLayerSupported=0
 
 [WebServer]
 Enabled=0
