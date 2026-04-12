@@ -44,6 +44,7 @@ $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $refreshNetworkingHelperPath = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"
 $setTargetServerHelperPath = Join-Path $PSScriptRoot "helper-agent-set-target-server-entry.ps1"
 $networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
+$sessionMetadataHelperPath = Join-Path $PSScriptRoot "subsystems\agent\SessionMetadata.ps1"
 
 if (-not (Test-Path $launchHelperPath)) {
     throw "Agent launch helper not found at $launchHelperPath"
@@ -63,6 +64,11 @@ if (-not (Test-Path $setTargetServerHelperPath)) {
 if (-not (Test-Path $networkResolverPath)) {
     throw "Network adapter resolver not found at $networkResolverPath"
 }
+if (-not (Test-Path $sessionMetadataHelperPath)) {
+    throw "Agent session metadata helper not found at $sessionMetadataHelperPath"
+}
+
+. $sessionMetadataHelperPath
 
 function Resolve-DumpcapInterfaceIndex {
     param(
@@ -180,37 +186,33 @@ try {
         Sort-Object LastWriteTimeUtc -Descending |
         Select-Object -First 1 -ExpandProperty FullName
 
-    $metadata = [pscustomobject]@{
-        SessionDir = $sessionDir
-        SessionName = $sessionName
-        AgentLogPath = $agentLogPath
-        PacketDumpPath = $packetDumpPath
-        LogLinesBefore = $logLinesBefore
-        LogLengthBefore = $logLengthBefore
-        LogWriteTimeBeforeUtc = if ($logWriteTimeBefore) { $logWriteTimeBefore.ToString("o") } else { $null }
-        CapturePath = $pcapPath
-        CapturePort = $CapturePort
-        InterfaceIndex = $InterfaceIndex
-        RequestedInterfaceAlias = $InterfaceAlias
-        InterfaceAlias = $resolvedInterfaceAlias
-        InterfaceFallbackUsed = $resolvedAdapter.UsedFallback
-        NetworkingPath = $networkingRefresh.NetworkingPath
-        NetworkingBindIp = $networkingRefresh.ResolvedP2pBindIp
-        AgentStateRoot = $networkingRefresh.AgentStateRoot
-        AgentLogRoot = $networkingRefresh.AgentLogRoot
-        TransferRoot = (Join-Path $networkingRefresh.AgentStateRoot "overlord-ed2k-transfer")
-        TargetServer = $targetServerSelection
-        ControlPort = $networkingRefresh.ControlListenPort
-        KadPort = $networkingRefresh.KadListenPort
-        Ed2kPort = $networkingRefresh.Ed2kListenPort
-        DumpcapPid = $dumpcap.Id
-        DumpcapStdoutPath = $dumpcapStdoutPath
-        DumpcapStderrPath = $dumpcapStderrPath
-        AgentPid = $agentProcess.Id
-        ControlUrl = "http://127.0.0.1:$($networkingRefresh.ControlListenPort)"
-        StatsUrl = "http://127.0.0.1:$($networkingRefresh.ControlListenPort)/api/internal/stats"
-        StartedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
-    }
+    $metadata = New-AgentSessionMetadata `
+        -SessionDir $sessionDir `
+        -SessionName $sessionName `
+        -StateRoot $networkingRefresh.AgentStateRoot `
+        -LogRoot $networkingRefresh.AgentLogRoot `
+        -CapturePath $pcapPath `
+        -CapturePort $CapturePort `
+        -AgentLogPath $agentLogPath `
+        -PacketDumpPath $packetDumpPath `
+        -ControlPort ([UInt16]$networkingRefresh.ControlListenPort) `
+        -KadPort ([UInt16]$networkingRefresh.KadListenPort) `
+        -Ed2kPort ([UInt16]$networkingRefresh.Ed2kListenPort) `
+        -BindIp $networkingRefresh.ResolvedP2pBindIp `
+        -RequestedInterfaceAlias $InterfaceAlias `
+        -InterfaceAlias $resolvedInterfaceAlias `
+        -InterfaceFallbackUsed ([bool]$resolvedAdapter.UsedFallback) `
+        -NetworkingPath $networkingRefresh.NetworkingPath `
+        -TargetServer $targetServerSelection `
+        -DumpcapPid $dumpcap.Id `
+        -DumpcapStdoutPath $dumpcapStdoutPath `
+        -DumpcapStderrPath $dumpcapStderrPath `
+        -AgentPid $agentProcess.Id `
+        -StartedAtUtc $sessionStartUtc
+    $metadata | Add-Member -NotePropertyName "LogLinesBefore" -NotePropertyValue $logLinesBefore
+    $metadata | Add-Member -NotePropertyName "LogLengthBefore" -NotePropertyValue $logLengthBefore
+    $metadata | Add-Member -NotePropertyName "LogWriteTimeBeforeUtc" -NotePropertyValue (if ($logWriteTimeBefore) { $logWriteTimeBefore.ToString("o") } else { $null })
+    $metadata | Add-Member -NotePropertyName "InterfaceIndex" -NotePropertyValue $InterfaceIndex
 
     $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8NoBOM $metadataPath
     $metadata

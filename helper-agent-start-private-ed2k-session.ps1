@@ -42,12 +42,15 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $configWriterPath = Join-Path $PSScriptRoot "helper-agent-write-private-local-config.ps1"
 $launchHelperPath = Join-Path $PSScriptRoot "helper-agent-launch-debug.ps1"
+$sessionMetadataHelperPath = Join-Path $PSScriptRoot "subsystems\agent\SessionMetadata.ps1"
 
-foreach ($requiredPath in @($cleanupHelperPath, $configWriterPath, $launchHelperPath)) {
+foreach ($requiredPath in @($cleanupHelperPath, $configWriterPath, $launchHelperPath, $sessionMetadataHelperPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required helper path not found at $requiredPath"
     }
 }
+
+. $sessionMetadataHelperPath
 
 & $cleanupHelperPath -CapturePort 0 | Out-Null
 
@@ -91,32 +94,25 @@ try {
         throw "Agent process overlord-agent-emule.exe (PID $($launchResult.AgentPid)) is not running after launch"
     }
 
-    $metadata = [pscustomobject]@{
-        SessionDir = $sessionDir
-        SessionName = $sessionName
-        StateRoot = $configResult.StateRoot
-        LogRoot = $configResult.LogRoot
-        ConfigPath = $configResult.ConfigPath
-        ConfigBackupPath = $configResult.BackupPath
-        CapturePath = $null
-        CapturePort = 0
-        AgentLogPath = (Join-Path $configResult.LogRoot "overlord-agent-emule.log")
-        PacketDumpPath = $null
-        ControlUrl = "http://127.0.0.1:$ControlPort"
-        StatsUrl = "http://127.0.0.1:$ControlPort/api/internal/stats"
-        ControlPort = $ControlPort
-        KadPort = $KadPort
-        Ed2kPort = $Ed2kPort
-        P2pBindIp = $P2pBindIp
-        KadBootstrapReadyContacts = $KadBootstrapReadyContacts
-        KadDisabled = [bool]$DisableKad
-        ServerHost = if ([string]::IsNullOrWhiteSpace($ServerHost)) { $null } else { $ServerHost }
-        ServerPort = if ($ServerPort -gt 0) { $ServerPort } else { $null }
-        ProbeSearchTerm = $ProbeSearchTerm
-        TransferRoot = (Join-Path $configResult.StateRoot "overlord-ed2k-transfer")
-        AgentPid = $agentProcess.Id
-        StartedAtUtc = $sessionStartUtc.ToString("o")
-    }
+    $metadata = New-AgentSessionMetadata `
+        -SessionDir $sessionDir `
+        -SessionName $sessionName `
+        -StateRoot $configResult.StateRoot `
+        -LogRoot $configResult.LogRoot `
+        -ConfigPath $configResult.ConfigPath `
+        -ConfigBackupPath $configResult.BackupPath `
+        -CapturePort 0 `
+        -ControlPort $ControlPort `
+        -KadPort $KadPort `
+        -Ed2kPort $Ed2kPort `
+        -BindIp $P2pBindIp `
+        -KadBootstrapReadyContacts $KadBootstrapReadyContacts `
+        -KadDisabled ([bool]$DisableKad) `
+        -ServerHost $ServerHost `
+        -ServerPort (if ($ServerPort -gt 0) { [UInt16]$ServerPort } else { $null }) `
+        -ProbeSearchTerm $ProbeSearchTerm `
+        -AgentPid $agentProcess.Id `
+        -StartedAtUtc $sessionStartUtc
     $metadata | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM $metadataPath
     $metadata
 }
