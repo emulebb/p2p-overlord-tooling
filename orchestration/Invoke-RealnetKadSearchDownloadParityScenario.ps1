@@ -850,7 +850,7 @@ function Save-CandidateRuntimeEvidence {
     Write-JsonFile -Path (Join-Path $phaseRoot "harness-part-state.json") -InputObject $partState -Depth 6
 }
 
-function Export-HarnessEd2kTraceWindow {
+function Export-Ed2kTraceWindow {
     param(
         [string]$SourcePath,
         [string]$DestinationPath,
@@ -895,6 +895,323 @@ function Export-HarnessEd2kTraceWindow {
     }
 
     return $false
+}
+
+function Resolve-AgentEd2kTracePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$AgentSession
+    )
+
+    $existingPath = [string](Get-JsonObjectPropertyValue -Object $AgentSession -PropertyName "Ed2kTcpDumpPath" -DefaultValue $null)
+    if (-not [string]::IsNullOrWhiteSpace($existingPath) -and (Test-Path -LiteralPath $existingPath)) {
+        return $existingPath
+    }
+
+    $logRoot = [string](Get-JsonObjectPropertyValue -Object $AgentSession -PropertyName "LogRoot" -DefaultValue $null)
+    if ([string]::IsNullOrWhiteSpace($logRoot) -or -not (Test-Path -LiteralPath $logRoot)) {
+        return $null
+    }
+
+    $startedAtUtcValue = Get-JsonObjectPropertyValue -Object $AgentSession -PropertyName "StartedAtUtc" -DefaultValue $null
+    $startedAtUtc = $null
+    if ($startedAtUtcValue) {
+        try {
+            $startedAtUtc = [datetime]::Parse(
+                [string]$startedAtUtcValue,
+                [System.Globalization.CultureInfo]::InvariantCulture,
+                [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+            )
+        }
+        catch {
+            $startedAtUtc = $null
+        }
+    }
+
+    return Get-ChildItem -LiteralPath $logRoot -Filter "agent-ed2k-tcp-dump-*.jsonl" -ErrorAction SilentlyContinue |
+        Where-Object {
+            if ($null -eq $startedAtUtc) {
+                return $true
+            }
+            $_.LastWriteTimeUtc -ge $startedAtUtc.AddSeconds(-5)
+        } |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
+}
+
+function Get-Ed2kStartupStageCatalog {
+    return @(
+        "connect_start",
+        "connect_ready",
+        "hello_sent",
+        "hello_received",
+        "hello_answer_received",
+        "secure_ident_started",
+        "secure_ident_state_received",
+        "secure_ident_key_exchange",
+        "startup_file_request_sent",
+        "startup_file_response_received",
+        "source_request_sent",
+        "source_answer_received",
+        "aich_request_sent",
+        "aich_answer_received",
+        "hashset_request_sent",
+        "hashset_answer_received",
+        "upload_request_sent",
+        "queue_ranking",
+        "upload_accepted",
+        "part_request_sent",
+        "part_data_received",
+        "piece_stored",
+        "completed"
+    )
+}
+
+function Get-Ed2kStartupStageIndexMap {
+    $indexMap = @{}
+    $index = 0
+    foreach ($stage in Get-Ed2kStartupStageCatalog) {
+        $indexMap[$stage] = $index
+        $index += 1
+    }
+    return $indexMap
+}
+
+function Test-IsEd2kDownloadTraceRecord {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Record
+    )
+
+    $flow = [string](Get-JsonObjectPropertyValue -Object $Record -PropertyName "flow" -DefaultValue "")
+    $stateId = [string](Get-JsonObjectPropertyValue -Object $Record -PropertyName "state_id" -DefaultValue "")
+
+    if ($flow -match "download" -or $stateId -match "download") {
+        return $true
+    }
+
+    return $false
+}
+
+function Get-Ed2kStartupStageEvent {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Record
+    )
+
+    if (-not (Test-IsEd2kDownloadTraceRecord -Record $Record)) {
+        return $null
+    }
+
+    $phase = [string](Get-JsonObjectPropertyValue -Object $Record -PropertyName "phase" -DefaultValue "")
+    $direction = [string](Get-JsonObjectPropertyValue -Object $Record -PropertyName "direction" -DefaultValue "")
+    $opcodeName = [string](Get-JsonObjectPropertyValue -Object $Record -PropertyName "opcode_name" -DefaultValue "")
+    $tsUtc = Convert-ToUtcTimestampString -Value (Get-JsonObjectPropertyValue -Object $Record -PropertyName "ts_utc" -DefaultValue $null)
+    $stage = $null
+    $terminalState = $null
+
+    switch ($phase) {
+        "connect_start" { $stage = "connect_start" }
+        "connect_ready" { $stage = "connect_ready" }
+        "hello" { if ($direction -eq "send") { $stage = "hello_sent" } }
+        "secure_ident_probe" { $stage = "secure_ident_started" }
+        "request_filename" { $stage = "startup_file_request_sent" }
+        "set_req_file_id" { $stage = "startup_file_request_sent" }
+        "request_sources2" { $stage = "source_request_sent" }
+        "aich_file_hash_request" { $stage = "aich_request_sent" }
+        "hashset_request" { $stage = "hashset_request_sent" }
+        "upload_request_hashset_fallback" { $stage = "upload_request_sent" }
+        "start_upload" { if ($direction -eq "send") { $stage = "upload_request_sent" } }
+        "queue_ranking" { $stage = "queue_ranking" }
+        "request_parts" { if ($direction -eq "send") { $stage = "part_request_sent" } }
+        "piece_fragment_stored" { $stage = "piece_stored" }
+        "compressed_piece_fragment_stored" { $stage = "piece_stored" }
+        "complete" {
+            $stage = "completed"
+            $terminalState = "completed"
+        }
+        "accepted_incomplete" { $terminalState = "accepted_incomplete" }
+        "peer_closed_incomplete" { $terminalState = "peer_closed_incomplete" }
+        "peer_shutdown_incomplete" { $terminalState = "peer_shutdown_incomplete" }
+        "peer_timeout_incomplete" { $terminalState = "peer_timeout_incomplete" }
+        "error" { $terminalState = "error" }
+    }
+
+    if (-not $stage) {
+        switch ($opcodeName) {
+            "OP_HELLO" { if ($direction -eq "recv") { $stage = "hello_received" } }
+            "OP_HELLOANSWER" { if ($direction -eq "recv") { $stage = "hello_answer_received" } }
+            "OP_SECIDENTSTATE" { if ($direction -eq "recv") { $stage = "secure_ident_state_received" } }
+            "OP_PUBLICKEY" { $stage = "secure_ident_key_exchange" }
+            "OP_SIGNATURE" { $stage = "secure_ident_key_exchange" }
+            "OP_REQFILENAMEANSWER" { $stage = "startup_file_response_received" }
+            "OP_FILESTATUS" { $stage = "startup_file_response_received" }
+            "OP_ANSWERSOURCES" { $stage = "source_answer_received" }
+            "OP_ANSWERSOURCES2" { $stage = "source_answer_received" }
+            "OP_AICHFILEHASHANS" { $stage = "aich_answer_received" }
+            "OP_HASHSETANSWER" { $stage = "hashset_answer_received" }
+            "OP_ACCEPTUPLOADREQ" { $stage = "upload_accepted" }
+            "OP_QUEUERANKING" { $stage = "queue_ranking" }
+            "OP_SENDINGPART" { $stage = "part_data_received" }
+            "OP_SENDINGPART_I64" { $stage = "part_data_received" }
+            "OP_COMPRESSEDPART" { $stage = "part_data_received" }
+            "OP_COMPRESSEDPART_I64" { $stage = "part_data_received" }
+        }
+    }
+
+    if (-not $stage -and -not $terminalState) {
+        return $null
+    }
+
+    return [pscustomobject]@{
+        TsUtc = $tsUtc
+        Stage = $stage
+        TerminalState = $terminalState
+        Phase = $phase
+        Direction = $direction
+        OpcodeName = $opcodeName
+        TraceKey = [string](Get-JsonObjectPropertyValue -Object $Record -PropertyName "trace_key" -DefaultValue "")
+        RemoteAddr = [string](Get-JsonObjectPropertyValue -Object $Record -PropertyName "remote_addr" -DefaultValue "")
+        TransportMode = [string](Get-JsonObjectPropertyValue -Object $Record -PropertyName "transport_mode" -DefaultValue "")
+        Note = [string](Get-JsonObjectPropertyValue -Object $Record -PropertyName "note" -DefaultValue "")
+    }
+}
+
+function Get-Ed2kStartupPhaseSummary {
+    param(
+        [string]$WindowPath,
+        [string]$SourceName
+    )
+
+    $stageIndexMap = Get-Ed2kStartupStageIndexMap
+    $stageEvents = [System.Collections.Generic.List[object]]::new()
+    $observedStages = [System.Collections.Generic.List[string]]::new()
+    $seenStages = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $traceKeys = [System.Collections.Generic.List[string]]::new()
+    $seenTraceKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $observedDownloadTrace = $false
+    $maxStageIndex = -1
+    $finalStage = $null
+    $terminalState = $null
+
+    if ($WindowPath -and (Test-Path -LiteralPath $WindowPath)) {
+        foreach ($line in Get-Content -LiteralPath $WindowPath) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+                continue
+            }
+
+            try {
+                $record = $line | ConvertFrom-Json
+            }
+            catch {
+                continue
+            }
+
+            if (-not (Test-IsEd2kDownloadTraceRecord -Record $record)) {
+                continue
+            }
+
+            $observedDownloadTrace = $true
+            $traceKey = [string](Get-JsonObjectPropertyValue -Object $record -PropertyName "trace_key" -DefaultValue "")
+            if (-not [string]::IsNullOrWhiteSpace($traceKey) -and $seenTraceKeys.Add($traceKey)) {
+                $traceKeys.Add($traceKey) | Out-Null
+            }
+
+            $event = Get-Ed2kStartupStageEvent -Record $record
+            if ($null -eq $event) {
+                continue
+            }
+
+            $stageEvents.Add($event) | Out-Null
+
+            if (-not [string]::IsNullOrWhiteSpace($event.Stage)) {
+                if ($seenStages.Add($event.Stage)) {
+                    $observedStages.Add($event.Stage) | Out-Null
+                }
+                if ($stageIndexMap.ContainsKey($event.Stage)) {
+                    $currentIndex = [int]$stageIndexMap[$event.Stage]
+                    if ($currentIndex -ge $maxStageIndex) {
+                        $maxStageIndex = $currentIndex
+                        $finalStage = $event.Stage
+                    }
+                }
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($event.TerminalState)) {
+                $terminalState = $event.TerminalState
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        Source = $SourceName
+        WindowPath = $WindowPath
+        WindowExists = [bool]($WindowPath -and (Test-Path -LiteralPath $WindowPath))
+        ObservedDownloadTrace = $observedDownloadTrace
+        ObservedStages = @($observedStages)
+        FinalStage = $finalStage
+        TerminalState = $terminalState
+        MaxStageIndex = $maxStageIndex
+        TraceKeys = @($traceKeys)
+        StageEventCount = $stageEvents.Count
+        StageEvents = @($stageEvents)
+    }
+}
+
+function Compare-Ed2kStartupPhaseSummaries {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$AgentSummary,
+        [Parameter(Mandatory = $true)]
+        [object]$HarnessSummary
+    )
+
+    $stageCatalog = @(Get-Ed2kStartupStageCatalog)
+    $firstDivergentStage = $null
+    foreach ($stage in $stageCatalog) {
+        $agentObserved = @($AgentSummary.ObservedStages) -contains $stage
+        $harnessObserved = @($HarnessSummary.ObservedStages) -contains $stage
+        if ($agentObserved -ne $harnessObserved) {
+            $firstDivergentStage = $stage
+            break
+        }
+    }
+
+    $parityState = if (-not $AgentSummary.ObservedDownloadTrace -and -not $HarnessSummary.ObservedDownloadTrace) {
+        "no_download_trace"
+    }
+    elseif ($firstDivergentStage) {
+        if ((@($HarnessSummary.ObservedStages) -contains $firstDivergentStage) -and -not (@($AgentSummary.ObservedStages) -contains $firstDivergentStage)) {
+            "agent_missing_stage"
+        }
+        elseif ((@($AgentSummary.ObservedStages) -contains $firstDivergentStage) -and -not (@($HarnessSummary.ObservedStages) -contains $firstDivergentStage)) {
+            "harness_missing_stage"
+        }
+        else {
+            "stage_divergence"
+        }
+    }
+    elseif ($AgentSummary.FinalStage -eq $HarnessSummary.FinalStage -and $AgentSummary.TerminalState -eq $HarnessSummary.TerminalState) {
+        "phase_aligned"
+    }
+    else {
+        "terminal_divergence"
+    }
+
+    return [pscustomobject]@{
+        AgentObservedDownloadTrace = [bool]$AgentSummary.ObservedDownloadTrace
+        HarnessObservedDownloadTrace = [bool]$HarnessSummary.ObservedDownloadTrace
+        AgentFinalStage = $AgentSummary.FinalStage
+        HarnessFinalStage = $HarnessSummary.FinalStage
+        AgentTerminalState = $AgentSummary.TerminalState
+        HarnessTerminalState = $HarnessSummary.TerminalState
+        AgentStageCount = @($AgentSummary.ObservedStages).Count
+        HarnessStageCount = @($HarnessSummary.ObservedStages).Count
+        FirstDivergentStage = $firstDivergentStage
+        ParityState = $parityState
+        AgentObservedStages = @($AgentSummary.ObservedStages)
+        HarnessObservedStages = @($HarnessSummary.ObservedStages)
+    }
 }
 
 function Parse-TextLogTimestampUtc {
@@ -1884,6 +2201,14 @@ foreach ($mode in $modeDefinitions) {
                 SourceTransitionTimelinePath = $null
                 SourceAcquisitionEventPath = $null
                 SourceAcquisitionSummaryPath = $null
+                AgentEd2kTraceWindowPath = $null
+                HarnessEd2kTraceWindowPath = $null
+                AgentStartupPhaseSummaryPath = $null
+                HarnessStartupPhaseSummaryPath = $null
+                StartupPhaseDiffPath = $null
+                AgentStartupPhaseState = $null
+                HarnessStartupPhaseState = $null
+                FirstDivergentStartupPhase = $null
                 SourceAcquisitionState = "agent_candidate_selected"
                 SourceSearchCompletionState = $null
                 SourceAcquisitionStarted = $false
@@ -2085,14 +2410,76 @@ foreach ($mode in $modeDefinitions) {
 
             if ($candidate.IsCommonCandidate) {
                 $candidateTraceWindowPath = Join-Path $candidateEvidencePath "harness-ed2k-tcp-window.jsonl"
-                $traceWindowWritten = Export-HarnessEd2kTraceWindow `
+                $traceWindowWritten = Export-Ed2kTraceWindow `
                     -SourcePath $harnessSession.EmuleHarnessEd2kTcpDumpPath `
                     -DestinationPath $candidateTraceWindowPath `
                     -StartUtc $candidateAttemptStartedAtUtc `
                     -EndUtc $candidateAttemptCompletedAtUtc
                 if ($traceWindowWritten) {
                     $attempt.CandidateTraceWindowPath = $candidateTraceWindowPath
+                    $attempt.HarnessEd2kTraceWindowPath = $candidateTraceWindowPath
                 }
+
+                $agentEd2kTraceSourcePath = Resolve-AgentEd2kTracePath -AgentSession $agentSession
+                $agentEd2kTraceWindowPath = Join-Path $candidateEvidencePath "agent-ed2k-tcp-window.jsonl"
+                $agentTraceWindowWritten = Export-Ed2kTraceWindow `
+                    -SourcePath $agentEd2kTraceSourcePath `
+                    -DestinationPath $agentEd2kTraceWindowPath `
+                    -StartUtc $candidateAttemptStartedAtUtc `
+                    -EndUtc $candidateAttemptCompletedAtUtc
+                if ($agentTraceWindowWritten) {
+                    $attempt.AgentEd2kTraceWindowPath = $agentEd2kTraceWindowPath
+                }
+
+                $agentStartupWindowPath = $null
+                if ($agentTraceWindowWritten) {
+                    $agentStartupWindowPath = $agentEd2kTraceWindowPath
+                }
+                $harnessStartupWindowPath = $null
+                if ($traceWindowWritten) {
+                    $harnessStartupWindowPath = $candidateTraceWindowPath
+                }
+                $agentStartupPhaseSummary = Get-Ed2kStartupPhaseSummary `
+                    -WindowPath $agentStartupWindowPath `
+                    -SourceName "agent"
+                $harnessStartupPhaseSummary = Get-Ed2kStartupPhaseSummary `
+                    -WindowPath $harnessStartupWindowPath `
+                    -SourceName "emule_harness"
+                $startupPhaseDiff = Compare-Ed2kStartupPhaseSummaries `
+                    -AgentSummary $agentStartupPhaseSummary `
+                    -HarnessSummary $harnessStartupPhaseSummary
+
+                $agentStartupPhaseSummaryPath = Join-Path $candidateEvidencePath "agent-ed2k-startup-phases.json"
+                $harnessStartupPhaseSummaryPath = Join-Path $candidateEvidencePath "harness-ed2k-startup-phases.json"
+                $startupPhaseDiffPath = Join-Path $candidateEvidencePath "ed2k-startup-phase-diff.json"
+                Write-JsonFile -Path $agentStartupPhaseSummaryPath -InputObject $agentStartupPhaseSummary -Depth 10
+                Write-JsonFile -Path $harnessStartupPhaseSummaryPath -InputObject $harnessStartupPhaseSummary -Depth 10
+                Write-JsonFile -Path $startupPhaseDiffPath -InputObject $startupPhaseDiff -Depth 10
+
+                $attempt.AgentStartupPhaseSummaryPath = $agentStartupPhaseSummaryPath
+                $attempt.HarnessStartupPhaseSummaryPath = $harnessStartupPhaseSummaryPath
+                $attempt.StartupPhaseDiffPath = $startupPhaseDiffPath
+                if ($agentStartupPhaseSummary.FinalStage) {
+                    $attempt.AgentStartupPhaseState = $agentStartupPhaseSummary.FinalStage
+                }
+                elseif ($agentStartupPhaseSummary.TerminalState) {
+                    $attempt.AgentStartupPhaseState = $agentStartupPhaseSummary.TerminalState
+                }
+                elseif (-not $agentStartupPhaseSummary.ObservedDownloadTrace) {
+                    $attempt.AgentStartupPhaseState = "no_download_trace"
+                }
+
+                if ($harnessStartupPhaseSummary.FinalStage) {
+                    $attempt.HarnessStartupPhaseState = $harnessStartupPhaseSummary.FinalStage
+                }
+                elseif ($harnessStartupPhaseSummary.TerminalState) {
+                    $attempt.HarnessStartupPhaseState = $harnessStartupPhaseSummary.TerminalState
+                }
+                elseif (-not $harnessStartupPhaseSummary.ObservedDownloadTrace) {
+                    $attempt.HarnessStartupPhaseState = "no_download_trace"
+                }
+                $attempt.FirstDivergentStartupPhase = $startupPhaseDiff.FirstDivergentStage
+                Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_startup_phases hash=$($candidate.Hash) agent_final=$($attempt.AgentStartupPhaseState) harness_final=$($attempt.HarnessStartupPhaseState) first_diff=$($attempt.FirstDivergentStartupPhase) parity_state=$($startupPhaseDiff.ParityState)"
             }
 
             Write-JsonFile -Path (Join-Path $candidateEvidencePath "candidate-attempt-summary.json") -InputObject $attempt -Depth 12
@@ -2137,7 +2524,8 @@ foreach ($mode in $modeDefinitions) {
             $agentSearchSummary.RawEventsPath,
             $agentSearchSummary.SummaryPath,
             $agentSession.AgentLogPath,
-            $agentSession.PacketDumpPath
+            $agentSession.PacketDumpPath,
+            (Resolve-AgentEd2kTracePath -AgentSession $agentSession)
         )) {
             Copy-IfExists -Path $path -DestinationRoot $agentArtifactRoot
         }

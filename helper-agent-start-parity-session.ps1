@@ -209,9 +209,13 @@ try {
         -DumpcapStderrPath $dumpcapStderrPath `
         -AgentPid $agentProcess.Id `
         -StartedAtUtc $sessionStartUtc
+    $logWriteTimeBeforeUtc = $null
+    if ($logWriteTimeBefore) {
+        $logWriteTimeBeforeUtc = $logWriteTimeBefore.ToString("o")
+    }
     $metadata | Add-Member -NotePropertyName "LogLinesBefore" -NotePropertyValue $logLinesBefore
     $metadata | Add-Member -NotePropertyName "LogLengthBefore" -NotePropertyValue $logLengthBefore
-    $metadata | Add-Member -NotePropertyName "LogWriteTimeBeforeUtc" -NotePropertyValue (if ($logWriteTimeBefore) { $logWriteTimeBefore.ToString("o") } else { $null })
+    $metadata | Add-Member -NotePropertyName "LogWriteTimeBeforeUtc" -NotePropertyValue $logWriteTimeBeforeUtc
     $metadata | Add-Member -NotePropertyName "InterfaceIndex" -NotePropertyValue $InterfaceIndex
 
     $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8NoBOM $metadataPath

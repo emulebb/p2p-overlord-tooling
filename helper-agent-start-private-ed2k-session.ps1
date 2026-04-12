@@ -94,6 +94,10 @@ try {
         throw "Agent process overlord-agent-emule.exe (PID $($launchResult.AgentPid)) is not running after launch"
     }
 
+    $resolvedServerPort = $null
+    if ($ServerPort -gt 0) {
+        $resolvedServerPort = [UInt16]$ServerPort
+    }
     $metadata = New-AgentSessionMetadata `
         -SessionDir $sessionDir `
         -SessionName $sessionName `
@@ -109,7 +113,7 @@ try {
         -KadBootstrapReadyContacts $KadBootstrapReadyContacts `
         -KadDisabled ([bool]$DisableKad) `
         -ServerHost $ServerHost `
-        -ServerPort (if ($ServerPort -gt 0) { [UInt16]$ServerPort } else { $null }) `
+        -ServerPort $resolvedServerPort `
         -ProbeSearchTerm $ProbeSearchTerm `
         -AgentPid $agentProcess.Id `
         -StartedAtUtc $sessionStartUtc
