@@ -10,6 +10,11 @@ srchybrid\x64\Debug path. Throws if EMULE_WORKSPACE_ROOT is not set or the
 expected eMule harness path does not exist under that workspace root.
 #>
 
+[CmdletBinding()]
+param(
+    [switch]$AllowMissing
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -34,7 +39,7 @@ $harnessDebugDir = [System.IO.Path]::GetFullPath(
     (Join-Path $emuleWorkspaceRoot "workspaces\$workspaceName\app\eMule-v0.72a-tracing-harness\srchybrid\x64\Debug")
 )
 
-if (-not (Test-Path -LiteralPath $harnessDebugDir -PathType Container)) {
+if (-not $AllowMissing -and -not (Test-Path -LiteralPath $harnessDebugDir -PathType Container)) {
     throw "eMule harness debug directory not found at $harnessDebugDir"
 }
 

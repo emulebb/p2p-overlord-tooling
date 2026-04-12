@@ -21,7 +21,11 @@ if (-not (Test-Path -LiteralPath $workspaceScriptPath -PathType Leaf)) {
     throw "Canonical eMule-build workspace entrypoint not found at $workspaceScriptPath"
 }
 
-$oracleHarnessDebugDir = & (Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1")
+$harnessDebugDirResolverPath = Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1"
+if (-not (Test-Path -LiteralPath $harnessDebugDirResolverPath -PathType Leaf)) {
+    throw "eMule harness debug-dir resolver not found at $harnessDebugDirResolverPath"
+}
+
 $buildArguments = @(
     '-NoLogo'
     '-NoProfile'
@@ -32,8 +36,6 @@ $buildArguments = @(
     'build-app'
     '-EmuleWorkspaceRoot'
     $emuleWorkspaceRoot
-    '-AppVariant'
-    'tracing-harness'
     '-Config'
     'Debug'
     '-Platform'
@@ -45,10 +47,11 @@ if ($LASTEXITCODE -ne 0) {
     throw "eMule harness debug build failed with exit code $LASTEXITCODE"
 }
 
-$builtExePath = Join-Path $oracleHarnessDebugDir "emule.exe"
-$runtimeExePath = Join-Path $oracleHarnessDebugDir "eMule_v072a_parity.exe"
-$builtPdbPath = Join-Path $oracleHarnessDebugDir "emule.pdb"
-$runtimePdbPath = Join-Path $oracleHarnessDebugDir "eMule_v072a_parity.pdb"
+$harnessDebugDir = & $harnessDebugDirResolverPath
+$builtExePath = Join-Path $harnessDebugDir "emule.exe"
+$runtimeExePath = Join-Path $harnessDebugDir "eMule_v072a_parity.exe"
+$builtPdbPath = Join-Path $harnessDebugDir "emule.pdb"
+$runtimePdbPath = Join-Path $harnessDebugDir "eMule_v072a_parity.pdb"
 
 if (-not (Test-Path $builtExePath)) {
     throw "Built eMule harness executable not found at $builtExePath"
