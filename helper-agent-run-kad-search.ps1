@@ -17,6 +17,8 @@ param(
     [string]$OutputRoot,
     [string]$ControlUrl = "http://127.0.0.1:13301",
     [int]$ListenPort = 0,
+    [int]$KadReadyTimeoutSeconds = 120,
+    [int]$MinimumPeerCount = 20,
     [int]$TimeoutSeconds = 180
 )
 
@@ -81,6 +83,40 @@ function Add-UniqueString {
     if ($Target -notcontains $Value) {
         [void]$Target.Add($Value)
     }
+}
+
+function Wait-AgentKadReady {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StatsUrl,
+        [int]$TimeoutSeconds = 120,
+        [int]$MinimumPeerCount = 20
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastState = $null
+    $lastPeerCount = 0
+    $lastP2pReady = $false
+
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $stats = Invoke-RestMethod -Uri $StatsUrl -TimeoutSec 10
+            if ($null -ne $stats) {
+                $lastState = [string]$stats.agent_activity.state
+                $lastPeerCount = if ($null -ne $stats.peers_connected) { [int]$stats.peers_connected } else { 0 }
+                $lastP2pReady = [bool]$stats.interface_report.p2p.ready
+                if ($lastP2pReady -and $lastState -ne "bootstrapping" -and $lastPeerCount -ge $MinimumPeerCount) {
+                    return $stats
+                }
+            }
+        }
+        catch {
+        }
+
+        Start-Sleep -Seconds 2
+    }
+
+    throw "Agent Kad readiness wait timed out at $StatsUrl within $TimeoutSeconds seconds (last_state=$lastState last_peers=$lastPeerCount p2p_ready=$lastP2pReady minimum_peers=$MinimumPeerCount)"
 }
 
 function Merge-ResultBatch {
@@ -159,8 +195,11 @@ $batchCount = 0
 $eventCount = 0
 $startedAtUtc = (Get-Date).ToUniversalTime()
 $completedAtUtc = $null
+$statsUrl = "{0}/api/internal/stats" -f $ControlUrl.TrimEnd("/")
 
 try {
+    Wait-AgentKadReady -StatsUrl $statsUrl -TimeoutSeconds $KadReadyTimeoutSeconds -MinimumPeerCount $MinimumPeerCount | Out-Null
+
     Invoke-RestMethod `
         -Method Post `
         -Uri ("{0}/api/internal/search" -f $ControlUrl.TrimEnd("/")) `

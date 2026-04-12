@@ -15,13 +15,20 @@ param(
     [string]$Query = "ebook",
     [ValidateSet("Debug", "Release")]
     [string]$EmuleHarnessBuildConfig = "Debug",
+    [ValidateSet("All", "PlaintextOnly", "ObfuscatedOnly")]
+    [string]$TransportModes = "All",
     [int]$SearchTimeoutSeconds = 240,
     [int]$DownloadTimeoutSeconds = 900,
     [int]$CandidateAttemptCount = 12,
     [int]$CandidateSourceProbeTimeoutSeconds = 60,
+    [int]$AgentTransferProgressProbeTimeoutSeconds = 120,
+    [int]$HarnessProgressProbeTimeoutSeconds = 90,
     [int]$SuccessfulDownloadCount = 2,
     [UInt64]$MaxCandidateSizeBytes = 16777216,
     [string]$InterfaceAlias = "hide.me",
+    [string[]]$PreferredHashes = @(),
+    [string[]]$PinnedCandidateHashes = @(),
+    [string]$PinnedCandidatesPath,
     [switch]$KeepSessionsRunning
 )
 
@@ -136,6 +143,162 @@ function Wait-TransferManifestProbeState {
     return $null
 }
 
+function Wait-TransferManifestProgressState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ManifestPath,
+        [int]$TimeoutSeconds = 120
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastManifest = $null
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path -LiteralPath $ManifestPath) {
+            $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
+            $lastManifest = $manifest
+            $manifestCompleted = [bool](Get-JsonObjectPropertyValue -Object $manifest -PropertyName "completed" -DefaultValue $false)
+            $verifiedRanges = @(Get-JsonObjectPropertyValue -Object $manifest -PropertyName "verified_ranges" -DefaultValue @())
+            $pieces = @(Get-JsonObjectPropertyValue -Object $manifest -PropertyName "pieces" -DefaultValue @())
+            $bytesWritten = 0
+            foreach ($piece in $pieces) {
+                $pieceBytesWritten = Get-JsonObjectPropertyValue -Object $piece -PropertyName "bytes_written" -DefaultValue 0
+                if ([int64]$pieceBytesWritten -gt $bytesWritten) {
+                    $bytesWritten = [int64]$pieceBytesWritten
+                }
+            }
+
+            if ($manifestCompleted) {
+                return [pscustomobject]@{
+                    State = "completed"
+                    Manifest = $manifest
+                    VerifiedRangeCount = $verifiedRanges.Count
+                    BytesWritten = [UInt64][Math]::Max($bytesWritten, 0)
+                }
+            }
+
+            if ($verifiedRanges.Count -gt 0 -or $bytesWritten -gt 0) {
+                return [pscustomobject]@{
+                    State = "progress"
+                    Manifest = $manifest
+                    VerifiedRangeCount = $verifiedRanges.Count
+                    BytesWritten = [UInt64][Math]::Max($bytesWritten, 0)
+                }
+            }
+        }
+
+        Start-Sleep -Seconds 2
+    }
+
+    if ($null -eq $lastManifest -and (Test-Path -LiteralPath $ManifestPath)) {
+        $lastManifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
+    }
+
+    $verifiedRanges = @()
+    $bytesWritten = [UInt64]0
+    if ($null -ne $lastManifest) {
+        $verifiedRanges = @(Get-JsonObjectPropertyValue -Object $lastManifest -PropertyName "verified_ranges" -DefaultValue @())
+        foreach ($piece in @(Get-JsonObjectPropertyValue -Object $lastManifest -PropertyName "pieces" -DefaultValue @())) {
+            $pieceBytesWritten = [UInt64](Get-JsonObjectPropertyValue -Object $piece -PropertyName "bytes_written" -DefaultValue 0)
+            if ($pieceBytesWritten -gt $bytesWritten) {
+                $bytesWritten = $pieceBytesWritten
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        State = "no-progress"
+        Manifest = $lastManifest
+        VerifiedRangeCount = $verifiedRanges.Count
+        BytesWritten = $bytesWritten
+    }
+}
+
+function Get-TransferManifestSnapshot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ManifestPath
+    )
+
+    $snapshot = [ordered]@{
+        TsUtc = (Get-Date).ToUniversalTime().ToString("o")
+        ManifestPath = $ManifestPath
+        ManifestExists = $false
+        Completed = $false
+        SourceCount = 0
+        VerifiedRangeCount = 0
+        BytesWritten = [UInt64]0
+        Manifest = $null
+    }
+
+    if (-not (Test-Path -LiteralPath $ManifestPath)) {
+        return [pscustomobject]$snapshot
+    }
+
+    $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
+    $sources = @(Get-JsonObjectPropertyValue -Object $manifest -PropertyName "sources" -DefaultValue @())
+    $verifiedRanges = @(Get-JsonObjectPropertyValue -Object $manifest -PropertyName "verified_ranges" -DefaultValue @())
+    $pieces = @(Get-JsonObjectPropertyValue -Object $manifest -PropertyName "pieces" -DefaultValue @())
+    $bytesWritten = [UInt64]0
+    foreach ($piece in $pieces) {
+        $pieceBytesWritten = [UInt64](Get-JsonObjectPropertyValue -Object $piece -PropertyName "bytes_written" -DefaultValue 0)
+        if ($pieceBytesWritten -gt $bytesWritten) {
+            $bytesWritten = $pieceBytesWritten
+        }
+    }
+
+    $snapshot.ManifestExists = $true
+    $snapshot.Completed = [bool](Get-JsonObjectPropertyValue -Object $manifest -PropertyName "completed" -DefaultValue $false)
+    $snapshot.SourceCount = $sources.Count
+    $snapshot.VerifiedRangeCount = $verifiedRanges.Count
+    $snapshot.BytesWritten = $bytesWritten
+    $snapshot.Manifest = $manifest
+
+    return [pscustomobject]$snapshot
+}
+
+function Wait-TransferManifestProbeTimelineState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ManifestPath,
+        [Parameter(Mandatory = $true)]
+        [string]$TimelinePath,
+        [int]$TimeoutSeconds = 45
+    )
+
+    Set-Content -LiteralPath $TimelinePath -Encoding utf8NoBOM -Value ""
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastSnapshot = $null
+
+    while ((Get-Date) -lt $deadline) {
+        $snapshot = Get-TransferManifestSnapshot -ManifestPath $ManifestPath
+        $lastSnapshot = $snapshot
+        Append-Utf8Line -Path $TimelinePath -Line ($snapshot | ConvertTo-Json -Depth 8 -Compress)
+
+        if ($snapshot.ManifestExists -and ($snapshot.Completed -or $snapshot.VerifiedRangeCount -gt 0 -or $snapshot.SourceCount -gt 0)) {
+            return [pscustomobject]@{
+                State = "ready"
+                TimelinePath = $TimelinePath
+                FinalSnapshot = $snapshot
+                Manifest = $snapshot.Manifest
+            }
+        }
+
+        Start-Sleep -Seconds 3
+    }
+
+    if ($null -eq $lastSnapshot) {
+        $lastSnapshot = Get-TransferManifestSnapshot -ManifestPath $ManifestPath
+        Append-Utf8Line -Path $TimelinePath -Line ($lastSnapshot | ConvertTo-Json -Depth 8 -Compress)
+    }
+
+    return [pscustomobject]@{
+        State = "timeout"
+        TimelinePath = $TimelinePath
+        FinalSnapshot = $lastSnapshot
+        Manifest = if ($lastSnapshot.ManifestExists) { $lastSnapshot.Manifest } else { $null }
+    }
+}
+
 function Wait-FileCompleted {
     param(
         [Parameter(Mandatory = $true)]
@@ -235,6 +398,1018 @@ function Wait-HarnessDownloadCompleted {
     throw "Harness download for $FileHash did not reach size $ExpectedSize in Incoming or Temp within $TimeoutSeconds seconds"
 }
 
+function Wait-HarnessDownloadProbeState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProfileRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$FileHash,
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedName,
+        [Parameter(Mandatory = $true)]
+        [UInt64]$ExpectedSize,
+        [int]$TimeoutSeconds = 90
+    )
+
+    $incomingPath = Join-Path $ProfileRoot ("Incoming\\{0}" -f $ExpectedName)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastObservedPath = $null
+    $lastObservedLength = [UInt64]0
+    $lastObservedKind = $null
+
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path -LiteralPath $incomingPath) {
+            $incomingItem = Get-Item -LiteralPath $incomingPath
+            $lastObservedPath = $incomingItem.FullName
+            $lastObservedLength = [UInt64]$incomingItem.Length
+            $lastObservedKind = "incoming"
+            if ($lastObservedLength -eq $ExpectedSize) {
+                return [pscustomobject]@{
+                    State = "completed"
+                    Path = $incomingItem.FullName
+                    Length = [UInt64]$incomingItem.Length
+                    CompletionKind = "incoming"
+                }
+            }
+            if ($lastObservedLength -gt 0) {
+                return [pscustomobject]@{
+                    State = "progress"
+                    Path = $incomingItem.FullName
+                    Length = [UInt64]$incomingItem.Length
+                    CompletionKind = "incoming"
+                }
+            }
+        }
+
+        $tempPartPath = Get-HarnessTempPartPath -ProfileRoot $ProfileRoot -FileHash $FileHash
+        if ($tempPartPath -and (Test-Path -LiteralPath $tempPartPath)) {
+            $tempItem = Get-Item -LiteralPath $tempPartPath
+            $lastObservedPath = $tempItem.FullName
+            $lastObservedLength = [UInt64]$tempItem.Length
+            $lastObservedKind = "temp-part"
+            if ($lastObservedLength -eq $ExpectedSize) {
+                return [pscustomobject]@{
+                    State = "completed"
+                    Path = $tempItem.FullName
+                    Length = [UInt64]$tempItem.Length
+                    CompletionKind = "temp-part"
+                }
+            }
+            if ($lastObservedLength -gt 0) {
+                return [pscustomobject]@{
+                    State = "progress"
+                    Path = $tempItem.FullName
+                    Length = [UInt64]$tempItem.Length
+                    CompletionKind = "temp-part"
+                }
+            }
+        }
+
+        Start-Sleep -Seconds 2
+    }
+
+    return [pscustomobject]@{
+        State = "no-progress"
+        Path = $lastObservedPath
+        Length = $lastObservedLength
+        CompletionKind = $lastObservedKind
+    }
+}
+
+function Write-ScenarioTraceLine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    Add-Content -LiteralPath $Path -Encoding utf8NoBOM -Value ("{0}`t{1}" -f ((Get-Date).ToUniversalTime().ToString("o")), $Message)
+}
+
+function Write-JsonFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $false)]
+        [object]$InputObject,
+        [int]$Depth = 10
+    )
+
+    if ($null -eq $InputObject) {
+        Set-Content -LiteralPath $Path -Encoding utf8NoBOM -Value "null"
+        return
+    }
+
+    $InputObject | ConvertTo-Json -Depth $Depth | Set-Content -LiteralPath $Path -Encoding utf8NoBOM
+}
+
+function Append-Utf8Line {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Line
+    )
+
+    $lineBytes = [System.Text.UTF8Encoding]::new($false).GetBytes($Line + "`n")
+    $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)
+    try {
+        $stream.Write($lineBytes, 0, $lineBytes.Length)
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
+function Add-UniqueNormalizedHash {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[string]]$Target,
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Seen,
+        [string]$Value
+    )
+
+    if ([string]::IsNullOrWhiteSpace([string]$Value)) {
+        return
+    }
+
+    $normalizedHash = ([string]$Value).Trim().ToLowerInvariant()
+    if ($Seen.Add($normalizedHash)) {
+        $Target.Add($normalizedHash) | Out-Null
+    }
+}
+
+function Resolve-PinnedCandidateHashes {
+    param(
+        [string[]]$PinnedCandidateHashes = @(),
+        [string]$PinnedCandidatesPath
+    )
+
+    $resolvedHashes = [System.Collections.Generic.List[string]]::new()
+    $seenHashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+    $appendHashes = {
+        param(
+            [object]$InputValue
+        )
+
+        if ($null -eq $InputValue) {
+            return
+        }
+
+        if ($InputValue -is [string]) {
+            Add-UniqueNormalizedHash -Target $resolvedHashes -Seen $seenHashes -Value ([string]$InputValue)
+            return
+        }
+
+        foreach ($item in @($InputValue)) {
+            if ($item -is [string]) {
+                Add-UniqueNormalizedHash -Target $resolvedHashes -Seen $seenHashes -Value ([string]$item)
+                continue
+            }
+
+            $hashValue = Get-JsonObjectPropertyValue -Object $item -PropertyName "Hash" -DefaultValue $null
+            if ([string]::IsNullOrWhiteSpace([string]$hashValue)) {
+                $hashValue = Get-JsonObjectPropertyValue -Object $item -PropertyName "hash" -DefaultValue $null
+            }
+            Add-UniqueNormalizedHash -Target $resolvedHashes -Seen $seenHashes -Value ([string]$hashValue)
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PinnedCandidatesPath)) {
+        if (-not (Test-Path -LiteralPath $PinnedCandidatesPath)) {
+            throw "Pinned candidates path not found at $PinnedCandidatesPath"
+        }
+
+        $resolvedPinnedPath = (Resolve-Path -LiteralPath $PinnedCandidatesPath).ProviderPath
+        $parsedPins = Get-Content -Raw -LiteralPath $resolvedPinnedPath | ConvertFrom-Json
+        $pathHandled = $false
+
+        foreach ($propertyName in @("CandidateHashes", "Hashes", "PinnedCandidateHashes", "Candidates", "PreferredHashes")) {
+            $propertyValue = Get-JsonObjectPropertyValue -Object $parsedPins -PropertyName $propertyName -DefaultValue $null
+            if ($null -ne $propertyValue) {
+                & $appendHashes $propertyValue
+                $pathHandled = $true
+            }
+        }
+
+        if (-not $pathHandled) {
+            & $appendHashes $parsedPins
+        }
+    }
+
+    & $appendHashes $PinnedCandidateHashes
+
+    return @($resolvedHashes)
+}
+
+function Resolve-CandidateName {
+    param(
+        [Parameter(Mandatory = $false)]
+        [object]$HarnessRecord,
+        [Parameter(Mandatory = $false)]
+        [object]$AgentRecord
+    )
+
+    if ($null -eq $HarnessRecord -and $null -eq $AgentRecord) {
+        return $null
+    }
+
+    $harnessName = if ($null -ne $HarnessRecord) { [string](Get-JsonObjectPropertyValue -Object $HarnessRecord -PropertyName "name" -DefaultValue $null) } else { $null }
+    if ($null -ne $AgentRecord) {
+        foreach ($agentName in @((Get-JsonObjectPropertyValue -Object $AgentRecord -PropertyName "Names" -DefaultValue @()))) {
+            if ($agentName -eq $harnessName -and -not [string]::IsNullOrWhiteSpace([string]$agentName)) {
+                return [string]$agentName
+            }
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($harnessName)) {
+        return $harnessName
+    }
+
+    if ($null -ne $AgentRecord) {
+        foreach ($agentName in @((Get-JsonObjectPropertyValue -Object $AgentRecord -PropertyName "Names" -DefaultValue @()))) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$agentName)) {
+                return [string]$agentName
+            }
+        }
+    }
+
+    return $null
+}
+
+function New-CandidateRecord {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Hash,
+        [Parameter(Mandatory = $false)]
+        [object]$HarnessRecord,
+        [Parameter(Mandatory = $false)]
+        [object]$AgentRecord,
+        [Parameter(Mandatory = $true)]
+        [UInt64]$MaxSizeBytes,
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$PreferredHashSet,
+        [Parameter(Mandatory = $true)]
+        [string]$SelectionKind,
+        [int]$SelectionOrder = 0
+    )
+
+    $normalizedHash = ([string]$Hash).Trim().ToLowerInvariant()
+    $resolvedName = Resolve-CandidateName -HarnessRecord $HarnessRecord -AgentRecord $AgentRecord
+
+    $resolvedSize = [UInt64]0
+    if ($null -ne $HarnessRecord -and $null -ne (Get-JsonObjectPropertyValue -Object $HarnessRecord -PropertyName "size" -DefaultValue $null)) {
+        $resolvedSize = [UInt64](Get-JsonObjectPropertyValue -Object $HarnessRecord -PropertyName "size" -DefaultValue 0)
+    }
+    elseif ($null -ne $AgentRecord -and $null -ne (Get-JsonObjectPropertyValue -Object $AgentRecord -PropertyName "Size" -DefaultValue $null)) {
+        $resolvedSize = [UInt64](Get-JsonObjectPropertyValue -Object $AgentRecord -PropertyName "Size" -DefaultValue 0)
+    }
+
+    $missingReason = $null
+    if ($null -eq $HarnessRecord -or $null -eq $AgentRecord) {
+        $missingReason = "candidate-missing"
+    }
+    elseif ($resolvedSize -eq 0) {
+        $missingReason = "zero-size"
+    }
+    elseif ($resolvedSize -gt $MaxSizeBytes) {
+        $missingReason = "size-exceeded"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($resolvedName)) {
+        $missingReason = "missing-name"
+    }
+
+    [pscustomobject]@{
+        Hash = $normalizedHash
+        Name = $resolvedName
+        Size = $resolvedSize
+        HarnessSourceCount = if ($null -ne $HarnessRecord) { [int](Get-JsonObjectPropertyValue -Object $HarnessRecord -PropertyName "source_count" -DefaultValue 0) } else { 0 }
+        HarnessCompleteSourceCount = if ($null -ne $HarnessRecord) { [int](Get-JsonObjectPropertyValue -Object $HarnessRecord -PropertyName "complete_source_count" -DefaultValue 0) } else { 0 }
+        AgentSourceCount = if ($null -ne $AgentRecord) { [int](Get-JsonObjectPropertyValue -Object $AgentRecord -PropertyName "SourceCount" -DefaultValue 0) } else { 0 }
+        AgentBatchHits = if ($null -ne $AgentRecord) { [int](Get-JsonObjectPropertyValue -Object $AgentRecord -PropertyName "BatchHits" -DefaultValue 0) } else { 0 }
+        ExtensionRank = Get-PreferredExtensionRank -Name $resolvedName
+        PreferredHashRank = if ($PreferredHashSet.Contains($normalizedHash)) { 1 } else { 0 }
+        IsCommonCandidate = [string]::IsNullOrWhiteSpace($missingReason)
+        MissingReason = $missingReason
+        SelectionKind = $SelectionKind
+        SelectionOrder = $SelectionOrder
+        HarnessSearchRecord = $HarnessRecord
+        AgentSearchRecord = $AgentRecord
+    }
+}
+
+function Get-CandidateOutcome {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Attempt
+    )
+
+    if (-not [bool](Get-JsonObjectPropertyValue -Object $Attempt -PropertyName "IsCommonCandidate" -DefaultValue $false)) {
+        return "candidate_missing"
+    }
+
+    if ([bool](Get-JsonObjectPropertyValue -Object $Attempt -PropertyName "DownloadSucceeded" -DefaultValue $false)) {
+        return "completed"
+    }
+
+    $sourceSearchCompletionState = [string](Get-JsonObjectPropertyValue -Object $Attempt -PropertyName "SourceSearchCompletionState" -DefaultValue $null)
+    $sourceAcquisitionState = [string](Get-JsonObjectPropertyValue -Object $Attempt -PropertyName "SourceAcquisitionState" -DefaultValue $null)
+    $harnessProbeState = [string](Get-JsonObjectPropertyValue -Object $Attempt -PropertyName "HarnessProbeState" -DefaultValue $null)
+    $agentProgressState = [string](Get-JsonObjectPropertyValue -Object $Attempt -PropertyName "AgentProgressState" -DefaultValue $null)
+    $probeSources = [int](Get-JsonObjectPropertyValue -Object $Attempt -PropertyName "ProbeSources" -DefaultValue 0)
+    $probeCompleted = [bool](Get-JsonObjectPropertyValue -Object $Attempt -PropertyName "ProbeCompleted" -DefaultValue $false)
+    $probeVerifiedRanges = [int](Get-JsonObjectPropertyValue -Object $Attempt -PropertyName "ProbeVerifiedRanges" -DefaultValue 0)
+
+    if (($agentProgressState -eq "progress" -or $agentProgressState -eq "completed") -and $harnessProbeState -eq "no-progress") {
+        return "agent_progress_no_harness_progress"
+    }
+
+    if ($harnessProbeState -eq "progress" -or $harnessProbeState -eq "completed") {
+        return "harness_transfer_started"
+    }
+
+    if ($agentProgressState -eq "no-progress") {
+        return "agent_no_transfer_progress"
+    }
+
+    if ($sourceSearchCompletionState -in @(
+            "agent_candidate_selected",
+            "agent_source_search_started",
+            "agent_source_search_returned_zero",
+            "agent_sources_filtered",
+            "agent_sources_merged_to_manifest"
+        )) {
+        return $sourceSearchCompletionState
+    }
+
+    if ($sourceAcquisitionState -in @("agent_candidate_selected", "agent_source_search_started", "agent_no_probe_sources", "agent_probe_sources_present")) {
+        return $sourceAcquisitionState
+    }
+
+    if ($probeSources -le 0 -and -not $probeCompleted -and $probeVerifiedRanges -le 0) {
+        return "agent_no_probe_sources"
+    }
+
+    return "candidate_missing"
+}
+
+function Save-CandidateSearchEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Candidate,
+        [Parameter(Mandatory = $true)]
+        [string]$EvidenceRoot
+    )
+
+    New-Item -ItemType Directory -Path $EvidenceRoot -Force | Out-Null
+
+    $searchEvidence = [ordered]@{
+        hash = $Candidate.Hash
+        name = $Candidate.Name
+        size = [UInt64]$Candidate.Size
+        selectionKind = $Candidate.SelectionKind
+        selectionOrder = [int]$Candidate.SelectionOrder
+        isCommonCandidate = [bool]$Candidate.IsCommonCandidate
+        missingReason = $Candidate.MissingReason
+        harnessSourceCount = [int]$Candidate.HarnessSourceCount
+        harnessCompleteSourceCount = [int]$Candidate.HarnessCompleteSourceCount
+        agentSourceCount = [int]$Candidate.AgentSourceCount
+        agentBatchHits = [int]$Candidate.AgentBatchHits
+        harnessSearchRecord = $Candidate.HarnessSearchRecord
+        agentSearchRecord = $Candidate.AgentSearchRecord
+    }
+
+    Write-JsonFile -Path (Join-Path $EvidenceRoot "candidate-search-evidence.json") -InputObject $searchEvidence -Depth 10
+    Write-JsonFile -Path (Join-Path $EvidenceRoot "harness-search-record.json") -InputObject $Candidate.HarnessSearchRecord -Depth 10
+    Write-JsonFile -Path (Join-Path $EvidenceRoot "agent-search-record.json") -InputObject $Candidate.AgentSearchRecord -Depth 10
+}
+
+function Save-CandidateRuntimeEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProfileRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$FileHash,
+        [Parameter(Mandatory = $true)]
+        [string]$EvidenceRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$Phase,
+        [string]$ProbeManifestPath
+    )
+
+    $phaseRoot = Join-Path $EvidenceRoot $Phase
+    New-Item -ItemType Directory -Path $phaseRoot -Force | Out-Null
+
+    $downloadsPath = Join-Path $ProfileRoot "config\downloads.txt"
+    if (Test-Path -LiteralPath $downloadsPath) {
+        Copy-Item -LiteralPath $downloadsPath -Destination (Join-Path $phaseRoot "downloads.txt") -Force
+    }
+
+    if ($ProbeManifestPath -and (Test-Path -LiteralPath $ProbeManifestPath)) {
+        Copy-Item -LiteralPath $ProbeManifestPath -Destination (Join-Path $phaseRoot "resume-manifest.json") -Force
+    }
+
+    $tempPartPath = Get-HarnessTempPartPath -ProfileRoot $ProfileRoot -FileHash $FileHash
+    $tempPartMetPath = $null
+    $tempPartBakPath = $null
+    $tempPartExists = $false
+    $tempPartLength = [UInt64]0
+    if ($tempPartPath) {
+        $tempPartMetPath = "$tempPartPath.met"
+        $tempPartBakPath = "$tempPartPath.met.bak"
+        if (Test-Path -LiteralPath $tempPartPath) {
+            $tempPartExists = $true
+            $tempPartLength = [UInt64](Get-Item -LiteralPath $tempPartPath).Length
+        }
+        if (Test-Path -LiteralPath $tempPartMetPath) {
+            Copy-Item -LiteralPath $tempPartMetPath -Destination (Join-Path $phaseRoot (Split-Path -Leaf $tempPartMetPath)) -Force
+        }
+        if (Test-Path -LiteralPath $tempPartBakPath) {
+            Copy-Item -LiteralPath $tempPartBakPath -Destination (Join-Path $phaseRoot (Split-Path -Leaf $tempPartBakPath)) -Force
+        }
+    }
+
+    $partState = [ordered]@{
+        phase = $Phase
+        capturedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
+        tempPartPath = $tempPartPath
+        tempPartExists = $tempPartExists
+        tempPartSize = $tempPartLength
+        tempPartMetPath = $tempPartMetPath
+        tempPartMetExists = if ($tempPartMetPath) { Test-Path -LiteralPath $tempPartMetPath } else { $false }
+        tempPartMetBakPath = $tempPartBakPath
+        tempPartMetBakExists = if ($tempPartBakPath) { Test-Path -LiteralPath $tempPartBakPath } else { $false }
+    }
+    Write-JsonFile -Path (Join-Path $phaseRoot "harness-part-state.json") -InputObject $partState -Depth 6
+}
+
+function Export-HarnessEd2kTraceWindow {
+    param(
+        [string]$SourcePath,
+        [string]$DestinationPath,
+        [datetime]$StartUtc,
+        [datetime]$EndUtc,
+        [int]$PaddingSeconds = 5
+    )
+
+    if (-not $SourcePath -or -not (Test-Path -LiteralPath $SourcePath)) {
+        return $false
+    }
+
+    $windowStart = $StartUtc.AddSeconds(-1 * $PaddingSeconds)
+    $windowEnd = $EndUtc.AddSeconds($PaddingSeconds)
+    $dateStyles = [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+    $selectedLines = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($line in Get-Content -LiteralPath $SourcePath) {
+        if ($line -notmatch '"ts_utc":"([^"]+)"') {
+            continue
+        }
+
+        try {
+            $lineTimestamp = [datetime]::Parse($Matches[1], [System.Globalization.CultureInfo]::InvariantCulture, $dateStyles)
+        }
+        catch {
+            continue
+        }
+
+        if ($lineTimestamp -ge $windowStart -and $lineTimestamp -le $windowEnd) {
+            $selectedLines.Add($line) | Out-Null
+        }
+    }
+
+    if ($selectedLines.Count -gt 0) {
+        Set-Content -LiteralPath $DestinationPath -Encoding utf8NoBOM -Value $selectedLines
+        return $true
+    }
+
+    if (Test-Path -LiteralPath $DestinationPath) {
+        Remove-Item -LiteralPath $DestinationPath -Force
+    }
+
+    return $false
+}
+
+function Parse-TextLogTimestampUtc {
+    param(
+        [string]$Line
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Line) -or $Line -notmatch '^(?<Timestamp>\S+)') {
+        return $null
+    }
+
+    $dateStyles = [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+    try {
+        return [datetime]::Parse($Matches.Timestamp, [System.Globalization.CultureInfo]::InvariantCulture, $dateStyles)
+    }
+    catch {
+        return $null
+    }
+}
+
+function Convert-ToUtcTimestampString {
+    param(
+        [Parameter(Mandatory = $false)]
+        [object]$Value
+    )
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    if ($Value -is [datetime]) {
+        return $Value.ToUniversalTime().ToString("o")
+    }
+
+    $stringValue = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($stringValue)) {
+        return $null
+    }
+
+    $dateStyles = [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+    try {
+        return ([datetime]::Parse($stringValue, [System.Globalization.CultureInfo]::InvariantCulture, $dateStyles)).ToUniversalTime().ToString("o")
+    }
+    catch {
+        return $stringValue
+    }
+}
+
+function Get-UtcTimestampSortKey {
+    param(
+        [Parameter(Mandatory = $false)]
+        [object]$Value
+    )
+
+    $normalizedValue = Convert-ToUtcTimestampString -Value $Value
+    if ([string]::IsNullOrWhiteSpace($normalizedValue)) {
+        return [datetime]::MaxValue
+    }
+
+    $dateStyles = [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+    try {
+        return [datetime]::Parse($normalizedValue, [System.Globalization.CultureInfo]::InvariantCulture, $dateStyles)
+    }
+    catch {
+        return [datetime]::MaxValue
+    }
+}
+
+function Get-NamedRegexIntValue {
+    param(
+        [string]$Line,
+        [string]$Pattern,
+        [string]$Name = "Count"
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Line) -or [string]::IsNullOrWhiteSpace($Pattern)) {
+        return $null
+    }
+
+    if ($Line -match $Pattern) {
+        return [int]$Matches[$Name]
+    }
+
+    return $null
+}
+
+function Get-ManifestProbeTimelineSummary {
+    param(
+        [string]$TimelinePath
+    )
+
+    $events = [System.Collections.Generic.List[object]]::new()
+    $maxSourceCount = 0
+    $maxVerifiedRangeCount = 0
+    $maxBytesWritten = [UInt64]0
+    $firstManifestSourceAtUtc = $null
+    $finalSnapshot = $null
+
+    if ($TimelinePath -and (Test-Path -LiteralPath $TimelinePath)) {
+        foreach ($line in Get-Content -LiteralPath $TimelinePath) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+                continue
+            }
+
+            try {
+                $snapshot = $line | ConvertFrom-Json
+            }
+            catch {
+                continue
+            }
+
+            $finalSnapshot = $snapshot
+            $tsUtc = Convert-ToUtcTimestampString -Value (Get-JsonObjectPropertyValue -Object $snapshot -PropertyName "TsUtc" -DefaultValue $null)
+            $completed = [bool](Get-JsonObjectPropertyValue -Object $snapshot -PropertyName "Completed" -DefaultValue $false)
+            $sourceCount = [int](Get-JsonObjectPropertyValue -Object $snapshot -PropertyName "SourceCount" -DefaultValue 0)
+            $verifiedRangeCount = [int](Get-JsonObjectPropertyValue -Object $snapshot -PropertyName "VerifiedRangeCount" -DefaultValue 0)
+            $bytesWritten = [UInt64](Get-JsonObjectPropertyValue -Object $snapshot -PropertyName "BytesWritten" -DefaultValue 0)
+
+            if ($sourceCount -gt $maxSourceCount) {
+                $maxSourceCount = $sourceCount
+                if ([string]::IsNullOrWhiteSpace($firstManifestSourceAtUtc)) {
+                    $firstManifestSourceAtUtc = $tsUtc
+                }
+            }
+            if ($verifiedRangeCount -gt $maxVerifiedRangeCount) {
+                $maxVerifiedRangeCount = $verifiedRangeCount
+            }
+            if ($bytesWritten -gt $maxBytesWritten) {
+                $maxBytesWritten = $bytesWritten
+            }
+
+            $events.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "manifest_probe"
+                    Stage = if ($completed) {
+                        "manifest_completed"
+                    }
+                    elseif ($sourceCount -gt 0) {
+                        "manifest_sources_present"
+                    }
+                    elseif ($verifiedRangeCount -gt 0 -or $bytesWritten -gt 0) {
+                        "manifest_progress_present"
+                    }
+                    else {
+                        "manifest_probe"
+                    }
+                    SourceCount = $sourceCount
+                    VerifiedRangeCount = $verifiedRangeCount
+                    BytesWritten = $bytesWritten
+                    Completed = $completed
+                }) | Out-Null
+        }
+    }
+
+    return [pscustomobject]@{
+        MaxSourceCount = $maxSourceCount
+        MaxVerifiedRangeCount = $maxVerifiedRangeCount
+        MaxBytesWritten = $maxBytesWritten
+        FirstManifestSourceAtUtc = $firstManifestSourceAtUtc
+        FinalSnapshot = $finalSnapshot
+        Events = @($events)
+    }
+}
+
+function Write-SourceTransitionTimeline {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$SourceAcquisitionSummary,
+        [string]$ManifestTimelinePath,
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationPath
+    )
+
+    $manifestSummary = Get-ManifestProbeTimelineSummary -TimelinePath $ManifestTimelinePath
+    $combinedEvents = [System.Collections.Generic.List[object]]::new()
+
+    foreach ($event in @(Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "TransitionEvents" -DefaultValue @())) {
+        if ($null -ne $event) {
+            $combinedEvents.Add($event) | Out-Null
+        }
+    }
+    foreach ($event in @($manifestSummary.Events)) {
+        if ($null -ne $event) {
+            $combinedEvents.Add($event) | Out-Null
+        }
+    }
+
+    $sortedEvents = @(
+        $combinedEvents |
+            Sort-Object `
+                @{ Expression = { Get-UtcTimestampSortKey -Value (Get-JsonObjectPropertyValue -Object $_ -PropertyName "TsUtc" -DefaultValue $null) } }, `
+                @{ Expression = { [string](Get-JsonObjectPropertyValue -Object $_ -PropertyName "Stage" -DefaultValue "") } }
+    )
+
+    Set-Content -LiteralPath $DestinationPath -Encoding utf8NoBOM -Value ""
+    foreach ($event in $sortedEvents) {
+        Append-Utf8Line -Path $DestinationPath -Line ($event | ConvertTo-Json -Depth 8 -Compress)
+    }
+
+    $preFilterSourceCount = [int](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "PreFilterSourceCount" -DefaultValue 0)
+    $postFilterSourceCount = [int](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "PostFilterSourceCount" -DefaultValue 0)
+    $maxReportedSourceCount = [int](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "MaxReportedSourceCount" -DefaultValue 0)
+    $sourceSearchStarted = [bool](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "SourceSearchStarted" -DefaultValue $false)
+    $backgroundSearchCompleted = [bool](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "BackgroundSearchCompleted" -DefaultValue $false)
+    $activeSearchCompleted = [bool](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "ActiveSearchCompleted" -DefaultValue $false)
+    $kadFallbackAttempted = [bool](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "KadFallbackAttempted" -DefaultValue $false)
+    $returnedNoSources = [bool](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "ReturnedNoSources" -DefaultValue $false)
+    $kadFallbackProduced = [bool](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "KadFallbackProduced" -DefaultValue $false)
+
+    $sourceSearchCompletionState = $null
+    if ($manifestSummary.MaxSourceCount -gt 0) {
+        $sourceSearchCompletionState = "agent_sources_merged_to_manifest"
+    }
+    elseif ($preFilterSourceCount -gt 0 -and $postFilterSourceCount -le 0) {
+        $sourceSearchCompletionState = "agent_sources_filtered"
+    }
+    elseif (($backgroundSearchCompleted -or $activeSearchCompleted -or $kadFallbackAttempted -or $returnedNoSources) -and $preFilterSourceCount -le 0 -and $maxReportedSourceCount -le 0 -and -not $kadFallbackProduced) {
+        $sourceSearchCompletionState = "agent_source_search_returned_zero"
+    }
+    elseif (-not $sourceSearchStarted) {
+        $sourceSearchCompletionState = "agent_candidate_selected"
+    }
+    elseif ($preFilterSourceCount -le 0 -and $maxReportedSourceCount -le 0) {
+        $sourceSearchCompletionState = "agent_source_search_started"
+    }
+
+    return [pscustomobject]@{
+        SourceTransitionTimelinePath = $DestinationPath
+        SourceSearchCompletionState = $sourceSearchCompletionState
+        PreFilterSourceCount = $preFilterSourceCount
+        PostFilterSourceCount = $postFilterSourceCount
+        CallbackOnlySourceCount = [int](Get-JsonObjectPropertyValue -Object $SourceAcquisitionSummary -PropertyName "CallbackOnlySourceCount" -DefaultValue 0)
+        MergedManifestSourceCount = [int]$manifestSummary.MaxSourceCount
+        ManifestMaxVerifiedRangeCount = [int]$manifestSummary.MaxVerifiedRangeCount
+        ManifestMaxBytesWritten = [UInt64]$manifestSummary.MaxBytesWritten
+        FirstManifestSourceAtUtc = $manifestSummary.FirstManifestSourceAtUtc
+        TransitionEventCount = $sortedEvents.Count
+    }
+}
+
+function Export-AgentSourceAcquisitionEvents {
+    param(
+        [string]$SourcePath,
+        [string]$DestinationPath,
+        [datetime]$StartUtc,
+        [datetime]$EndUtc,
+        [string]$FileHash
+    )
+
+    $fileHashLower = ([string]$FileHash).ToLowerInvariant()
+    $windowStart = $StartUtc.AddSeconds(-3)
+    $windowEnd = $EndUtc.AddSeconds(3)
+    $selectedLines = [System.Collections.Generic.List[string]]::new()
+
+    if ($SourcePath -and (Test-Path -LiteralPath $SourcePath)) {
+        foreach ($line in Get-Content -LiteralPath $SourcePath) {
+            $timestamp = Parse-TextLogTimestampUtc -Line $line
+            if ($null -eq $timestamp -or $timestamp -lt $windowStart -or $timestamp -gt $windowEnd) {
+                continue
+            }
+
+            $lineLower = $line.ToLowerInvariant()
+            if (
+                $lineLower.Contains($fileHashLower) -or
+                $lineLower.Contains("native ed2k download") -or
+                $lineLower.Contains("background source search") -or
+                $lineLower.Contains("source search") -or
+                $lineLower.Contains("kad source fallback")
+            ) {
+                $selectedLines.Add($line) | Out-Null
+            }
+        }
+    }
+
+    Set-Content -LiteralPath $DestinationPath -Encoding utf8NoBOM -Value $selectedLines
+
+    $matchedHashLineCount = 0
+    $sourceSearchStarted = $false
+    $returnedNoSources = $false
+    $searchFailed = $false
+    $kadFallbackProduced = $false
+    $kadFallbackAttempted = $false
+    $maxReportedSourceCount = 0
+    $backgroundSearchCompleted = $false
+    $activeSearchCompleted = $false
+    $backgroundSourceCount = $null
+    $activeSourceCount = $null
+    $kadFallbackSourceCount = $null
+    $aggregatedSourceCount = $null
+    $preFilterSourceCount = $null
+    $postFilterSourceCount = $null
+    $callbackOnlySourceCount = $null
+    $failureLines = [System.Collections.Generic.List[string]]::new()
+    $transitionEvents = [System.Collections.Generic.List[object]]::new()
+
+    foreach ($line in $selectedLines) {
+        $lineLower = $line.ToLowerInvariant()
+        $timestamp = Parse-TextLogTimestampUtc -Line $line
+        $tsUtc = if ($null -ne $timestamp) { $timestamp.ToUniversalTime().ToString("o") } else { $null }
+        if ($lineLower.Contains($fileHashLower)) {
+            $matchedHashLineCount++
+        }
+        if ($lineLower.Contains("source search")) {
+            $sourceSearchStarted = $true
+        }
+        if ($lineLower.Contains("returned no sources")) {
+            $returnedNoSources = $true
+        }
+        if ($lineLower.Contains("source search failed")) {
+            $searchFailed = $true
+            $failureLines.Add($line) | Out-Null
+        }
+        if ($lineLower.Contains("kad source fallback produced")) {
+            $kadFallbackProduced = $true
+            $kadFallbackAttempted = $true
+        }
+
+        $reportedCount = Get-NamedRegexIntValue -Line $line -Pattern 'source_count=(?<Count>\d+)'
+        if ($null -eq $reportedCount) {
+            $reportedCount = Get-NamedRegexIntValue -Line $line -Pattern 'sources=(?<Count>\d+)'
+        }
+        if ($null -ne $reportedCount -and $reportedCount -gt $maxReportedSourceCount) {
+            $maxReportedSourceCount = $reportedCount
+        }
+
+        if ($lineLower.Contains("sent ed2k background source search")) {
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "background_source_search_started"
+                    FileHash = $FileHash
+                    RawLine = $line
+                }) | Out-Null
+        }
+        elseif ($lineLower.Contains("source search attempt=")) {
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "active_source_search_started"
+                    FileHash = $FileHash
+                    RawLine = $line
+                }) | Out-Null
+        }
+
+        if ($lineLower.Contains("native ed2k download background source acquisition completed")) {
+            $backgroundSearchCompleted = $true
+            $backgroundSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'source_count=(?<Count>\d+)'
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "background_source_search_completed"
+                    FileHash = $FileHash
+                    SourceCount = if ($null -ne $backgroundSourceCount) { $backgroundSourceCount } else { 0 }
+                    AggregatedSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'aggregated_source_count=(?<Count>\d+)'
+                    RawLine = $line
+                }) | Out-Null
+            continue
+        }
+
+        if ($lineLower.Contains("completed ed2k background source search")) {
+            $backgroundSearchCompleted = $true
+            $backgroundSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'source_count=(?<Count>\d+)'
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "background_source_search_completed"
+                    FileHash = $FileHash
+                    SourceCount = if ($null -ne $backgroundSourceCount) { $backgroundSourceCount } else { 0 }
+                    RawLine = $line
+                }) | Out-Null
+            continue
+        }
+
+        if ($lineLower.Contains("native ed2k download active source acquisition completed")) {
+            $activeSearchCompleted = $true
+            $activeSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'source_count=(?<Count>\d+)'
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "active_source_search_completed"
+                    FileHash = $FileHash
+                    SourceCount = if ($null -ne $activeSourceCount) { $activeSourceCount } else { 0 }
+                    AggregatedSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'aggregated_source_count=(?<Count>\d+)'
+                    RawLine = $line
+                }) | Out-Null
+            continue
+        }
+
+        if ($lineLower.Contains("completed source search file_hash=")) {
+            $activeSearchCompleted = $true
+            $activeSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'sources=(?<Count>\d+)'
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "active_source_search_completed"
+                    FileHash = $FileHash
+                    SourceCount = if ($null -ne $activeSourceCount) { $activeSourceCount } else { 0 }
+                    RawLine = $line
+                }) | Out-Null
+            continue
+        }
+
+        if ($lineLower.Contains("native ed2k download kad source fallback produced")) {
+            $kadFallbackAttempted = $true
+            $kadFallbackProduced = $true
+            $kadFallbackSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'source_count=(?<Count>\d+)'
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "kad_source_fallback_completed"
+                    FileHash = $FileHash
+                    SourceCount = if ($null -ne $kadFallbackSourceCount) { $kadFallbackSourceCount } else { 0 }
+                    AggregatedSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'aggregated_source_count=(?<Count>\d+)'
+                    RawLine = $line
+                }) | Out-Null
+            continue
+        }
+
+        if ($lineLower.Contains("native ed2k download kad source fallback returned no sources")) {
+            $kadFallbackAttempted = $true
+            $returnedNoSources = $true
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "kad_source_fallback_returned_zero"
+                    FileHash = $FileHash
+                    RawLine = $line
+                }) | Out-Null
+            continue
+        }
+
+        if ($lineLower.Contains("native ed2k download source acquisition completed")) {
+            $aggregatedSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'aggregated_source_count=(?<Count>\d+)'
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "source_acquisition_completed"
+                    FileHash = $FileHash
+                    AggregatedSourceCount = if ($null -ne $aggregatedSourceCount) { $aggregatedSourceCount } else { 0 }
+                    RawLine = $line
+                }) | Out-Null
+            continue
+        }
+
+        if ($lineLower.Contains("native ed2k download source filtering")) {
+            $preFilterSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'pre_filter_source_count=(?<Count>\d+)'
+            $postFilterSourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'post_filter_source_count=(?<Count>\d+)'
+            $callbackOnlySourceCount = Get-NamedRegexIntValue -Line $line -Pattern 'callback_only_source_count=(?<Count>\d+)'
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "source_filtering_completed"
+                    FileHash = $FileHash
+                    PreFilterSourceCount = if ($null -ne $preFilterSourceCount) { $preFilterSourceCount } else { 0 }
+                    PostFilterSourceCount = if ($null -ne $postFilterSourceCount) { $postFilterSourceCount } else { 0 }
+                    CallbackOnlySourceCount = if ($null -ne $callbackOnlySourceCount) { $callbackOnlySourceCount } else { 0 }
+                    RawLine = $line
+                }) | Out-Null
+            continue
+        }
+
+        if ($lineLower.Contains("source search failed")) {
+            $transitionEvents.Add([pscustomobject]@{
+                    TsUtc = $tsUtc
+                    EventKind = "agent_log"
+                    Stage = "source_search_failed"
+                    FileHash = $FileHash
+                    RawLine = $line
+                }) | Out-Null
+            continue
+        }
+    }
+
+    if ($null -eq $preFilterSourceCount -and $null -ne $aggregatedSourceCount) {
+        $preFilterSourceCount = $aggregatedSourceCount
+    }
+
+    $sourceAcquisitionState = if ($maxReportedSourceCount -gt 0 -or $kadFallbackProduced) {
+        "agent_probe_sources_present"
+    }
+    elseif ($returnedNoSources -or $searchFailed) {
+        "agent_no_probe_sources"
+    }
+    elseif ($sourceSearchStarted) {
+        "agent_source_search_started"
+    }
+    else {
+        "agent_candidate_selected"
+    }
+
+    return [pscustomobject]@{
+        EventPath = $DestinationPath
+        EventCount = $selectedLines.Count
+        MatchedHashLineCount = $matchedHashLineCount
+        SourceSearchStarted = $sourceSearchStarted
+        ReturnedNoSources = $returnedNoSources
+        SearchFailed = $searchFailed
+        KadFallbackProduced = $kadFallbackProduced
+        KadFallbackAttempted = $kadFallbackAttempted
+        MaxReportedSourceCount = $maxReportedSourceCount
+        BackgroundSearchCompleted = $backgroundSearchCompleted
+        ActiveSearchCompleted = $activeSearchCompleted
+        BackgroundSourceCount = $backgroundSourceCount
+        ActiveSourceCount = $activeSourceCount
+        KadFallbackSourceCount = $kadFallbackSourceCount
+        AggregatedSourceCount = $aggregatedSourceCount
+        PreFilterSourceCount = $preFilterSourceCount
+        PostFilterSourceCount = $postFilterSourceCount
+        CallbackOnlySourceCount = $callbackOnlySourceCount
+        SourceAcquisitionState = $sourceAcquisitionState
+        SourceAcquisitionError = if ($failureLines.Count -gt 0) { ($failureLines -join "`n") } else { $null }
+        TransitionEvents = @($transitionEvents)
+    }
+}
+
 function Get-LastHarnessSearchSnapshot {
     param(
         [Parameter(Mandatory = $true)]
@@ -312,18 +1487,64 @@ function Select-CommonCandidates {
         [psobject]$AgentSearchSummary,
         [Parameter(Mandatory = $true)]
         [UInt64]$MaxSizeBytes,
+        [string[]]$PreferredHashes = @(),
+        [string[]]$PinnedHashes = @(),
         [int]$MaxCandidates = 5
     )
+
+    $preferredHashSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($preferredHash in @($PreferredHashes)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$preferredHash)) {
+            $preferredHashSet.Add(([string]$preferredHash).ToLowerInvariant()) | Out-Null
+        }
+    }
+
+    $harnessByHash = @{}
+    foreach ($result in @($HarnessSnapshot.results)) {
+        $hash = ([string](Get-JsonObjectPropertyValue -Object $result -PropertyName "hash" -DefaultValue "")).ToLowerInvariant()
+        if (-not [string]::IsNullOrWhiteSpace($hash)) {
+            $harnessByHash[$hash] = $result
+        }
+    }
 
     $agentByHash = @{}
     foreach ($file in @($AgentSearchSummary.Files)) {
         if (-not [string]::IsNullOrWhiteSpace([string]$file.Hash)) {
-            $agentByHash[[string]$file.Hash] = $file
+            $agentByHash[[string]$file.Hash.ToLowerInvariant()] = $file
         }
     }
 
+    if (@($PinnedHashes).Count -gt 0) {
+        $selectedPinnedCandidates = [System.Collections.Generic.List[object]]::new()
+        $selectionOrder = 0
+        foreach ($pinnedHash in @($PinnedHashes)) {
+            $normalizedHash = ([string]$pinnedHash).Trim().ToLowerInvariant()
+            if ([string]::IsNullOrWhiteSpace($normalizedHash)) {
+                continue
+            }
+
+            $pinnedHarnessRecord = if ($harnessByHash.ContainsKey($normalizedHash)) { $harnessByHash[$normalizedHash] } else { $null }
+            $pinnedAgentRecord = if ($agentByHash.ContainsKey($normalizedHash)) { $agentByHash[$normalizedHash] } else { $null }
+            $selectedPinnedCandidates.Add((New-CandidateRecord `
+                -Hash $normalizedHash `
+                -HarnessRecord $pinnedHarnessRecord `
+                -AgentRecord $pinnedAgentRecord `
+                -MaxSizeBytes $MaxSizeBytes `
+                -PreferredHashSet $preferredHashSet `
+                -SelectionKind "pinned" `
+                -SelectionOrder $selectionOrder)) | Out-Null
+            $selectionOrder++
+        }
+
+        if ($selectedPinnedCandidates.Count -eq 0) {
+            throw "Pinned candidate selection resolved to zero usable hashes"
+        }
+
+        return @($selectedPinnedCandidates)
+    }
+
     $candidates = foreach ($result in @($HarnessSnapshot.results)) {
-        $hash = ([string]$result.hash).ToLowerInvariant()
+        $hash = ([string](Get-JsonObjectPropertyValue -Object $result -PropertyName "hash" -DefaultValue "")).ToLowerInvariant()
         if ([string]::IsNullOrWhiteSpace($hash)) {
             continue
         }
@@ -331,46 +1552,24 @@ function Select-CommonCandidates {
             continue
         }
 
-        $size = [UInt64]$result.size
-        if ($size -eq 0 -or $size -gt $MaxSizeBytes) {
+        $candidate = New-CandidateRecord `
+            -Hash $hash `
+            -HarnessRecord $result `
+            -AgentRecord $agentByHash[$hash] `
+            -MaxSizeBytes $MaxSizeBytes `
+            -PreferredHashSet $preferredHashSet `
+            -SelectionKind "ranked"
+
+        if (-not $candidate.IsCommonCandidate) {
             continue
         }
 
-        $agentFile = $agentByHash[$hash]
-        $commonName = $null
-        foreach ($agentName in @($agentFile.Names)) {
-            if ($agentName -eq [string]$result.name) {
-                $commonName = [string]$agentName
-                break
-            }
-        }
-        if ([string]::IsNullOrWhiteSpace($commonName)) {
-            $commonName = if (-not [string]::IsNullOrWhiteSpace([string]$result.name)) {
-                [string]$result.name
-            } elseif (@($agentFile.Names).Count -gt 0) {
-                [string]$agentFile.Names[0]
-            } else {
-                $null
-            }
-        }
-        if ([string]::IsNullOrWhiteSpace($commonName)) {
-            continue
-        }
-
-        [pscustomobject]@{
-            Hash = $hash
-            Name = $commonName
-            Size = $size
-            HarnessSourceCount = [int]$result.source_count
-            HarnessCompleteSourceCount = [int]$result.complete_source_count
-            AgentSourceCount = [int]$agentFile.SourceCount
-            AgentBatchHits = [int]$agentFile.BatchHits
-            ExtensionRank = Get-PreferredExtensionRank -Name $commonName
-        }
+        $candidate
     }
 
     $selected = $candidates |
         Sort-Object `
+            @{ Expression = "PreferredHashRank"; Descending = $true }, `
             @{ Expression = "ExtensionRank"; Descending = $true }, `
             @{ Expression = { $_.HarnessSourceCount + $_.AgentSourceCount + $_.AgentBatchHits }; Descending = $true }, `
             @{ Expression = "Size"; Descending = $false }, `
@@ -381,7 +1580,26 @@ function Select-CommonCandidates {
         throw "No common Kad search result matched the candidate filters"
     }
 
-    return $selected
+    $selectionOrder = 0
+    return @($selected | ForEach-Object {
+        [pscustomobject]@{
+            Hash = $_.Hash
+            Name = $_.Name
+            Size = [UInt64]$_.Size
+            HarnessSourceCount = [int]$_.HarnessSourceCount
+            HarnessCompleteSourceCount = [int]$_.HarnessCompleteSourceCount
+            AgentSourceCount = [int]$_.AgentSourceCount
+            AgentBatchHits = [int]$_.AgentBatchHits
+            ExtensionRank = [int]$_.ExtensionRank
+            PreferredHashRank = [int]$_.PreferredHashRank
+            IsCommonCandidate = [bool]$_.IsCommonCandidate
+            MissingReason = $_.MissingReason
+            SelectionKind = $_.SelectionKind
+            SelectionOrder = $selectionOrder++
+            HarnessSearchRecord = $_.HarnessSearchRecord
+            AgentSearchRecord = $_.AgentSearchRecord
+        }
+    })
 }
 
 function Copy-IfExists {
@@ -455,6 +1673,7 @@ foreach ($requiredPath in @(
 
 $resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
 $selectedServer = & $selectServerHelperPath
+$effectivePinnedCandidateHashes = Resolve-PinnedCandidateHashes -PinnedCandidateHashes $PinnedCandidateHashes -PinnedCandidatesPath $PinnedCandidatesPath
 
 & $buildHarnessHelperPath | Out-Null
 
@@ -469,8 +1688,12 @@ $runManifest = [ordered]@{
     scenarioId = $scenarioId
     runId = $runId
     query = $Query
+    transportModes = $TransportModes
     interfaceAlias = $resolvedAdapter.InterfaceAlias
     bindIp = $resolvedAdapter.IPAddress
+    preferredHashes = @($PreferredHashes)
+    pinnedCandidateHashes = @($effectivePinnedCandidateHashes)
+    pinnedCandidatesPath = if ([string]::IsNullOrWhiteSpace($PinnedCandidatesPath)) { $null } else { (Resolve-Path -LiteralPath $PinnedCandidatesPath).ProviderPath }
     selectedServer = $selectedServer.Selected
     startedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
 }
@@ -492,6 +1715,15 @@ $modeDefinitions = @(
     }
 )
 
+switch ($TransportModes) {
+    "PlaintextOnly" {
+        $modeDefinitions = @($modeDefinitions | Where-Object { $_.Id -eq "plaintext" })
+    }
+    "ObfuscatedOnly" {
+        $modeDefinitions = @($modeDefinitions | Where-Object { $_.Id -eq "obfuscated" })
+    }
+}
+
 foreach ($mode in $modeDefinitions) {
     $modeRoot = Join-Path $artifactRoot $mode.Id
     $profileRoot = Join-Path $modeRoot "emule-harness-profile"
@@ -500,18 +1732,24 @@ foreach ($mode in $modeDefinitions) {
     $agentSearchRoot = Join-Path $modeRoot "agent-search"
     $harnessDownloadsRoot = Join-Path $harnessArtifactRoot "downloads"
     $agentDownloadsRoot = Join-Path $agentArtifactRoot "downloads"
+    $candidateEvidenceRoot = Join-Path $modeRoot "candidate-evidence"
     $harnessSearchPath = Join-Path $modeRoot "emule-harness-kad-search.jsonl"
     $harnessSelectedHashPath = Join-Path $modeRoot "selected-hash.txt"
     $candidateAttemptsPath = Join-Path $modeRoot "candidate-attempts.json"
+    $candidateSelectionPath = Join-Path $modeRoot "candidate-selection.json"
+    $candidatePinsPath = Join-Path $modeRoot "candidate-pins.json"
+    $modeTracePath = Join-Path $modeRoot "execution-trace.log"
     $upnpBeforePath = Join-Path $modeRoot "miniupnpc-before.txt"
     $upnpAfterPath = Join-Path $modeRoot "miniupnpc-after.txt"
-    foreach ($path in @($modeRoot, $harnessArtifactRoot, $agentArtifactRoot, $agentSearchRoot, $harnessDownloadsRoot, $agentDownloadsRoot)) {
+    foreach ($path in @($modeRoot, $harnessArtifactRoot, $agentArtifactRoot, $agentSearchRoot, $harnessDownloadsRoot, $agentDownloadsRoot, $candidateEvidenceRoot)) {
         New-Item -ItemType Directory -Path $path -Force | Out-Null
     }
+    Set-Content -LiteralPath $modeTracePath -Encoding utf8NoBOM -Value ""
 
     $harnessSession = $null
     $agentSession = $null
     try {
+        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) setup_start"
         Get-UpnpList | Set-Content -Encoding utf8NoBOM $upnpBeforePath
 
         $profile = & $profileWriterPath `
@@ -544,15 +1782,18 @@ foreach ($mode in $modeDefinitions) {
             -Ed2k $mode.AgentEd2k `
             -ConfigPath $agentNetworking.TempConfigPath | Out-Null
 
+        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) harness_start"
         $harnessSession = & $startHarnessHelperPath `
             -ProfileRoot $profileRoot `
             -SearchTerm $Query `
             -SearchResultsPath $harnessSearchPath `
             -SearchDownloadHashPath $harnessSelectedHashPath `
             -BuildConfig $EmuleHarnessBuildConfig
+        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) harness_ready session_dir=$($harnessSession.SessionDir)"
 
         Get-UpnpList | Set-Content -Encoding utf8NoBOM $upnpAfterPath
 
+        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_start"
         $agentSession = & $startAgentHelperPath `
             -InterfaceAlias $resolvedAdapter.InterfaceAlias `
             -ServerIp $selectedServer.Host `
@@ -564,6 +1805,7 @@ foreach ($mode in $modeDefinitions) {
             -ServerUdpObfuscationPort $selectedServer.UdpObfuscationPort
 
         Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl | Out-Null
+        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_ready session_dir=$($agentSession.SessionDir) control_url=$($agentSession.ControlUrl)"
 
         $agentSearchSummary = & $agentSearchHelperPath `
             -Query $Query `
@@ -574,31 +1816,44 @@ foreach ($mode in $modeDefinitions) {
             -Path $harnessSearchPath `
             -MinimumResults 1 `
             -TimeoutSeconds $SearchTimeoutSeconds
+        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) searches_complete harness_results=$([int]$harnessSnapshot.result_count) agent_results=$([int]$agentSearchSummary.ResultCount)"
 
         $candidateList = Select-CommonCandidates `
             -HarnessSnapshot $harnessSnapshot `
             -AgentSearchSummary $agentSearchSummary `
             -MaxSizeBytes $MaxCandidateSizeBytes `
+            -PreferredHashes $PreferredHashes `
+            -PinnedHashes $effectivePinnedCandidateHashes `
             -MaxCandidates $CandidateAttemptCount
+        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidates_selected count=$(@($candidateList).Count)"
+        Write-JsonFile -Path $candidateSelectionPath -InputObject @($candidateList) -Depth 10
+        Write-JsonFile -Path $candidatePinsPath -InputObject ([ordered]@{
+            query = $Query
+            mode = $mode.Id
+            generatedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
+            candidateHashes = @($candidateList | ForEach-Object { $_.Hash })
+            candidates = @($candidateList | ForEach-Object {
+                [ordered]@{
+                    hash = $_.Hash
+                    name = $_.Name
+                    size = [UInt64]$_.Size
+                    isCommonCandidate = [bool]$_.IsCommonCandidate
+                    missingReason = $_.MissingReason
+                    selectionKind = $_.SelectionKind
+                    selectionOrder = [int]$_.SelectionOrder
+                }
+            })
+        }) -Depth 10
 
         $candidateAttempts = [System.Collections.Generic.List[object]]::new()
         $completedDownloads = [System.Collections.Generic.List[object]]::new()
+        $stopAfterCurrentCandidate = $false
         foreach ($candidate in @($candidateList)) {
-            $agentTransferDir = Join-Path $agentSession.TransferRoot $candidate.Hash.ToLowerInvariant()
-            if (Test-Path -LiteralPath $agentTransferDir) {
-                Remove-Item -LiteralPath $agentTransferDir -Recurse -Force
-            }
+            $candidateAttemptStartedAtUtc = (Get-Date).ToUniversalTime()
+            $candidateEvidencePath = Join-Path $candidateEvidenceRoot $candidate.Hash
+            Save-CandidateSearchEvidence -Candidate $candidate -EvidenceRoot $candidateEvidencePath
 
-            & $agentDownloadHelperPath `
-                -FileHash $candidate.Hash `
-                -FileName $candidate.Name `
-                -FileSize ([UInt64]$candidate.Size) `
-                -ControlUrl $agentSession.ControlUrl | Out-Null
-
-            $probeManifestPath = Join-Path $agentTransferDir "resume-manifest.json"
-            $probeManifest = Wait-TransferManifestProbeState `
-                -ManifestPath $probeManifestPath `
-                -TimeoutSeconds $CandidateSourceProbeTimeoutSeconds
+            Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_start hash=$($candidate.Hash) size=$([UInt64]$candidate.Size) harness_sources=$([int]$candidate.HarnessSourceCount) agent_sources=$([int]$candidate.AgentSourceCount) agent_batch_hits=$([int]$candidate.AgentBatchHits) selection_kind=$($candidate.SelectionKind) is_common=$([bool]$candidate.IsCommonCandidate)"
 
             $attempt = [pscustomobject]@{
                 Hash = $candidate.Hash
@@ -608,110 +1863,259 @@ foreach ($mode in $modeDefinitions) {
                 HarnessCompleteSourceCount = [int]$candidate.HarnessCompleteSourceCount
                 AgentSourceCount = [int]$candidate.AgentSourceCount
                 AgentBatchHits = [int]$candidate.AgentBatchHits
-                ProbeManifestPath = $probeManifestPath
-                ProbeSources = if ($null -ne $probeManifest) { @(Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "sources" -DefaultValue @()).Count } else { 0 }
-                ProbeCompleted = if ($null -ne $probeManifest) { [bool](Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "completed" -DefaultValue $false) } else { $false }
-                ProbeVerifiedRanges = if ($null -ne $probeManifest) { @(Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "verified_ranges" -DefaultValue @()).Count } else { 0 }
+                IsCommonCandidate = [bool]$candidate.IsCommonCandidate
+                MissingReason = $candidate.MissingReason
+                SelectionKind = $candidate.SelectionKind
+                SelectionOrder = [int]$candidate.SelectionOrder
+                HarnessSearchRecord = $candidate.HarnessSearchRecord
+                AgentSearchRecord = $candidate.AgentSearchRecord
+                ProbeManifestPath = $null
+                ProbeSources = 0
+                ProbeCompleted = $false
+                ProbeVerifiedRanges = 0
+                AgentProgressState = $null
+                AgentProgressVerifiedRanges = 0
+                AgentProgressBytesWritten = [UInt64]0
+                HarnessProbeState = $null
+                HarnessProbePath = $null
+                HarnessProbeSize = [UInt64]0
+                HarnessProbeCompletionKind = $null
+                ManifestProbeTimelinePath = $null
+                SourceTransitionTimelinePath = $null
+                SourceAcquisitionEventPath = $null
+                SourceAcquisitionSummaryPath = $null
+                SourceAcquisitionState = "agent_candidate_selected"
+                SourceSearchCompletionState = $null
+                SourceAcquisitionStarted = $false
+                SourceAcquisitionError = $null
+                PreFilterSourceCount = 0
+                PostFilterSourceCount = 0
+                CallbackOnlySourceCount = 0
+                MergedManifestSourceCount = 0
                 DownloadSucceeded = $false
                 DownloadError = $null
+                Outcome = $null
+                EvidenceRoot = $candidateEvidencePath
+                CandidateTraceWindowPath = $null
+                AttemptStartedAtUtc = $candidateAttemptStartedAtUtc.ToString("o")
+                AttemptCompletedAtUtc = $null
             }
 
-            if ($attempt.ProbeSources -gt 0 -or $attempt.ProbeCompleted -or $attempt.ProbeVerifiedRanges -gt 0) {
+            if (-not $candidate.IsCommonCandidate) {
+                $attempt.DownloadError = "Candidate unavailable for replay: $($candidate.MissingReason)"
+                Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_missing hash=$($candidate.Hash) reason=$($candidate.MissingReason)"
+            }
+            else {
+                $agentTransferDir = Join-Path $agentSession.TransferRoot $candidate.Hash.ToLowerInvariant()
+                if (Test-Path -LiteralPath $agentTransferDir) {
+                    Remove-Item -LiteralPath $agentTransferDir -Recurse -Force
+                }
+
                 try {
-                    Set-Content -LiteralPath $harnessSelectedHashPath -Value $candidate.Hash -Encoding ascii
-                    $agentTransferManifest = Wait-TransferManifestState `
+                    & $agentDownloadHelperPath `
+                        -FileHash $candidate.Hash `
+                        -FileName $candidate.Name `
+                        -FileSize ([UInt64]$candidate.Size) `
+                        -ControlUrl $agentSession.ControlUrl | Out-Null
+
+                    $probeManifestPath = Join-Path $agentTransferDir "resume-manifest.json"
+                    $attempt.ProbeManifestPath = $probeManifestPath
+                    $manifestProbeTimelinePath = Join-Path $candidateEvidencePath "manifest-probe-timeline.jsonl"
+                    $attempt.ManifestProbeTimelinePath = $manifestProbeTimelinePath
+                    $probeManifestState = Wait-TransferManifestProbeTimelineState `
                         -ManifestPath $probeManifestPath `
-                        -TimeoutSeconds $DownloadTimeoutSeconds
+                        -TimelinePath $manifestProbeTimelinePath `
+                        -TimeoutSeconds $CandidateSourceProbeTimeoutSeconds
+                    $probeManifest = $probeManifestState.Manifest
 
-                    $harnessDownloadState = Wait-HarnessDownloadCompleted `
-                        -ProfileRoot $profileRoot `
-                        -FileHash $candidate.Hash `
-                        -ExpectedName $candidate.Name `
-                        -ExpectedSize ([UInt64]$candidate.Size) `
-                        -TimeoutSeconds $DownloadTimeoutSeconds
-
-                    $candidateAgentArtifactRoot = Join-Path $agentDownloadsRoot $candidate.Hash.ToLowerInvariant()
-                    New-Item -ItemType Directory -Path $candidateAgentArtifactRoot -Force | Out-Null
-                    $transferCollection = & $collectTransferHelperPath `
-                        -TransferRoot $agentSession.TransferRoot `
-                        -FileHash $candidate.Hash `
-                        -DestinationRoot $candidateAgentArtifactRoot
-
-                    $candidateHarnessArtifactRoot = Join-Path $harnessDownloadsRoot $candidate.Hash.ToLowerInvariant()
-                    New-Item -ItemType Directory -Path $candidateHarnessArtifactRoot -Force | Out-Null
-                    Copy-Item -LiteralPath $harnessDownloadState.Path -Destination (Join-Path $candidateHarnessArtifactRoot $candidate.Name) -Force
-
-                    $attempt = [pscustomobject]@{
-                        Hash = $attempt.Hash
-                        Name = $attempt.Name
-                        Size = $attempt.Size
-                        HarnessSourceCount = $attempt.HarnessSourceCount
-                        HarnessCompleteSourceCount = $attempt.HarnessCompleteSourceCount
-                        AgentSourceCount = $attempt.AgentSourceCount
-                        AgentBatchHits = $attempt.AgentBatchHits
-                        ProbeManifestPath = $attempt.ProbeManifestPath
-                        ProbeSources = $attempt.ProbeSources
-                        ProbeCompleted = $attempt.ProbeCompleted
-                        ProbeVerifiedRanges = $attempt.ProbeVerifiedRanges
-                        DownloadSucceeded = $true
-                        DownloadError = $null
-                        HarnessDownloadedPath = $harnessDownloadState.Path
-                        HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
-                        HarnessCompletionKind = $harnessDownloadState.CompletionKind
-                        AgentTransferManifestPath = $probeManifestPath
-                        AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
-                        AgentTransferCollectedRoot = $transferCollection.DestinationRoot
+                    $attempt.ProbeSources = if ($null -ne $probeManifest) { @(Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "sources" -DefaultValue @()).Count } else { 0 }
+                    $attempt.ProbeCompleted = if ($null -ne $probeManifest) { [bool](Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "completed" -DefaultValue $false) } else { $false }
+                    $attempt.ProbeVerifiedRanges = if ($null -ne $probeManifest) { @(Get-JsonObjectPropertyValue -Object $probeManifest -PropertyName "verified_ranges" -DefaultValue @()).Count } else { 0 }
+                    Save-CandidateRuntimeEvidence -ProfileRoot $profileRoot -FileHash $candidate.Hash -EvidenceRoot $candidateEvidencePath -Phase "before-queue" -ProbeManifestPath $probeManifestPath
+                    $sourceEventPath = Join-Path $candidateEvidencePath "agent-source-acquisition.log"
+                    $sourceAcquisitionSummary = Export-AgentSourceAcquisitionEvents `
+                        -SourcePath $agentSession.AgentLogPath `
+                        -DestinationPath $sourceEventPath `
+                        -StartUtc $candidateAttemptStartedAtUtc `
+                        -EndUtc (Get-Date).ToUniversalTime() `
+                        -FileHash $candidate.Hash
+                    $sourceTransitionTimelinePath = Join-Path $candidateEvidencePath "source-transition-timeline.jsonl"
+                    $sourceTransitionEvidence = Write-SourceTransitionTimeline `
+                        -SourceAcquisitionSummary $sourceAcquisitionSummary `
+                        -ManifestTimelinePath $manifestProbeTimelinePath `
+                        -DestinationPath $sourceTransitionTimelinePath
+                    $sourceAcquisitionSummary = $sourceAcquisitionSummary | Select-Object -Property * -ExcludeProperty TransitionEvents
+                    $sourceAcquisitionSummary | Add-Member -NotePropertyName "SourceTransitionTimelinePath" -NotePropertyValue $sourceTransitionTimelinePath
+                    $sourceAcquisitionSummary | Add-Member -NotePropertyName "SourceSearchCompletionState" -NotePropertyValue $sourceTransitionEvidence.SourceSearchCompletionState
+                    $sourceAcquisitionSummary | Add-Member -NotePropertyName "MergedManifestSourceCount" -NotePropertyValue $sourceTransitionEvidence.MergedManifestSourceCount
+                    $sourceAcquisitionSummary | Add-Member -NotePropertyName "ManifestMaxVerifiedRangeCount" -NotePropertyValue $sourceTransitionEvidence.ManifestMaxVerifiedRangeCount
+                    $sourceAcquisitionSummary | Add-Member -NotePropertyName "ManifestMaxBytesWritten" -NotePropertyValue $sourceTransitionEvidence.ManifestMaxBytesWritten
+                    $sourceAcquisitionSummary | Add-Member -NotePropertyName "FirstManifestSourceAtUtc" -NotePropertyValue $sourceTransitionEvidence.FirstManifestSourceAtUtc
+                    $sourceAcquisitionSummary | Add-Member -NotePropertyName "TransitionEventCount" -NotePropertyValue $sourceTransitionEvidence.TransitionEventCount
+                    $sourceAcquisitionSummaryPath = Join-Path $candidateEvidencePath "agent-source-acquisition-summary.json"
+                    Write-JsonFile -Path $sourceAcquisitionSummaryPath -InputObject $sourceAcquisitionSummary -Depth 10
+                    $attempt.SourceTransitionTimelinePath = $sourceTransitionTimelinePath
+                    $attempt.SourceAcquisitionEventPath = $sourceEventPath
+                    $attempt.SourceAcquisitionSummaryPath = $sourceAcquisitionSummaryPath
+                    $attempt.SourceAcquisitionState = $sourceAcquisitionSummary.SourceAcquisitionState
+                    $attempt.SourceSearchCompletionState = $sourceTransitionEvidence.SourceSearchCompletionState
+                    $attempt.SourceAcquisitionStarted = [bool]$sourceAcquisitionSummary.SourceSearchStarted
+                    $attempt.SourceAcquisitionError = $sourceAcquisitionSummary.SourceAcquisitionError
+                    $attempt.PreFilterSourceCount = [int](Get-JsonObjectPropertyValue -Object $sourceAcquisitionSummary -PropertyName "PreFilterSourceCount" -DefaultValue 0)
+                    $attempt.PostFilterSourceCount = [int](Get-JsonObjectPropertyValue -Object $sourceAcquisitionSummary -PropertyName "PostFilterSourceCount" -DefaultValue 0)
+                    $attempt.CallbackOnlySourceCount = [int](Get-JsonObjectPropertyValue -Object $sourceAcquisitionSummary -PropertyName "CallbackOnlySourceCount" -DefaultValue 0)
+                    $attempt.MergedManifestSourceCount = [int]$sourceTransitionEvidence.MergedManifestSourceCount
+                    if (
+                        $attempt.ProbeSources -gt 0 -or
+                        $attempt.ProbeCompleted -or
+                        $attempt.ProbeVerifiedRanges -gt 0 -or
+                        $attempt.PostFilterSourceCount -gt 0 -or
+                        [int](Get-JsonObjectPropertyValue -Object $sourceAcquisitionSummary -PropertyName "MaxReportedSourceCount" -DefaultValue 0) -gt 0
+                    ) {
+                        $attempt.SourceAcquisitionState = "agent_probe_sources_present"
                     }
+                    Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_probe hash=$($candidate.Hash) agent_probe_sources=$($attempt.ProbeSources) agent_probe_completed=$($attempt.ProbeCompleted) agent_probe_verified_ranges=$($attempt.ProbeVerifiedRanges) pre_filter_sources=$($attempt.PreFilterSourceCount) post_filter_sources=$($attempt.PostFilterSourceCount) merged_manifest_sources=$($attempt.MergedManifestSourceCount)"
 
-                    $completedDownloads.Add([pscustomobject]@{
-                        Hash = $candidate.Hash
-                        Name = $candidate.Name
-                        Size = [UInt64]$candidate.Size
-                        HarnessDownloadedPath = $harnessDownloadState.Path
-                        HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
-                        HarnessCompletionKind = $harnessDownloadState.CompletionKind
-                        AgentTransferManifestPath = $probeManifestPath
-                        AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
-                        AgentTransferCollectedRoot = $transferCollection.DestinationRoot
-                    }) | Out-Null
+                    if ($attempt.ProbeSources -gt 0 -or $attempt.ProbeCompleted -or $attempt.ProbeVerifiedRanges -gt 0) {
+                        Set-Content -LiteralPath $harnessSelectedHashPath -Value $candidate.Hash -Encoding ascii
+                        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_hash_written hash=$($candidate.Hash)"
+                        Save-CandidateRuntimeEvidence -ProfileRoot $profileRoot -FileHash $candidate.Hash -EvidenceRoot $candidateEvidencePath -Phase "after-queue" -ProbeManifestPath $probeManifestPath
 
-                    if ($completedDownloads.Count -ge $SuccessfulDownloadCount) {
-                        $candidateAttempts.Add($attempt) | Out-Null
-                        break
+                        $agentProgressState = Wait-TransferManifestProgressState `
+                            -ManifestPath $probeManifestPath `
+                            -TimeoutSeconds $AgentTransferProgressProbeTimeoutSeconds
+                        $attempt.AgentProgressState = $agentProgressState.State
+                        $attempt.AgentProgressVerifiedRanges = [int]$agentProgressState.VerifiedRangeCount
+                        $attempt.AgentProgressBytesWritten = [UInt64]$agentProgressState.BytesWritten
+                        Save-CandidateRuntimeEvidence -ProfileRoot $profileRoot -FileHash $candidate.Hash -EvidenceRoot $candidateEvidencePath -Phase "after-agent-progress" -ProbeManifestPath $probeManifestPath
+                        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_agent_progress hash=$($candidate.Hash) state=$($agentProgressState.State) verified_ranges=$($agentProgressState.VerifiedRangeCount) bytes_written=$([UInt64]$agentProgressState.BytesWritten)"
+
+                        if ($agentProgressState.State -eq "no-progress") {
+                            $attempt.DownloadError = "Agent transfer showed no progress within $AgentTransferProgressProbeTimeoutSeconds seconds after queueing"
+                            Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_skip_no_agent_progress hash=$($candidate.Hash)"
+                        }
+                        else {
+                            $agentTransferManifest = if ($agentProgressState.State -eq "completed") {
+                                $agentProgressState.Manifest
+                            } else {
+                                Wait-TransferManifestState `
+                                    -ManifestPath $probeManifestPath `
+                                    -TimeoutSeconds $DownloadTimeoutSeconds
+                            }
+                            Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_agent_completed hash=$($candidate.Hash)"
+
+                            $harnessProbeState = Wait-HarnessDownloadProbeState `
+                                -ProfileRoot $profileRoot `
+                                -FileHash $candidate.Hash `
+                                -ExpectedName $candidate.Name `
+                                -ExpectedSize ([UInt64]$candidate.Size) `
+                                -TimeoutSeconds $HarnessProgressProbeTimeoutSeconds
+                            $attempt.HarnessProbeState = $harnessProbeState.State
+                            $attempt.HarnessProbePath = $harnessProbeState.Path
+                            $attempt.HarnessProbeSize = [UInt64]$harnessProbeState.Length
+                            $attempt.HarnessProbeCompletionKind = $harnessProbeState.CompletionKind
+                            Save-CandidateRuntimeEvidence -ProfileRoot $profileRoot -FileHash $candidate.Hash -EvidenceRoot $candidateEvidencePath -Phase "after-harness-probe" -ProbeManifestPath $probeManifestPath
+                            Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_harness_probe hash=$($candidate.Hash) state=$($harnessProbeState.State) path=$($harnessProbeState.Path) size=$([UInt64]$harnessProbeState.Length)"
+
+                            if ($harnessProbeState.State -eq "no-progress") {
+                                $attempt.DownloadError = "Harness download showed no progress within $HarnessProgressProbeTimeoutSeconds seconds after queueing"
+                                Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_skip_no_harness_progress hash=$($candidate.Hash)"
+                            }
+                            else {
+                                $harnessDownloadState = Wait-HarnessDownloadCompleted `
+                                    -ProfileRoot $profileRoot `
+                                    -FileHash $candidate.Hash `
+                                    -ExpectedName $candidate.Name `
+                                    -ExpectedSize ([UInt64]$candidate.Size) `
+                                    -TimeoutSeconds $DownloadTimeoutSeconds
+
+                                $candidateAgentArtifactRoot = Join-Path $agentDownloadsRoot $candidate.Hash.ToLowerInvariant()
+                                New-Item -ItemType Directory -Path $candidateAgentArtifactRoot -Force | Out-Null
+                                $transferCollection = & $collectTransferHelperPath `
+                                    -TransferRoot $agentSession.TransferRoot `
+                                    -FileHash $candidate.Hash `
+                                    -DestinationRoot $candidateAgentArtifactRoot
+
+                                $candidateHarnessArtifactRoot = Join-Path $harnessDownloadsRoot $candidate.Hash.ToLowerInvariant()
+                                New-Item -ItemType Directory -Path $candidateHarnessArtifactRoot -Force | Out-Null
+                                Copy-Item -LiteralPath $harnessDownloadState.Path -Destination (Join-Path $candidateHarnessArtifactRoot $candidate.Name) -Force
+                                Save-CandidateRuntimeEvidence -ProfileRoot $profileRoot -FileHash $candidate.Hash -EvidenceRoot $candidateEvidencePath -Phase "completed" -ProbeManifestPath $probeManifestPath
+
+                                $attempt.DownloadSucceeded = $true
+                                $attempt.HarnessDownloadedPath = $harnessDownloadState.Path
+                                $attempt.HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
+                                $attempt.HarnessCompletionKind = $harnessDownloadState.CompletionKind
+                                $attempt.AgentTransferManifestPath = $probeManifestPath
+                                $attempt.AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
+                                $attempt.AgentTransferCollectedRoot = $transferCollection.DestinationRoot
+
+                                $completedDownloads.Add([pscustomobject]@{
+                                    Hash = $candidate.Hash
+                                    Name = $candidate.Name
+                                    Size = [UInt64]$candidate.Size
+                                    HarnessDownloadedPath = $harnessDownloadState.Path
+                                    HarnessDownloadedSize = [UInt64]$harnessDownloadState.Length
+                                    HarnessCompletionKind = $harnessDownloadState.CompletionKind
+                                    AgentTransferManifestPath = $probeManifestPath
+                                    AgentTransferCompleted = [bool](Get-JsonObjectPropertyValue -Object $agentTransferManifest -PropertyName "completed" -DefaultValue $false)
+                                    AgentTransferCollectedRoot = $transferCollection.DestinationRoot
+                                    EvidenceRoot = $candidateEvidencePath
+                                }) | Out-Null
+                                Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_completed hash=$($candidate.Hash) harness_path=$($harnessDownloadState.Path)"
+
+                                if ($completedDownloads.Count -ge $SuccessfulDownloadCount) {
+                                    $stopAfterCurrentCandidate = $true
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_skip_no_agent_probe hash=$($candidate.Hash)"
                     }
                 }
                 catch {
-                    $attempt = [pscustomobject]@{
-                        Hash = $attempt.Hash
-                        Name = $attempt.Name
-                        Size = $attempt.Size
-                        HarnessSourceCount = $attempt.HarnessSourceCount
-                        HarnessCompleteSourceCount = $attempt.HarnessCompleteSourceCount
-                        AgentSourceCount = $attempt.AgentSourceCount
-                        AgentBatchHits = $attempt.AgentBatchHits
-                        ProbeManifestPath = $attempt.ProbeManifestPath
-                        ProbeSources = $attempt.ProbeSources
-                        ProbeCompleted = $attempt.ProbeCompleted
-                        ProbeVerifiedRanges = $attempt.ProbeVerifiedRanges
-                        DownloadSucceeded = $false
-                        DownloadError = $_.Exception.Message
-                    }
+                    Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) candidate_failed hash=$($candidate.Hash) error=$($_.Exception.Message)"
+                    $attempt.DownloadError = $_.Exception.Message
                 }
             }
 
+            $candidateAttemptCompletedAtUtc = (Get-Date).ToUniversalTime()
+            $attempt.AttemptCompletedAtUtc = $candidateAttemptCompletedAtUtc.ToString("o")
+            $attempt.Outcome = Get-CandidateOutcome -Attempt $attempt
+
+            if ($candidate.IsCommonCandidate) {
+                $candidateTraceWindowPath = Join-Path $candidateEvidencePath "harness-ed2k-tcp-window.jsonl"
+                $traceWindowWritten = Export-HarnessEd2kTraceWindow `
+                    -SourcePath $harnessSession.EmuleHarnessEd2kTcpDumpPath `
+                    -DestinationPath $candidateTraceWindowPath `
+                    -StartUtc $candidateAttemptStartedAtUtc `
+                    -EndUtc $candidateAttemptCompletedAtUtc
+                if ($traceWindowWritten) {
+                    $attempt.CandidateTraceWindowPath = $candidateTraceWindowPath
+                }
+            }
+
+            Write-JsonFile -Path (Join-Path $candidateEvidencePath "candidate-attempt-summary.json") -InputObject $attempt -Depth 12
             $candidateAttempts.Add($attempt) | Out-Null
+
+            if ($stopAfterCurrentCandidate) {
+                break
+            }
         }
-        @($candidateAttempts) | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM $candidateAttemptsPath
+        Write-JsonFile -Path $candidateAttemptsPath -InputObject @($candidateAttempts) -Depth 12
 
         if ($completedDownloads.Count -lt $SuccessfulDownloadCount) {
+            Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) insufficient_completions completed=$($completedDownloads.Count) required=$SuccessfulDownloadCount"
             throw "Only $($completedDownloads.Count) common Kad results completed download in mode '$($mode.Id)' within $CandidateAttemptCount attempts. See $candidateAttemptsPath"
         }
 
         if (-not $KeepSessionsRunning) {
             if ($harnessSession) {
+                Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) harness_stop_try session_dir=$($harnessSession.SessionDir)"
                 & $stopHarnessHelperPath -SessionDir $harnessSession.SessionDir | Out-Null
             }
             if ($agentSession) {
+                Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_stop_try session_dir=$($agentSession.SessionDir)"
                 & $stopAgentHelperPath -SessionDir $agentSession.SessionDir | Out-Null
             }
         }
@@ -746,6 +2150,8 @@ foreach ($mode in $modeDefinitions) {
             CompletedDownloadCount = $completedDownloads.Count
             CompletedDownloads = @($completedDownloads)
             CandidateAttemptsPath = $candidateAttemptsPath
+            CandidateSelectionPath = $candidateSelectionPath
+            CandidatePinsPath = $candidatePinsPath
             HarnessReadyState = $harnessSession.EmuleHarnessReadyState
             AgentControlUrl = $agentSession.ControlUrl
             AgentSearchStatus = $agentSearchSummary.Status
@@ -754,8 +2160,10 @@ foreach ($mode in $modeDefinitions) {
             HarnessArtifactsRoot = $harnessArtifactRoot
             AgentArtifactsRoot = $agentArtifactRoot
         }) | Out-Null
+        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) success completed_downloads=$($completedDownloads.Count)"
     }
     catch {
+        Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) error=$($_.Exception.Message)"
         $modeResults.Add([pscustomobject]@{
             Mode = $mode.Id
             Success = $false
@@ -764,6 +2172,8 @@ foreach ($mode in $modeDefinitions) {
             HarnessSessionDir = if ($harnessSession) { $harnessSession.SessionDir } else { $null }
             AgentSessionDir = if ($agentSession) { $agentSession.SessionDir } else { $null }
             CandidateAttemptsPath = if (Test-Path -LiteralPath $candidateAttemptsPath) { $candidateAttemptsPath } else { $null }
+            CandidateSelectionPath = if (Test-Path -LiteralPath $candidateSelectionPath) { $candidateSelectionPath } else { $null }
+            CandidatePinsPath = if (Test-Path -LiteralPath $candidatePinsPath) { $candidatePinsPath } else { $null }
             HarnessArtifactsRoot = $harnessArtifactRoot
             AgentArtifactsRoot = $agentArtifactRoot
         }) | Out-Null
@@ -772,16 +2182,20 @@ foreach ($mode in $modeDefinitions) {
         if (-not $KeepSessionsRunning) {
             if ($harnessSession) {
                 try {
+                    Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) harness_stop_finally session_dir=$($harnessSession.SessionDir)"
                     & $stopHarnessHelperPath -SessionDir $harnessSession.SessionDir | Out-Null
                 }
                 catch {
+                    Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) harness_stop_finally_error error=$($_.Exception.Message)"
                 }
             }
             if ($agentSession) {
                 try {
+                    Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_stop_finally session_dir=$($agentSession.SessionDir)"
                     & $stopAgentHelperPath -SessionDir $agentSession.SessionDir | Out-Null
                 }
                 catch {
+                    Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_stop_finally_error error=$($_.Exception.Message)"
                 }
             }
         }
@@ -792,8 +2206,12 @@ $summary = [pscustomobject]@{
     ScenarioId = $scenarioId
     RunId = $runId
     Query = $Query
+    TransportModes = $TransportModes
     InterfaceAlias = $resolvedAdapter.InterfaceAlias
     BindIp = $resolvedAdapter.IPAddress
+    PreferredHashes = @($PreferredHashes)
+    PinnedCandidateHashes = @($effectivePinnedCandidateHashes)
+    PinnedCandidatesPath = if ([string]::IsNullOrWhiteSpace($PinnedCandidatesPath)) { $null } else { (Resolve-Path -LiteralPath $PinnedCandidatesPath).ProviderPath }
     SelectedServer = $selectedServer
     Modes = @($modeResults)
     StartedAtUtc = $runManifest.startedAtUtc
