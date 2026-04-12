@@ -18,3 +18,9 @@ The intended split is:
 These scripts are internal implementation detail. Orchestration and the stable
 CLI may depend on them, but contributors should not treat their individual file
 paths as operator-facing API.
+
+Internal conventions:
+
+- `RuntimeContext.ps1` owns repo-root resolution, shared path assertions, and internal script invocation
+- `*Subsystem.ps1` files are the supported internal entry modules for orchestration and CLI code
+- `helper-*` scripts under subsystem folders are implementation detail behind those entry modules

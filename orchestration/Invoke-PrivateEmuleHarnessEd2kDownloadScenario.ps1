@@ -24,6 +24,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "..\subsystems\agent\AgentSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\emule-harness\EmuleHarnessSubsystem.ps1")
+
 function Wait-AgentControlReady {
     param(
         [Parameter(Mandatory = $true)]
@@ -209,22 +212,8 @@ foreach ($path in @($artifactRoot, $emuleHarnessArtifactsRoot, $agentArtifactsRo
 }
 
 $profileScriptPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
-$emuleHarnessStartScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-private-ed2k-session.ps1"
-$emuleHarnessStopScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
-$agentStartScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-private-ed2k-session.ps1"
-$agentStopScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
-$enrichScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-enrich-download.ps1"
-$collectTransferScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-collect-ed2k-transfer.ps1"
 
-foreach ($requiredPath in @(
-    $profileScriptPath,
-    $emuleHarnessStartScriptPath,
-    $emuleHarnessStopScriptPath,
-    $agentStartScriptPath,
-    $agentStopScriptPath,
-    $enrichScriptPath,
-    $collectTransferScriptPath
-)) {
+foreach ($requiredPath in @($profileScriptPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required scenario helper not found at $requiredPath"
     }
@@ -266,7 +255,7 @@ $failedReason = $null
 
 try {
     $agentBootstrapNode = "127.0.0.1:{0}" -f [UInt16]$manifest.agent.kadPort
-    $emuleHarnessSession = & $emuleHarnessStartScriptPath `
+    $emuleHarnessSession = Start-EmuleHarnessPrivateEd2kSession `
         -ProfileRoot $profile.ProfileRoot `
         -SeedFilePath $emuleHarnessSeedPath `
         -ExportLinkPath $emuleHarnessLinkPath `
@@ -287,12 +276,12 @@ try {
     if ($EnableObfuscation) {
         $agentStartParams.EnableObfuscation = $true
     }
-    $agentSession = & $agentStartScriptPath @agentStartParams
+    $agentSession = Start-AgentPrivateEd2kSession @agentStartParams
     Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl -TimeoutSeconds 180
 
     $publishSummary = Wait-EmuleHarnessPublishReady -EmuleHarnessSession $emuleHarnessSession -TimeoutSeconds $EmuleHarnessPublishTimeoutSeconds
 
-    & $enrichScriptPath `
+    Post-AgentEnrichDownload `
         -FileHash $parsedLink.FileHash `
         -FileName $parsedLink.FileName `
         -FileSize $parsedLink.FileSize `
@@ -300,7 +289,7 @@ try {
 
     $manifestPath = Join-Path $agentSession.TransferRoot ($parsedLink.FileHash.ToLowerInvariant()) "resume-manifest.json"
     $manifestState = Wait-TransferManifestState -ManifestPath $manifestPath -TimeoutSeconds $DownloadTimeoutSeconds
-    $transferSummary = & $collectTransferScriptPath `
+    $transferSummary = Collect-AgentEd2kTransfer `
         -TransferRoot $agentSession.TransferRoot `
         -FileHash $parsedLink.FileHash `
         -DestinationRoot $agentArtifactsRoot
@@ -361,10 +350,10 @@ catch {
 finally {
     if (-not $KeepSessionsRunning) {
         if ($emuleHarnessSession) {
-            & $emuleHarnessStopScriptPath -SessionDir $emuleHarnessSession.SessionDir | Out-Null
+            Stop-EmuleHarnessParitySession -SessionDir $emuleHarnessSession.SessionDir | Out-Null
         }
         if ($agentSession) {
-            & $agentStopScriptPath -SessionDir $agentSession.SessionDir | Out-Null
+            Stop-AgentParitySession -SessionDir $agentSession.SessionDir | Out-Null
             if ($agentSession.ConfigBackupPath -and (Test-Path -LiteralPath $agentSession.ConfigBackupPath)) {
                 Copy-Item -LiteralPath $agentSession.ConfigBackupPath -Destination $agentSession.ConfigPath -Force
             }

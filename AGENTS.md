@@ -13,3 +13,7 @@
   reports.
 - Keep subsystem-specific logic isolated under `subsystems/` when adding new
   platform features.
+- Run tooling PowerShell scripts with `pwsh`.
+- Every tracked `.ps1` file in this repo, including internal modules such as
+  `*Subsystem.ps1`, `RuntimeContext.ps1`, and CLI support files, must start
+  with `#Requires -Version 7.6`.

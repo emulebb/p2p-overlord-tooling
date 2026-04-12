@@ -13,6 +13,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "..\subsystems\agent\AgentSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\emule-harness\EmuleHarnessSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\goed2k\Goed2kSubsystem.ps1")
+
 function Wait-AgentControlReady {
     param(
         [Parameter(Mandatory = $true)]
@@ -205,10 +209,10 @@ function Stop-AgentSessionWithRestore {
         [Parameter(Mandatory = $true)]
         [psobject]$Session,
         [Parameter(Mandatory = $true)]
-        [string]$StopScriptPath
+        [scriptblock]$StopOperation
     )
 
-    & $StopScriptPath -SessionDir $Session.SessionDir | Out-Null
+    & $StopOperation -SessionDir $Session.SessionDir | Out-Null
     if ($Session.ConfigBackupPath -and (Test-Path -LiteralPath $Session.ConfigBackupPath)) {
         Copy-Item -LiteralPath $Session.ConfigBackupPath -Destination $Session.ConfigPath -Force
     }
@@ -252,8 +256,8 @@ function New-EmuleHarnessPrivateProfile {
 function Start-EmuleHarnessPeer {
     param(
         [string]$ProfileScriptPath,
-        [string]$ServerMetWriterPath,
-        [string]$StartScriptPath,
+        [scriptblock]$ServerMetWriterOperation,
+        [scriptblock]$StartOperation,
         [string]$ProfileRoot,
         [string]$BindAddr,
         [UInt16]$TcpPort,
@@ -280,7 +284,7 @@ function Start-EmuleHarnessPeer {
         -KadUdpKey $KadUdpKey
 
     $serverMetPath = Join-Path $profile.ProfileRoot "config\server.met"
-    & $ServerMetWriterPath -ServerIp $ServerHost -ServerPort ([int]$ServerPort) -DestinationPath $serverMetPath | Out-Null
+    & $ServerMetWriterOperation -ServerIp $ServerHost -ServerPort ([int]$ServerPort) -DestinationPath $serverMetPath | Out-Null
 
     if (-not [string]::IsNullOrWhiteSpace($SeedMarkerText) -and $SeedRepeatCount -gt 0) {
         New-Item -ItemType Directory -Path (Split-Path -Parent $SeedFilePath) -Force | Out-Null
@@ -290,7 +294,7 @@ function Start-EmuleHarnessPeer {
         throw "eMule harness seed file was not materialized at $SeedFilePath"
     }
 
-    $session = & $StartScriptPath `
+    $session = & $StartOperation `
         -ProfileRoot $profile.ProfileRoot `
         -SeedFilePath $SeedFilePath `
         -ExportLinkPath $ExportLinkPath `
@@ -338,8 +342,8 @@ function Invoke-TestMultiFilePublishSearch {
 
         $emuleHarnesses += Start-EmuleHarnessPeer `
             -ProfileScriptPath $Paths.Profile `
-            -ServerMetWriterPath $Paths.ServerMetWriter `
-            -StartScriptPath $Paths.EmuleHarnessStart `
+            -ServerMetWriterOperation $Paths.ServerMetWriter `
+            -StartOperation $Paths.EmuleHarnessStart `
             -ProfileRoot (Join-Path $TestRoot "emule-harness-a") `
             -BindAddr "127.0.0.1" `
             -TcpPort 46062 `
@@ -357,8 +361,8 @@ function Invoke-TestMultiFilePublishSearch {
 
         $emuleHarnesses += Start-EmuleHarnessPeer `
             -ProfileScriptPath $Paths.Profile `
-            -ServerMetWriterPath $Paths.ServerMetWriter `
-            -StartScriptPath $Paths.EmuleHarnessStart `
+            -ServerMetWriterOperation $Paths.ServerMetWriter `
+            -StartOperation $Paths.EmuleHarnessStart `
             -ProfileRoot (Join-Path $TestRoot "emule-harness-b") `
             -BindAddr "127.0.0.1" `
             -TcpPort 46064 `
@@ -419,7 +423,7 @@ function Invoke-TestMultiFilePublishSearch {
     }
     finally {
         if ($agentSession) {
-            Stop-AgentSessionWithRestore -Session $agentSession -StopScriptPath $Paths.AgentStop
+            Stop-AgentSessionWithRestore -Session $agentSession -StopOperation $Paths.AgentStop
         }
         for ($index = $emuleHarnesses.Count - 1; $index -ge 0; $index--) {
             $emuleHarness = $emuleHarnesses[$index]
@@ -462,8 +466,8 @@ function Invoke-TestTwoEmuleHarnessSameHash {
 
         $emuleHarnesses += Start-EmuleHarnessPeer `
             -ProfileScriptPath $Paths.Profile `
-            -ServerMetWriterPath $Paths.ServerMetWriter `
-            -StartScriptPath $Paths.EmuleHarnessStart `
+            -ServerMetWriterOperation $Paths.ServerMetWriter `
+            -StartOperation $Paths.EmuleHarnessStart `
             -ProfileRoot (Join-Path $TestRoot "emule-harness-a") `
             -BindAddr "127.0.0.1" `
             -TcpPort 46162 `
@@ -481,8 +485,8 @@ function Invoke-TestTwoEmuleHarnessSameHash {
 
         $emuleHarnesses += Start-EmuleHarnessPeer `
             -ProfileScriptPath $Paths.Profile `
-            -ServerMetWriterPath $Paths.ServerMetWriter `
-            -StartScriptPath $Paths.EmuleHarnessStart `
+            -ServerMetWriterOperation $Paths.ServerMetWriter `
+            -StartOperation $Paths.EmuleHarnessStart `
             -ProfileRoot (Join-Path $TestRoot "emule-harness-b") `
             -BindAddr "127.0.0.1" `
             -TcpPort 46164 `
@@ -550,7 +554,7 @@ function Invoke-TestTwoEmuleHarnessSameHash {
     }
     finally {
         if ($agentSession) {
-            Stop-AgentSessionWithRestore -Session $agentSession -StopScriptPath $Paths.AgentStop
+            Stop-AgentSessionWithRestore -Session $agentSession -StopOperation $Paths.AgentStop
         }
         for ($index = $emuleHarnesses.Count - 1; $index -ge 0; $index--) {
             $emuleHarness = $emuleHarnesses[$index]
@@ -647,7 +651,7 @@ function Invoke-TestLowIdCallbackFailure {
     }
     finally {
         if ($agentSession) {
-            Stop-AgentSessionWithRestore -Session $agentSession -StopScriptPath $Paths.AgentStop
+            Stop-AgentSessionWithRestore -Session $agentSession -StopOperation $Paths.AgentStop
         }
         if ($serverSession) {
             & $Paths.ServerStop -SessionDir $serverSession.SessionDir | Out-Null
@@ -662,17 +666,50 @@ if (-not $env:OVERLORD_TMP_DIR) {
 
 $paths = @{
     Profile = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
-    ServerMetWriter = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-write-target-server-met.ps1"
-    EmuleHarnessStart = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-private-ed2k-session.ps1"
-    EmuleHarnessStop = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
-    AgentStart = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-private-ed2k-session.ps1"
-    AgentStop = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
-    AgentEnrich = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-enrich-download.ps1"
-    AgentCollect = Join-Path $toolingRoot "subsystems\agent\helper-agent-collect-ed2k-transfer.ps1"
-    ServerStart = Join-Path $toolingRoot "subsystems\goed2k\helper-goed2k-start-private-session.ps1"
-    ServerStop = Join-Path $toolingRoot "subsystems\goed2k\helper-goed2k-stop-private-session.ps1"
+    ServerMetWriter = { param($ServerIp, $ServerPort, $DestinationPath) Write-EmuleHarnessTargetServerMet -ServerIp $ServerIp -ServerPort $ServerPort -DestinationPath $DestinationPath }
+    EmuleHarnessStart = {
+        param(
+            $ProfileRoot,
+            $SeedFilePath,
+            $ExportLinkPath,
+            $AgentBootstrapNode,
+            $BuildConfig,
+            [switch]$SkipRuntimeCleanup
+        )
+        Start-EmuleHarnessPrivateEd2kSession -ProfileRoot $ProfileRoot -SeedFilePath $SeedFilePath -ExportLinkPath $ExportLinkPath -AgentBootstrapNode $AgentBootstrapNode -BuildConfig $BuildConfig -SkipRuntimeCleanup:$SkipRuntimeCleanup
+    }
+    EmuleHarnessStop = { param($SessionDir) Stop-EmuleHarnessParitySession -SessionDir $SessionDir }
+    AgentStart = {
+        param(
+            $ScenarioRoot,
+            $ControlPort,
+            $KadPort,
+            $Ed2kPort,
+            [switch]$DisableKad,
+            $ServerHost,
+            $ServerPort,
+            $ServerSessionRotationSeconds,
+            $ProbeSearchTerm
+        )
+        Start-AgentPrivateEd2kSession -ScenarioRoot $ScenarioRoot -ControlPort $ControlPort -KadPort $KadPort -Ed2kPort $Ed2kPort -DisableKad:$DisableKad -ServerHost $ServerHost -ServerPort $ServerPort -ServerSessionRotationSeconds $ServerSessionRotationSeconds -ProbeSearchTerm $ProbeSearchTerm
+    }
+    AgentStop = { param($SessionDir) Stop-AgentParitySession -SessionDir $SessionDir }
+    AgentEnrich = { param($FileHash, $FileName, $FileSize, $ControlUrl) Post-AgentEnrichDownload -FileHash $FileHash -FileName $FileName -FileSize $FileSize -ControlUrl $ControlUrl }
+    AgentCollect = { param($TransferRoot, $FileHash, $DestinationRoot) Collect-AgentEd2kTransfer -TransferRoot $TransferRoot -FileHash $FileHash -DestinationRoot $DestinationRoot }
+    ServerStart = {
+        param(
+            $ScenarioRoot,
+            $ListenHost,
+            $TcpPort,
+            $AdminPort,
+            $AdminToken,
+            $SourceCatalogPath
+        )
+        Start-Goed2kPrivateSession -ScenarioRoot $ScenarioRoot -ListenHost $ListenHost -TcpPort $TcpPort -AdminPort $AdminPort -AdminToken $AdminToken -SourceCatalogPath $SourceCatalogPath
+    }
+    ServerStop = { param($SessionDir) Stop-Goed2kPrivateSession -SessionDir $SessionDir }
 }
-foreach ($requiredPath in $paths.Values) {
+foreach ($requiredPath in @($paths.Profile)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required validation helper not found at $requiredPath"
     }

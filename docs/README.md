@@ -33,13 +33,15 @@ the supported surface and scenario behavior remain coherent.
 
 ## Architecture
 
-- CLI dispatch stays in `../cli/`
+- CLI dispatch stays in `../cli/` and should come from the command registry
 - scenario composition stays in `../orchestration/`
-- subsystem-owned runtime logic stays in `../subsystems/`
+- shared root/path resolution stays in `../subsystems/RuntimeContext.ps1`
+- subsystem entry modules stay in `../subsystems/*/*Subsystem.ps1`
+- subsystem-owned runtime logic stays behind those subsystem entry modules
 - result shaping stays in `../normalizers/` and `../reports/`
 
 Do not add new repo-root `helper-*` scripts. New reusable logic belongs under
-the owning subsystem.
+the owning subsystem, and orchestration should not depend on helper file names.
 
 ## Repo Guards
 

@@ -27,6 +27,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "..\subsystems\agent\AgentSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\emule-harness\EmuleHarnessSubsystem.ps1")
+
 function Wait-AgentControlReady {
     param(
         [Parameter(Mandatory = $true)]
@@ -255,8 +258,6 @@ function Wait-HarnessContactReady {
 function Invoke-AgentManualPublishWhenReady {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$SeedScriptPath,
-        [Parameter(Mandatory = $true)]
         [string]$ControlUrl,
         [Parameter(Mandatory = $true)]
         [string]$Ed2kHash,
@@ -272,7 +273,7 @@ function Invoke-AgentManualPublishWhenReady {
     $lastError = $null
     while ((Get-Date) -lt $deadline) {
         try {
-            & $SeedScriptPath `
+            Post-AgentSeedPopular `
                 -Ed2kHash $Ed2kHash `
                 -CanonicalName $CanonicalName `
                 -Size $Size `
@@ -515,29 +516,10 @@ foreach ($path in @($artifactRoot, $harnessArtifactRoot, $agentArtifactRoot, $co
     New-Item -ItemType Directory -Path $path -Force | Out-Null
 }
 
-$buildScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-build-debug.ps1"
-$harnessDirResolverPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-resolve-harness-debug-dir.ps1"
 $profileScriptPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
-$harnessStartScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-private-ed2k-session.ps1"
-$harnessStopScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
-$harnessCleanupScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-clean-runtime.ps1"
-$agentStartScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-private-ed2k-session.ps1"
-$agentStopScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
-$agentSeedScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-seed-popular.ps1"
 $coordinatorStartScriptPath = Join-Path $env:OVERLORD_PROJECT_DIR "p2p-overlord-be\overlord-be-coordinator\scripts\windows\coordinator_run_start_direct.cmd"
 
-foreach ($requiredPath in @(
-    $buildScriptPath,
-    $harnessDirResolverPath,
-    $profileScriptPath,
-    $harnessStartScriptPath,
-    $harnessStopScriptPath,
-    $harnessCleanupScriptPath,
-    $agentStartScriptPath,
-    $agentStopScriptPath,
-    $agentSeedScriptPath,
-    $coordinatorStartScriptPath
-)) {
+foreach ($requiredPath in @($profileScriptPath, $coordinatorStartScriptPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required scenario helper not found at $requiredPath"
     }
@@ -546,10 +528,10 @@ foreach ($requiredPath in @(
 $buildUsedFallback = $false
 $buildFallbackReason = $null
 try {
-    & $buildScriptPath | Out-Null
+    Build-EmuleHarnessDebug | Out-Null
 }
 catch {
-    $harnessDebugDir = & $harnessDirResolverPath
+    $harnessDebugDir = Resolve-EmuleHarnessDebugDir
     $runtimeExePath = Join-Path $harnessDebugDir "eMule_v072a_parity.exe"
     if (-not (Test-Path -LiteralPath $runtimeExePath)) {
         throw
@@ -559,7 +541,7 @@ catch {
     $buildFallbackReason = $_.Exception.Message
 }
 
-& $harnessCleanupScriptPath -CapturePort 0 | Out-Null
+Clean-EmuleHarnessRuntime -CapturePort 0 | Out-Null
 
 $preexistingCoordinatorPids = @(
     Get-CoordinatorProcesses | ForEach-Object { [int]$_.ProcessId }
@@ -634,7 +616,7 @@ try {
             BuildConfig = $HarnessBuildConfig
             SkipRuntimeCleanup = $true
         }
-        $session = & $harnessStartScriptPath @startParams
+        $session = Start-EmuleHarnessPrivateEd2kSession @startParams
 
         $harnessProfiles += $profile
         $harnessSessions += $session
@@ -651,7 +633,7 @@ try {
     }
 
     $firstHarnessBootstrap = "{0}:{1}" -f $manifest.harnesses[0].bindAddr, [UInt16]$manifest.harnesses[0].udpPort
-    $agentSession = & $agentStartScriptPath `
+    $agentSession = Start-AgentPrivateEd2kSession `
         -ScenarioRoot (Join-Path $artifactRoot "agent-runtime") `
         -EmuleHarnessBootstrapNode $firstHarnessBootstrap `
         -ControlPort ([UInt16]$manifest.agent.controlPort) `
@@ -667,7 +649,6 @@ try {
         -MinimumPeersConnected $agentBootstrapReadyContacts
 
     Invoke-AgentManualPublishWhenReady `
-        -SeedScriptPath $agentSeedScriptPath `
         -Ed2kHash $manifest.agent.manualPublish.hash `
         -CanonicalName $manifest.agent.manualPublish.canonicalName `
         -Size ([UInt64]$manifest.agent.manualPublish.size) `
@@ -812,11 +793,11 @@ catch {
 finally {
     if (-not $KeepSessionsRunning) {
         foreach ($session in @($harnessSessions)) {
-            & $harnessStopScriptPath -SessionDir $session.SessionDir | Out-Null
+            Stop-EmuleHarnessParitySession -SessionDir $session.SessionDir | Out-Null
         }
 
         if ($agentSession) {
-            & $agentStopScriptPath -SessionDir $agentSession.SessionDir | Out-Null
+            Stop-AgentParitySession -SessionDir $agentSession.SessionDir | Out-Null
             if ($agentSession.ConfigBackupPath -and (Test-Path -LiteralPath $agentSession.ConfigBackupPath)) {
                 Copy-Item -LiteralPath $agentSession.ConfigBackupPath -Destination $agentSession.ConfigPath -Force
             }

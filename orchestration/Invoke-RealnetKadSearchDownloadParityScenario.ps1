@@ -35,6 +35,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "..\subsystems\agent\AgentSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\ed2k\Ed2kSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\emule-harness\EmuleHarnessSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\kad\KadSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\network\NetworkSubsystem.ps1")
+
 function Wait-AgentControlReady {
     param(
         [Parameter(Mandatory = $true)]
@@ -1948,51 +1954,20 @@ if (-not $env:OVERLORD_LOG_DIR) {
     throw "OVERLORD_LOG_DIR is not set"
 }
 
-$networkResolverPath = Join-Path $toolingRoot "subsystems\network\helper-network-resolve-adapter.ps1"
-$buildHarnessHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-build-debug.ps1"
-$selectServerHelperPath = Join-Path $toolingRoot "subsystems\ed2k\helper-ed2k-select-live-server.ps1"
 $profileWriterPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
-$writeServerMetHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-write-target-server-met.ps1"
-$setHarnessObfuscationHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-set-obfuscation-mode.ps1"
-$setAgentObfuscationHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-set-obfuscation-mode.ps1"
-$refreshAgentNetworkingHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-refresh-runtime-networking.ps1"
-$startHarnessHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-private-ed2k-session.ps1"
-$stopHarnessHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
-$startAgentHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-parity-session.ps1"
-$stopAgentHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
-$agentSearchHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-run-kad-search.ps1"
-$agentDownloadHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-enrich-download.ps1"
-$collectTransferHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-collect-ed2k-transfer.ps1"
-$nodesDatPath = Join-Path $toolingRoot ".local\emule-harness-seeds\canonical\nodes.dat"
+$nodesDatPath = Resolve-KadSeedBundleFilePath -ToolingRoot $toolingRoot -SeedBundleId "canonical" -FileName "nodes.dat"
 
-foreach ($requiredPath in @(
-    $networkResolverPath,
-    $buildHarnessHelperPath,
-    $selectServerHelperPath,
-    $profileWriterPath,
-    $writeServerMetHelperPath,
-    $setHarnessObfuscationHelperPath,
-    $setAgentObfuscationHelperPath,
-    $refreshAgentNetworkingHelperPath,
-    $startHarnessHelperPath,
-    $stopHarnessHelperPath,
-    $startAgentHelperPath,
-    $stopAgentHelperPath,
-    $agentSearchHelperPath,
-    $agentDownloadHelperPath,
-    $collectTransferHelperPath,
-    $nodesDatPath
-)) {
+foreach ($requiredPath in @($profileWriterPath, $nodesDatPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required helper not found at $requiredPath"
     }
 }
 
-$resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
-$selectedServer = & $selectServerHelperPath
+$resolvedAdapter = Resolve-OverlordNetworkAdapter -PreferredInterfaceAlias $InterfaceAlias
+$selectedServer = Select-Ed2kLiveServer
 $effectivePinnedCandidateHashes = Resolve-PinnedCandidateHashes -PinnedCandidateHashes $PinnedCandidateHashes -PinnedCandidatesPath $PinnedCandidatesPath
 
-& $buildHarnessHelperPath | Out-Null
+Build-EmuleHarnessDebug | Out-Null
 
 $scenarioId = "kad.search-download.emule-harness.agent.realnet.v1"
 $runId = "{0}-{1}" -f $scenarioId, (Get-Date -Format "yyyyMMdd-HHmmss")
@@ -2082,7 +2057,7 @@ foreach ($mode in $modeDefinitions) {
             -ResetTransientState
 
         Copy-Item -LiteralPath $nodesDatPath -Destination (Join-Path $profileRoot "config\nodes.dat") -Force
-        & $writeServerMetHelperPath `
+        Write-EmuleHarnessTargetServerMet `
             -ServerIp $selectedServer.Host `
             -ServerPort $selectedServer.Port `
             -UdpFlags $selectedServer.UdpFlags `
@@ -2091,16 +2066,16 @@ foreach ($mode in $modeDefinitions) {
             -TcpObfuscationPort $selectedServer.TcpObfuscationPort `
             -UdpObfuscationPort $selectedServer.UdpObfuscationPort `
             -DestinationPath (Join-Path $profileRoot "config\server.met") | Out-Null
-        & $setHarnessObfuscationHelperPath -Mode $mode.HarnessMode -ProfileRoot $profileRoot | Out-Null
+        Set-EmuleHarnessObfuscationMode -Mode $mode.HarnessMode -ProfileRoot $profileRoot | Out-Null
 
-        $agentNetworking = & $refreshAgentNetworkingHelperPath -InterfaceAlias $resolvedAdapter.InterfaceAlias
-        & $setAgentObfuscationHelperPath `
+        $agentNetworking = Refresh-AgentRuntimeNetworking -InterfaceAlias $resolvedAdapter.InterfaceAlias
+        Set-AgentObfuscationMode `
             -Kad $mode.AgentKad `
             -Ed2k $mode.AgentEd2k `
             -ConfigPath $agentNetworking.TempConfigPath | Out-Null
 
         Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) harness_start"
-        $harnessSession = & $startHarnessHelperPath `
+        $harnessSession = Start-EmuleHarnessPrivateEd2kSession `
             -ProfileRoot $profileRoot `
             -SearchTerm $Query `
             -SearchResultsPath $harnessSearchPath `
@@ -2111,7 +2086,7 @@ foreach ($mode in $modeDefinitions) {
         Get-UpnpList | Set-Content -Encoding utf8NoBOM $upnpAfterPath
 
         Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_start"
-        $agentSession = & $startAgentHelperPath `
+        $agentSession = Start-AgentParitySession `
             -InterfaceAlias $resolvedAdapter.InterfaceAlias `
             -ServerIp $selectedServer.Host `
             -ServerPort $selectedServer.Port `
@@ -2124,7 +2099,7 @@ foreach ($mode in $modeDefinitions) {
         Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl | Out-Null
         Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_ready session_dir=$($agentSession.SessionDir) control_url=$($agentSession.ControlUrl)"
 
-        $agentSearchSummary = & $agentSearchHelperPath `
+        $agentSearchSummary = Run-AgentKadSearch `
             -Query $Query `
             -ControlUrl $agentSession.ControlUrl `
             -OutputRoot $agentSearchRoot `
@@ -2237,7 +2212,7 @@ foreach ($mode in $modeDefinitions) {
                 }
 
                 try {
-                    & $agentDownloadHelperPath `
+                    Post-AgentEnrichDownload `
                         -FileHash $candidate.Hash `
                         -FileName $candidate.Name `
                         -FileSize ([UInt64]$candidate.Size) `
@@ -2356,7 +2331,7 @@ foreach ($mode in $modeDefinitions) {
 
                                 $candidateAgentArtifactRoot = Join-Path $agentDownloadsRoot $candidate.Hash.ToLowerInvariant()
                                 New-Item -ItemType Directory -Path $candidateAgentArtifactRoot -Force | Out-Null
-                                $transferCollection = & $collectTransferHelperPath `
+                                $transferCollection = Collect-AgentEd2kTransfer `
                                     -TransferRoot $agentSession.TransferRoot `
                                     -FileHash $candidate.Hash `
                                     -DestinationRoot $candidateAgentArtifactRoot
@@ -2499,11 +2474,11 @@ foreach ($mode in $modeDefinitions) {
         if (-not $KeepSessionsRunning) {
             if ($harnessSession) {
                 Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) harness_stop_try session_dir=$($harnessSession.SessionDir)"
-                & $stopHarnessHelperPath -SessionDir $harnessSession.SessionDir | Out-Null
+                Stop-EmuleHarnessParitySession -SessionDir $harnessSession.SessionDir | Out-Null
             }
             if ($agentSession) {
                 Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_stop_try session_dir=$($agentSession.SessionDir)"
-                & $stopAgentHelperPath -SessionDir $agentSession.SessionDir | Out-Null
+                Stop-AgentParitySession -SessionDir $agentSession.SessionDir | Out-Null
             }
         }
 
@@ -2571,7 +2546,7 @@ foreach ($mode in $modeDefinitions) {
             if ($harnessSession) {
                 try {
                     Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) harness_stop_finally session_dir=$($harnessSession.SessionDir)"
-                    & $stopHarnessHelperPath -SessionDir $harnessSession.SessionDir | Out-Null
+                    Stop-EmuleHarnessParitySession -SessionDir $harnessSession.SessionDir | Out-Null
                 }
                 catch {
                     Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) harness_stop_finally_error error=$($_.Exception.Message)"
@@ -2580,7 +2555,7 @@ foreach ($mode in $modeDefinitions) {
             if ($agentSession) {
                 try {
                     Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_stop_finally session_dir=$($agentSession.SessionDir)"
-                    & $stopAgentHelperPath -SessionDir $agentSession.SessionDir | Out-Null
+                    Stop-AgentParitySession -SessionDir $agentSession.SessionDir | Out-Null
                 }
                 catch {
                     Write-ScenarioTraceLine -Path $modeTracePath -Message "mode=$($mode.Id) agent_stop_finally_error error=$($_.Exception.Message)"

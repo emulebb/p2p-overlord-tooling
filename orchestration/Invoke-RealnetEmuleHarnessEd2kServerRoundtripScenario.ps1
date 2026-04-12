@@ -22,6 +22,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "..\subsystems\agent\AgentSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\ed2k\Ed2kSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\emule-harness\EmuleHarnessSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\network\NetworkSubsystem.ps1")
+
 function Wait-AgentControlReady {
     param(
         [Parameter(Mandatory = $true)]
@@ -242,38 +247,18 @@ foreach ($path in @(
     New-Item -ItemType Directory -Path $path -Force | Out-Null
 }
 
-$networkResolverPath = Join-Path $toolingRoot "subsystems\network\helper-network-resolve-adapter.ps1"
-$selectServerHelperPath = Join-Path $toolingRoot "subsystems\ed2k\helper-ed2k-select-live-server.ps1"
 $profileScriptPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
-$writeServerMetHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-write-target-server-met.ps1"
-$startHarnessHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-private-ed2k-session.ps1"
-$stopHarnessHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
-$startAgentHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-parity-session.ps1"
-$stopAgentHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
-$collectTransferHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-collect-ed2k-transfer.ps1"
-$enrichDownloadHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-enrich-download.ps1"
 
-foreach ($requiredPath in @(
-    $networkResolverPath,
-    $selectServerHelperPath,
-    $profileScriptPath,
-    $writeServerMetHelperPath,
-    $startHarnessHelperPath,
-    $stopHarnessHelperPath,
-    $startAgentHelperPath,
-    $stopAgentHelperPath,
-    $collectTransferHelperPath,
-    $enrichDownloadHelperPath
-)) {
+foreach ($requiredPath in @($profileScriptPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required scenario helper not found at $requiredPath"
     }
 }
 
-$resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $manifest.interfaceAlias
+$resolvedAdapter = Resolve-OverlordNetworkAdapter -PreferredInterfaceAlias $manifest.interfaceAlias
 $bindAddr = [string]$resolvedAdapter.IPAddress
 
-$selectedServer = & $selectServerHelperPath `
+$selectedServer = Select-Ed2kLiveServer `
     -SourcePath $(if ([string]::IsNullOrWhiteSpace($ServerMetPath)) { (Join-Path $toolingRoot ".local\emule-harness-seeds\$($manifest.seedBundleId)\server.met") } else { $ServerMetPath }) `
     -MaxCandidates ([int]$manifest.serverSelection.maxCandidates) `
     -ConnectTimeoutMilliseconds ([int]$manifest.serverSelection.connectTimeoutMilliseconds)
@@ -311,7 +296,7 @@ try {
         -EnableEd2k $true `
         -EnableUpnp $true `
         -ResetTransientState
-    & $writeServerMetHelperPath `
+    Write-EmuleHarnessTargetServerMet `
         -ServerIp $selectedServer.Host `
         -ServerPort ([int]$selectedServer.Port) `
         -UdpFlags ([int]$selectedServer.UdpFlags) `
@@ -324,7 +309,7 @@ try {
     $seedFilePath = Join-Path $seederProfile.IncomingRoot $manifest.file.name
     New-DeterministicBinaryFile -Path $seedFilePath -SizeBytes ([UInt64]$manifest.file.sizeBytes) -Pattern ([string]$manifest.file.pattern)
 
-    $seederSession = & $startHarnessHelperPath `
+    $seederSession = Start-EmuleHarnessPrivateEd2kSession `
         -ProfileRoot $seederProfile.ProfileRoot `
         -SeedFilePath $seedFilePath `
         -ExportLinkPath $seedLinkPath `
@@ -339,7 +324,7 @@ try {
         -SourceTcpPort ([UInt16]$manifest.harnessSeeder.tcpPort)
     Remove-DirectoryIfExists -Path (Join-Path $env:OVERLORD_TMP_DIR ("agent-real-state\overlord-ed2k-transfer\{0}" -f $parsedLink.FileHash.ToLowerInvariant()))
 
-    $agentStage1Session = & $startAgentHelperPath `
+    $agentStage1Session = Start-AgentParitySession `
         -InterfaceAlias $resolvedAdapter.InterfaceAlias `
         -CapturePort ([int]$manifest.agent.capturePort) `
         -SessionPrefix "$runId-agent-stage1" `
@@ -359,7 +344,7 @@ try {
         Start-Sleep -Seconds ([int]$manifest.timeouts.initialPublishDelaySeconds)
     }
 
-    & $enrichDownloadHelperPath `
+    Post-AgentEnrichDownload `
         -FileHash $parsedLink.FileHash `
         -FileName $parsedLink.FileName `
         -FileSize $parsedLink.FileSize `
@@ -369,7 +354,7 @@ try {
 
     $agentTransferManifestPath = Join-Path $agentStage1Session.TransferRoot ($parsedLink.FileHash.ToLowerInvariant()) "resume-manifest.json"
     $agentTransferManifest = Wait-TransferManifestState -ManifestPath $agentTransferManifestPath -TimeoutSeconds ([int]$manifest.timeouts.agentDownloadSeconds)
-    $agentTransferSummary = & $collectTransferHelperPath `
+    $agentTransferSummary = Collect-AgentEd2kTransfer `
         -TransferRoot $agentStage1Session.TransferRoot `
         -FileHash $parsedLink.FileHash `
         -DestinationRoot $agentStage1ArtifactsRoot
@@ -387,13 +372,13 @@ try {
         throw "Agent did not complete the real-server download for $($parsedLink.FileHash)"
     }
 
-    & $stopHarnessHelperPath -SessionDir $seederSession.SessionDir | Out-Null
+    Stop-EmuleHarnessParitySession -SessionDir $seederSession.SessionDir | Out-Null
     $seederSession = $null
 
-    & $stopAgentHelperPath -SessionDir $agentStage1Session.SessionDir | Out-Null
+    Stop-AgentParitySession -SessionDir $agentStage1Session.SessionDir | Out-Null
     $agentStage1Session = $null
 
-    $agentStage2Session = & $startAgentHelperPath `
+    $agentStage2Session = Start-AgentParitySession `
         -InterfaceAlias $resolvedAdapter.InterfaceAlias `
         -CapturePort ([int]$manifest.agent.capturePort) `
         -SessionPrefix "$runId-agent-stage2" `
@@ -424,7 +409,7 @@ try {
         -EnableEd2k $true `
         -EnableUpnp $true `
         -ResetTransientState
-    & $writeServerMetHelperPath `
+    Write-EmuleHarnessTargetServerMet `
         -ServerIp $selectedServer.Host `
         -ServerPort ([int]$selectedServer.Port) `
         -UdpFlags ([int]$selectedServer.UdpFlags) `
@@ -444,7 +429,7 @@ try {
     )
     $harnessDirectDownloadLink = (Get-Content -LiteralPath $downloadLinkPath -Raw).Trim()
 
-    $downloaderSession = & $startHarnessHelperPath `
+    $downloaderSession = Start-EmuleHarnessPrivateEd2kSession `
         -ProfileRoot $downloaderProfile.ProfileRoot `
         -DownloadLinkPath $downloadLinkPath `
         -BuildConfig $EmuleHarnessBuildConfig
@@ -491,16 +476,16 @@ catch {
 finally {
     if (-not $KeepSessionsRunning) {
         if ($downloaderSession) {
-            & $stopHarnessHelperPath -SessionDir $downloaderSession.SessionDir | Out-Null
+            Stop-EmuleHarnessParitySession -SessionDir $downloaderSession.SessionDir | Out-Null
         }
         if ($seederSession) {
-            & $stopHarnessHelperPath -SessionDir $seederSession.SessionDir | Out-Null
+            Stop-EmuleHarnessParitySession -SessionDir $seederSession.SessionDir | Out-Null
         }
         if ($agentStage2Session) {
-            & $stopAgentHelperPath -SessionDir $agentStage2Session.SessionDir | Out-Null
+            Stop-AgentParitySession -SessionDir $agentStage2Session.SessionDir | Out-Null
         }
         if ($agentStage1Session) {
-            & $stopAgentHelperPath -SessionDir $agentStage1Session.SessionDir | Out-Null
+            Stop-AgentParitySession -SessionDir $agentStage1Session.SessionDir | Out-Null
         }
     }
 

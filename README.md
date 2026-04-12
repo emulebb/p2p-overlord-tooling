@@ -38,19 +38,20 @@ treated as stable operator entrypoints.
 
 ## Tooling Architecture
 
-- `cli/` exposes the stable workspace command surface
-- `orchestration/` composes subsystem behaviors into reproducible runs
+- `cli/` exposes the stable workspace command surface through a command registry
+- `orchestration/` composes subsystem entry modules into reproducible runs
 - `scenarios/` defines versioned scenario contracts
-- `subsystems/` owns runtime-specific logic for agent, eMule harness, goed2k,
-  network, pcap, parity, and protocol helpers
+- `subsystems/RuntimeContext.ps1` centralizes repo-root resolution and internal script invocation
+- `subsystems/*/*Subsystem.ps1` provides the internal entry modules that orchestration imports
+- `subsystems/` owns runtime-specific logic for agent, eMule harness, goed2k, network, pcap, parity, and protocol helpers
 - `reports/` and `normalizers/` transform raw run artifacts into consumable
   summaries
 
 ## Contributor Note
 
 Do not add new root-level `helper-*` scripts. New reusable logic should live
-under the owning subsystem, and orchestration should call subsystem-owned
-scripts or functions rather than depending on repo-root helper naming.
+under the owning subsystem, and orchestration should call subsystem entry
+modules or functions rather than depending on helper file paths.
 
 ## Docs
 

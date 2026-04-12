@@ -94,7 +94,7 @@ $metadata = [ordered]@{
 Save-SessionMetadata -Path $metadataPath -Metadata $metadata
 
 $worker = Start-Process `
-    -FilePath "pwsh.exe" `
+    -FilePath "pwsh" `
     -ArgumentList @(
         "-NoLogo",
         "-NoProfile",

@@ -29,6 +29,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "..\subsystems\agent\AgentSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\emule-harness\EmuleHarnessSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\network\NetworkSubsystem.ps1")
+. (Join-Path $PSScriptRoot "..\subsystems\parity\ParitySubsystem.ps1")
+
 function Resolve-BindAddress {
     param(
         [string]$ExplicitBindAddr,
@@ -155,8 +160,6 @@ function Wait-AgentControlReady {
 function Invoke-SeedPopularWithRetry {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$ScriptPath,
-        [Parameter(Mandatory = $true)]
         [string]$Ed2kHash,
         [Parameter(Mandatory = $true)]
         [string]$CanonicalName,
@@ -176,7 +179,7 @@ function Invoke-SeedPopularWithRetry {
     do {
         $attempt++
         try {
-            & $ScriptPath `
+            Post-AgentSeedPopular `
                 -Ed2kHash $Ed2kHash `
                 -CanonicalName $CanonicalName `
                 -Size $Size `
@@ -228,22 +231,10 @@ function Test-MilestonesPassed {
     return $true
 }
 
-function Resolve-EmuleHarnessRuntimeExePath {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ToolingRoot
-    )
-
-    $resolverPath = Join-Path $ToolingRoot "subsystems\emule-harness\helper-emule-harness-resolve-harness-debug-dir.ps1"
-    $harnessDebugDir = & $resolverPath
-    return (Join-Path $harnessDebugDir "eMule_v072a_parity.exe")
-}
-
 $toolingRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$networkResolverPath = Join-Path $toolingRoot "subsystems\network\helper-network-resolve-adapter.ps1"
 $manifest = Get-Content -Raw $ScenarioManifestPath | ConvertFrom-Json
 $requiredMilestoneIds = @(Get-RequiredMilestoneIds -Manifest $manifest)
-$resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
+$resolvedAdapter = Resolve-OverlordNetworkAdapter -PreferredInterfaceAlias $InterfaceAlias
 $resolvedInterfaceAlias = [string]$resolvedAdapter.InterfaceAlias
 $bindAddrValue = Resolve-BindAddress -ExplicitBindAddr $BindAddr -ResolvedAdapter $resolvedAdapter
 
@@ -255,14 +246,7 @@ if (-not $env:OVERLORD_LOG_DIR) {
 }
 
 $requiredPaths = @(
-    (Join-Path $toolingRoot "profiles\\New-EmuleHarnessProfile.ps1"),
-    (Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-parity-session.ps1"),
-    (Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"),
-    (Join-Path $toolingRoot "subsystems\agent\helper-agent-start-parity-session.ps1"),
-    (Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"),
-    (Join-Path $toolingRoot "subsystems\agent\helper-agent-post-seed-popular.ps1"),
-    (Join-Path $toolingRoot "subsystems\agent\helper-agent-extract-publish-log.ps1"),
-    (Join-Path $toolingRoot "subsystems\parity\helper-parity-compare-udp-jsonl.py")
+    (Join-Path $toolingRoot "profiles\\New-EmuleHarnessProfile.ps1")
 )
 foreach ($requiredPath in $requiredPaths) {
     if (-not (Test-Path $requiredPath)) {
@@ -297,8 +281,6 @@ $agentSession = $null
 $emuleHarnessTraceSlice = $null
 $agentPublishArtifacts = $null
 $agentSessionMetadata = $null
-$emuleHarnessStopScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
-$agentStopScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
 
 try {
     $seedRoot = Join-Path $toolingRoot ".local\emule-harness-seeds\$SeedBundleId"
@@ -321,7 +303,7 @@ try {
         -ServerUdpPort $EmuleHarnessServerUdpPort
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "emule-harness-profile-materialized" -Details "Profile root created at $($profile.ProfileRoot)"
 
-    $emuleHarnessRuntimeExePath = Resolve-EmuleHarnessRuntimeExePath -ToolingRoot $toolingRoot
+    $emuleHarnessRuntimeExePath = Resolve-EmuleHarnessRuntimeExePath
     $runManifest = [ordered]@{
         schemaVersion = "run-manifest/v1"
         scenarioId = $manifest.scenarioId
@@ -350,8 +332,7 @@ try {
     }
     $runManifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8NoBOM $manifestPath
 
-    $emuleHarnessStartScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-parity-session.ps1"
-    $emuleHarnessSession = & $emuleHarnessStartScriptPath `
+    $emuleHarnessSession = Start-EmuleHarnessParitySession `
         -InterfaceAlias $resolvedInterfaceAlias `
         -CapturePort $EmuleHarnessUdpPort `
         -SessionPrefix $runId `
@@ -359,8 +340,7 @@ try {
         -ProfileRoot $profile.ProfileRoot
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "emule-harness-started" -Details "eMule harness launched with profile root $($profile.ProfileRoot)"
 
-    $agentStartScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-parity-session.ps1"
-    $agentSession = & $agentStartScriptPath `
+    $agentSession = Start-AgentParitySession `
         -InterfaceIndex $AgentInterfaceIndex `
         -InterfaceAlias $resolvedInterfaceAlias `
         -CapturePort $AgentCapturePort `
@@ -368,9 +348,7 @@ try {
     Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "agent-started" -Details "Agent launched and exposed stats at $($agentSession.StatsUrl)"
 
-    $seedScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-seed-popular.ps1"
     $publishAttempt = Invoke-SeedPopularWithRetry `
-        -ScriptPath $seedScriptPath `
         -Ed2kHash $manifest.agent.seedRequest.hash `
         -CanonicalName $manifest.agent.seedRequest.canonicalName `
         -Size ([uint64]$manifest.agent.seedRequest.size) `
@@ -384,8 +362,7 @@ try {
     }
 
     $null = Get-AgentStatsSlice -StatsUrl $agentSession.StatsUrl -DestinationPath $agentStatsPath
-    $agentExtractScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-extract-publish-log.ps1"
-    $agentPublishArtifacts = & $agentExtractScriptPath -SessionDir $agentSession.SessionDir
+    $agentPublishArtifacts = Extract-AgentPublishLog -SessionDir $agentSession.SessionDir
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "agent-artifacts-captured" -Details "Agent publish log saved to $($agentPublishArtifacts.PublishLogPath)"
 
     $emuleHarnessTraceSlice = Get-EmuleHarnessTraceSlice -SessionDir $emuleHarnessSession.SessionDir
@@ -401,19 +378,18 @@ try {
     }
 
     if (-not $KeepSessionsRunning) {
-        & $emuleHarnessStopScriptPath -SessionDir $emuleHarnessSession.SessionDir | Out-Null
-        & $agentStopScriptPath -SessionDir $agentSession.SessionDir | Out-Null
+        Stop-EmuleHarnessParitySession -SessionDir $emuleHarnessSession.SessionDir | Out-Null
+        Stop-AgentParitySession -SessionDir $agentSession.SessionDir | Out-Null
     }
 
     $agentSessionMetadataPath = Join-Path $agentSession.SessionDir "agent-session.json"
     $agentSessionMetadata = Get-Content -Raw $agentSessionMetadataPath | ConvertFrom-Json
     if ($agentSessionMetadata.PacketDumpPath -and $emuleHarnessSession.PacketDumpPath) {
-        $compareToolPath = Join-Path $toolingRoot "subsystems\parity\helper-parity-compare-udp-jsonl.py"
-        $compareOutput = & python $compareToolPath `
-            --emule-harness $emuleHarnessSession.PacketDumpPath `
-            --agent $agentSessionMetadata.PacketDumpPath `
-            --opcodes KADEMLIA2_HELLO_REQ KADEMLIA2_HELLO_RES KADEMLIA2_HELLO_RES_ACK KADEMLIA2_PUBLISH_KEY_REQ KADEMLIA2_PUBLISH_SOURCE_REQ KADEMLIA2_PUBLISH_RES
-        $compareOutput | Set-Content -Encoding utf8NoBOM $parityOutputPath
+        $compareOutput = Compare-UdpParityJsonl `
+            -EmuleHarnessPath $emuleHarnessSession.PacketDumpPath `
+            -AgentPath $agentSessionMetadata.PacketDumpPath `
+            -Opcodes @("KADEMLIA2_HELLO_REQ", "KADEMLIA2_HELLO_RES", "KADEMLIA2_HELLO_RES_ACK", "KADEMLIA2_PUBLISH_KEY_REQ", "KADEMLIA2_PUBLISH_SOURCE_REQ", "KADEMLIA2_PUBLISH_RES") `
+            -OutputPath $parityOutputPath
         Set-MilestonePassed -MilestoneMap $milestoneMap -Id "udp-parity-compared" -Details "UDP parity report saved to $parityOutputPath"
     }
 
@@ -496,13 +472,13 @@ finally {
     if (-not $KeepSessionsRunning) {
         if ($agentSession -and (Test-Path $agentSession.SessionDir)) {
             try {
-                & $agentStopScriptPath -SessionDir $agentSession.SessionDir | Out-Null
+                Stop-AgentParitySession -SessionDir $agentSession.SessionDir | Out-Null
             } catch {
             }
         }
         if ($emuleHarnessSession -and (Test-Path $emuleHarnessSession.SessionDir)) {
             try {
-                & $emuleHarnessStopScriptPath -SessionDir $emuleHarnessSession.SessionDir | Out-Null
+                Stop-EmuleHarnessParitySession -SessionDir $emuleHarnessSession.SessionDir | Out-Null
             } catch {
             }
         }

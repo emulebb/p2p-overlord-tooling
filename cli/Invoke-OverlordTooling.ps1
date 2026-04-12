@@ -13,26 +13,22 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "..\subsystems\RuntimeContext.ps1")
+. (Join-Path $PSScriptRoot "CommandRegistry.ps1")
+
 function Show-ToolingHelp {
     [CmdletBinding()]
-    param()
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
 
-    [pscustomobject]@{
-        name = "overlord-tooling"
-        commands = @(
-            [ordered]@{ name = "help"; description = "Show CLI help" }
-            [ordered]@{ name = "layout"; description = "Show the platform directory layout" }
-            [ordered]@{ name = "paths"; description = "Show canonical workspace and repo paths" }
-            [ordered]@{ name = "guard-tracked-files"; description = "Fail when tracked files contain local user-profile paths or configured personal-name filename leaks" }
-            [ordered]@{ name = "import-emule-harness-seeds"; description = "Import local nodes.dat and server.met into the untracked canonical eMule harness seed bundle" }
-            [ordered]@{ name = "show-scenario"; description = "Print a scenario manifest" }
-            [ordered]@{ name = "run-kad-startup-hello-publish"; description = "Run the first paired eMule harness and agent Kad startup, HELLO, and publish scenario" }
-            [ordered]@{ name = "run-private-emule-harness-ed2k-download"; description = "Run a private local eMule harness Kad source publish plus native ED2K download scenario" }
-            [ordered]@{ name = "run-private-emule-harness-ed2k-server-download"; description = "Run a private local eMule harness and agent ED2K download through a local goed2k-server" }
-            [ordered]@{ name = "run-realnet-emule-harness-ed2k-server-roundtrip"; description = "Run a real-network ED2K server roundtrip: eMule harness to agent, then agent back to a fresh eMule harness profile" }
-            [ordered]@{ name = "run-private-harness-kad-triplet"; description = "Run a local Kad cluster with three eMule harness peers plus one agent, including publish and search" }
-            [ordered]@{ name = "validate-ed2k-server-triplet"; description = "Run focused local triplet validation for multi-file, multi-source, and callback-limit ED2K server cases" }
-        )
+    Get-ToolingCommandRegistry -RepoRoot $RepoRoot | ForEach-Object {
+        [pscustomobject]@{
+            name = $_.Name
+            kind = $_.Kind
+            description = $_.Description
+        }
     }
 }
 
@@ -102,16 +98,8 @@ function ConvertTo-ScriptInvocationArgs {
     }
 }
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-ToolingRepoRoot -StartPath $PSScriptRoot
 $workspaceRoot = Resolve-Path (Join-Path $repoRoot "..")
-$guardScriptPath = Join-Path $repoRoot "orchestration\Invoke-TrackedFilePrivacyGuard.ps1"
-$seedImportScriptPath = Join-Path $repoRoot "orchestration\Import-EmuleHarnessSeedBundle.ps1"
-$scenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-KadStartupHelloPublishScenario.ps1"
-$privateEd2kScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateEmuleHarnessEd2kDownloadScenario.ps1"
-$privateEd2kServerScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateEmuleHarnessEd2kServerDownloadScenario.ps1"
-$realnetEd2kServerRoundtripScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-RealnetEmuleHarnessEd2kServerRoundtripScenario.ps1"
-$privateHarnessKadTripletScenarioRunnerScriptPath = Join-Path $repoRoot "orchestration\Invoke-PrivateHarnessKadTripletScenario.ps1"
-$tripletValidationScriptPath = Join-Path $repoRoot "orchestration\Invoke-ValidateEd2kServerTriplet.ps1"
 $command = "help"
 $commandArgs = @()
 if ($Arguments -and $Arguments.Count -gt 0) {
@@ -121,9 +109,10 @@ if ($Arguments -and $Arguments.Count -gt 0) {
     }
 }
 
+$resolvedCommand = Get-ToolingCommand -RepoRoot $repoRoot -Name $Command.ToLowerInvariant()
 switch ($Command.ToLowerInvariant()) {
     "help" {
-        Show-ToolingHelp
+        Show-ToolingHelp -RepoRoot $repoRoot
     }
     "layout" {
         Get-ToolingLayout -RepoRoot $repoRoot
@@ -131,31 +120,11 @@ switch ($Command.ToLowerInvariant()) {
     "paths" {
         [pscustomobject]@{
             workspaceRoot = $workspaceRoot.Path
-            toolingRepoRoot = $repoRoot.Path
+            toolingRepoRoot = $repoRoot
             docsRoot = (Join-Path $repoRoot "docs")
             schemasRoot = (Join-Path $repoRoot "schemas")
             scenariosRoot = (Join-Path $repoRoot "scenarios")
         }
-    }
-    "guard-tracked-files" {
-        if (-not (Test-Path $guardScriptPath)) {
-            throw "Tracked-file privacy guard not found at $guardScriptPath"
-        }
-
-        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
-        $namedArgs = $invocationArgs.Named
-        $positionalArgs = $invocationArgs.Positional
-        & $guardScriptPath -RepoRoot $repoRoot @namedArgs @positionalArgs
-    }
-    "import-emule-harness-seeds" {
-        if (-not (Test-Path $seedImportScriptPath)) {
-            throw "eMule harness seed import helper not found at $seedImportScriptPath"
-        }
-
-        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
-        $namedArgs = $invocationArgs.Named
-        $positionalArgs = $invocationArgs.Positional
-        & $seedImportScriptPath @namedArgs @positionalArgs
     }
     "show-scenario" {
         if ($commandArgs.Count -eq 0) {
@@ -170,67 +139,16 @@ switch ($Command.ToLowerInvariant()) {
 
         Get-Content -Raw $manifestPath | ConvertFrom-Json
     }
-    "run-kad-startup-hello-publish" {
-        if (-not (Test-Path $scenarioRunnerScriptPath)) {
-            throw "Scenario runner not found at $scenarioRunnerScriptPath"
-        }
-
-        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
-        $namedArgs = $invocationArgs.Named
-        $positionalArgs = $invocationArgs.Positional
-        & $scenarioRunnerScriptPath @namedArgs @positionalArgs
-    }
-    "run-private-emule-harness-ed2k-download" {
-        if (-not (Test-Path $privateEd2kScenarioRunnerScriptPath)) {
-            throw "Private ED2K scenario runner not found at $privateEd2kScenarioRunnerScriptPath"
-        }
-
-        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
-        $namedArgs = $invocationArgs.Named
-        $positionalArgs = $invocationArgs.Positional
-        & $privateEd2kScenarioRunnerScriptPath @namedArgs @positionalArgs
-    }
-    "run-private-emule-harness-ed2k-server-download" {
-        if (-not (Test-Path $privateEd2kServerScenarioRunnerScriptPath)) {
-            throw "Private ED2K server scenario runner not found at $privateEd2kServerScenarioRunnerScriptPath"
-        }
-
-        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
-        $namedArgs = $invocationArgs.Named
-        $positionalArgs = $invocationArgs.Positional
-        & $privateEd2kServerScenarioRunnerScriptPath @namedArgs @positionalArgs
-    }
-    "run-realnet-emule-harness-ed2k-server-roundtrip" {
-        if (-not (Test-Path $realnetEd2kServerRoundtripScenarioRunnerScriptPath)) {
-            throw "Realnet ED2K server roundtrip runner not found at $realnetEd2kServerRoundtripScenarioRunnerScriptPath"
-        }
-
-        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
-        $namedArgs = $invocationArgs.Named
-        $positionalArgs = $invocationArgs.Positional
-        & $realnetEd2kServerRoundtripScenarioRunnerScriptPath @namedArgs @positionalArgs
-    }
-    "run-private-harness-kad-triplet" {
-        if (-not (Test-Path $privateHarnessKadTripletScenarioRunnerScriptPath)) {
-            throw "Private harness Kad triplet scenario runner not found at $privateHarnessKadTripletScenarioRunnerScriptPath"
-        }
-
-        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
-        $namedArgs = $invocationArgs.Named
-        $positionalArgs = $invocationArgs.Positional
-        & $privateHarnessKadTripletScenarioRunnerScriptPath @namedArgs @positionalArgs
-    }
-    "validate-ed2k-server-triplet" {
-        if (-not (Test-Path $tripletValidationScriptPath)) {
-            throw "ED2K server triplet validation runner not found at $tripletValidationScriptPath"
-        }
-
-        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
-        $namedArgs = $invocationArgs.Named
-        $positionalArgs = $invocationArgs.Positional
-        & $tripletValidationScriptPath @namedArgs @positionalArgs
-    }
     default {
-        throw "Unknown overlord-tooling command '$Command'. Run '.\\overlord-tooling.ps1 help'."
+        if ($null -eq $resolvedCommand) {
+            throw "Unknown overlord-tooling command '$Command'. Run '.\\overlord-tooling.ps1 help'."
+        }
+
+        if ($resolvedCommand.Kind -ne "script") {
+            throw "Command '$Command' is not configured as a script-backed CLI entrypoint"
+        }
+
+        $invocationArgs = ConvertTo-ScriptInvocationArgs -Tokens $commandArgs
+        Invoke-ToolingScript -ScriptPath $resolvedCommand.ScriptPath -NamedArguments $invocationArgs.Named -PositionalArguments $invocationArgs.Positional
     }
 }
