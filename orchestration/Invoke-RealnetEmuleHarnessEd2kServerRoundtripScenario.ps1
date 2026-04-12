@@ -242,16 +242,16 @@ foreach ($path in @(
     New-Item -ItemType Directory -Path $path -Force | Out-Null
 }
 
-$networkResolverPath = Join-Path $toolingRoot "helper-network-resolve-adapter.ps1"
-$selectServerHelperPath = Join-Path $toolingRoot "helper-ed2k-select-live-server.ps1"
+$networkResolverPath = Join-Path $toolingRoot "subsystems\network\helper-network-resolve-adapter.ps1"
+$selectServerHelperPath = Join-Path $toolingRoot "subsystems\ed2k\helper-ed2k-select-live-server.ps1"
 $profileScriptPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
-$writeServerMetHelperPath = Join-Path $toolingRoot "helper-emule-harness-write-target-server-met.ps1"
-$startHarnessHelperPath = Join-Path $toolingRoot "helper-emule-harness-start-private-ed2k-session.ps1"
-$stopHarnessHelperPath = Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"
-$startAgentHelperPath = Join-Path $toolingRoot "helper-agent-start-parity-session.ps1"
-$stopAgentHelperPath = Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"
-$collectTransferHelperPath = Join-Path $toolingRoot "helper-agent-collect-ed2k-transfer.ps1"
-$enrichDownloadHelperPath = Join-Path $toolingRoot "helper-agent-post-enrich-download.ps1"
+$writeServerMetHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-write-target-server-met.ps1"
+$startHarnessHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-private-ed2k-session.ps1"
+$stopHarnessHelperPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
+$startAgentHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-parity-session.ps1"
+$stopAgentHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
+$collectTransferHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-collect-ed2k-transfer.ps1"
+$enrichDownloadHelperPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-enrich-download.ps1"
 
 foreach ($requiredPath in @(
     $networkResolverPath,

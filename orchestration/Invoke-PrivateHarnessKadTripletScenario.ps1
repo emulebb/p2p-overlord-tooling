@@ -515,15 +515,15 @@ foreach ($path in @($artifactRoot, $harnessArtifactRoot, $agentArtifactRoot, $co
     New-Item -ItemType Directory -Path $path -Force | Out-Null
 }
 
-$buildScriptPath = Join-Path $toolingRoot "helper-emule-harness-build-debug.ps1"
-$harnessDirResolverPath = Join-Path $toolingRoot "helper-emule-harness-resolve-harness-debug-dir.ps1"
+$buildScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-build-debug.ps1"
+$harnessDirResolverPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-resolve-harness-debug-dir.ps1"
 $profileScriptPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
-$harnessStartScriptPath = Join-Path $toolingRoot "helper-emule-harness-start-private-ed2k-session.ps1"
-$harnessStopScriptPath = Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"
-$harnessCleanupScriptPath = Join-Path $toolingRoot "helper-emule-harness-clean-runtime.ps1"
-$agentStartScriptPath = Join-Path $toolingRoot "helper-agent-start-private-ed2k-session.ps1"
-$agentStopScriptPath = Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"
-$agentSeedScriptPath = Join-Path $toolingRoot "helper-agent-post-seed-popular.ps1"
+$harnessStartScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-private-ed2k-session.ps1"
+$harnessStopScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
+$harnessCleanupScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-clean-runtime.ps1"
+$agentStartScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-private-ed2k-session.ps1"
+$agentStopScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
+$agentSeedScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-seed-popular.ps1"
 $coordinatorStartScriptPath = Join-Path $env:OVERLORD_PROJECT_DIR "p2p-overlord-be\overlord-be-coordinator\scripts\windows\coordinator_run_start_direct.cmd"
 
 foreach ($requiredPath in @(

@@ -1,3 +1,4 @@
 # Kad Subsystem
 
-Kad-specific scenario, normalization, and reporting helpers should live here.
+Owns Kad-specific normalization, scenario-specific analysis, and future
+protocol-focused tooling that does not belong to a concrete runtime subsystem.

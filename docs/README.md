@@ -17,7 +17,29 @@ Supporting notes for the workspace tooling platform.
 - `../schemas/` versioned JSON contracts
 - `../normalizers/` trace normalization
 - `../reports/` machine-readable and terminal summaries
-- `../subsystems/` subsystem modules
+- `../subsystems/` subsystem modules and internal implementation scripts
+
+## Supported Surface
+
+Treat these as the supported operator-facing surface:
+
+- `../overlord-tooling.ps1`
+- documented orchestration scripts under `../orchestration/`
+- scenario manifests under `../scenarios/`
+
+Scripts under `../subsystems/` are internal implementation details that back
+the platform surface above. Contributors may refactor them freely as long as
+the supported surface and scenario behavior remain coherent.
+
+## Architecture
+
+- CLI dispatch stays in `../cli/`
+- scenario composition stays in `../orchestration/`
+- subsystem-owned runtime logic stays in `../subsystems/`
+- result shaping stays in `../normalizers/` and `../reports/`
+
+Do not add new repo-root `helper-*` scripts. New reusable logic belongs under
+the owning subsystem.
 
 ## Repo Guards
 

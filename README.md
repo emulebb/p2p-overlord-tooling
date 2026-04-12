@@ -22,9 +22,35 @@ tooling-repo notes in `./AGENTS.md`.
 - `schemas/` versioned manifest and summary schemas
 - `normalizers/` trace normalization and post-processing
 - `reports/` summary generation
-- `subsystems/` subsystem-specific tooling modules
-- legacy `helper-*.ps1` scripts remain acceptable thin wrappers while the
-  platform surface grows
+- `subsystems/` subsystem-specific tooling modules and internal scripts
+
+## Supported Surface
+
+Operator-facing entrypoints are:
+
+- `overlord-tooling.ps1`
+- `orchestration/` scenario runners
+- `scenarios/` manifest contracts
+
+Subsystem-owned scripts under `subsystems/` are internal implementation
+details. They can be reorganized as the platform evolves and should not be
+treated as stable operator entrypoints.
+
+## Tooling Architecture
+
+- `cli/` exposes the stable workspace command surface
+- `orchestration/` composes subsystem behaviors into reproducible runs
+- `scenarios/` defines versioned scenario contracts
+- `subsystems/` owns runtime-specific logic for agent, eMule harness, goed2k,
+  network, pcap, parity, and protocol helpers
+- `reports/` and `normalizers/` transform raw run artifacts into consumable
+  summaries
+
+## Contributor Note
+
+Do not add new root-level `helper-*` scripts. New reusable logic should live
+under the owning subsystem, and orchestration should call subsystem-owned
+scripts or functions rather than depending on repo-root helper naming.
 
 ## Docs
 

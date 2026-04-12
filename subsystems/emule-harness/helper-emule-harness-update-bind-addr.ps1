@@ -13,7 +13,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
+$networkResolverPath = Join-Path $PSScriptRoot "..\network\helper-network-resolve-adapter.ps1"
 $runtimeRoot = if ($ProfileRoot) {
     [System.IO.Path]::GetFullPath($ProfileRoot)
 } else {

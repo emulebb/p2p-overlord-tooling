@@ -192,15 +192,15 @@ foreach ($path in @($artifactRoot, $emuleHarnessArtifactsRoot, $agentArtifactsRo
 }
 
 $profileScriptPath = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
-$oracleServerMetWriterPath = Join-Path $toolingRoot "helper-emule-harness-write-target-server-met.ps1"
-$emuleHarnessStartScriptPath = Join-Path $toolingRoot "helper-emule-harness-start-private-ed2k-session.ps1"
-$emuleHarnessStopScriptPath = Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"
-$agentStartScriptPath = Join-Path $toolingRoot "helper-agent-start-private-ed2k-session.ps1"
-$agentStopScriptPath = Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"
-$serverStartScriptPath = Join-Path $toolingRoot "helper-goed2k-start-private-session.ps1"
-$serverStopScriptPath = Join-Path $toolingRoot "helper-goed2k-stop-private-session.ps1"
-$enrichScriptPath = Join-Path $toolingRoot "helper-agent-post-enrich-download.ps1"
-$collectTransferScriptPath = Join-Path $toolingRoot "helper-agent-collect-ed2k-transfer.ps1"
+$oracleServerMetWriterPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-write-target-server-met.ps1"
+$emuleHarnessStartScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-private-ed2k-session.ps1"
+$emuleHarnessStopScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
+$agentStartScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-private-ed2k-session.ps1"
+$agentStopScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
+$serverStartScriptPath = Join-Path $toolingRoot "subsystems\goed2k\helper-goed2k-start-private-session.ps1"
+$serverStopScriptPath = Join-Path $toolingRoot "subsystems\goed2k\helper-goed2k-stop-private-session.ps1"
+$enrichScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-enrich-download.ps1"
+$collectTransferScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-collect-ed2k-transfer.ps1"
 
 foreach ($requiredPath in @(
     $profileScriptPath,

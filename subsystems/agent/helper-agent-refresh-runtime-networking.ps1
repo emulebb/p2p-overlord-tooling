@@ -23,7 +23,7 @@ $ErrorActionPreference = "Stop"
 $projectDir = if ($env:OVERLORD_PROJECT_DIR) {
     $env:OVERLORD_PROJECT_DIR
 } else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
 
 if (-not $RuntimeDir) {
@@ -32,7 +32,7 @@ if (-not $RuntimeDir) {
 if (-not $TempConfigPath -and $env:OVERLORD_TMP_DIR) {
     $TempConfigPath = Join-Path $env:OVERLORD_TMP_DIR "agent-real-miniupnpc.toml"
 }
-$networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
+$networkResolverPath = Join-Path $PSScriptRoot "..\network\helper-network-resolve-adapter.ps1"
 
 function Update-TomlScalarValue {
     param(

@@ -53,7 +53,7 @@ function Resolve-DumpcapInterfaceIndex {
 $projectDir = if ($env:OVERLORD_PROJECT_DIR) {
     $env:OVERLORD_PROJECT_DIR
 } else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
 $tmpDir = if ($env:OVERLORD_TMP_DIR) {
     $env:OVERLORD_TMP_DIR
@@ -62,7 +62,7 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
 }
 
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
-$networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
+$networkResolverPath = Join-Path $PSScriptRoot "..\network\helper-network-resolve-adapter.ps1"
 if (-not (Test-Path $dumpcapPath)) {
     throw "dumpcap.exe not found at $dumpcapPath"
 }

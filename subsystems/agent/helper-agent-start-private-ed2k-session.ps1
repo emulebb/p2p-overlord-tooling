@@ -42,7 +42,7 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $configWriterPath = Join-Path $PSScriptRoot "helper-agent-write-private-local-config.ps1"
 $launchHelperPath = Join-Path $PSScriptRoot "helper-agent-launch-debug.ps1"
-$sessionMetadataHelperPath = Join-Path $PSScriptRoot "subsystems\agent\SessionMetadata.ps1"
+$sessionMetadataHelperPath = Join-Path $PSScriptRoot "SessionMetadata.ps1"
 
 foreach ($requiredPath in @($cleanupHelperPath, $configWriterPath, $launchHelperPath, $sessionMetadataHelperPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {

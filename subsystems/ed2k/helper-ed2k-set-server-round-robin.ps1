@@ -28,7 +28,7 @@ $ErrorActionPreference = "Stop"
 $projectDir = if ($env:OVERLORD_PROJECT_DIR) {
     $env:OVERLORD_PROJECT_DIR
 } else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
 $tmpDir = if ($env:OVERLORD_TMP_DIR) {
     $env:OVERLORD_TMP_DIR

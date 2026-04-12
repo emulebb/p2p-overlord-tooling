@@ -662,15 +662,15 @@ if (-not $env:OVERLORD_TMP_DIR) {
 
 $paths = @{
     Profile = Join-Path $toolingRoot "profiles\New-EmuleHarnessPrivateEd2kProfile.ps1"
-    ServerMetWriter = Join-Path $toolingRoot "helper-emule-harness-write-target-server-met.ps1"
-    EmuleHarnessStart = Join-Path $toolingRoot "helper-emule-harness-start-private-ed2k-session.ps1"
-    EmuleHarnessStop = Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"
-    AgentStart = Join-Path $toolingRoot "helper-agent-start-private-ed2k-session.ps1"
-    AgentStop = Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"
-    AgentEnrich = Join-Path $toolingRoot "helper-agent-post-enrich-download.ps1"
-    AgentCollect = Join-Path $toolingRoot "helper-agent-collect-ed2k-transfer.ps1"
-    ServerStart = Join-Path $toolingRoot "helper-goed2k-start-private-session.ps1"
-    ServerStop = Join-Path $toolingRoot "helper-goed2k-stop-private-session.ps1"
+    ServerMetWriter = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-write-target-server-met.ps1"
+    EmuleHarnessStart = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-private-ed2k-session.ps1"
+    EmuleHarnessStop = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
+    AgentStart = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-private-ed2k-session.ps1"
+    AgentStop = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
+    AgentEnrich = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-enrich-download.ps1"
+    AgentCollect = Join-Path $toolingRoot "subsystems\agent\helper-agent-collect-ed2k-transfer.ps1"
+    ServerStart = Join-Path $toolingRoot "subsystems\goed2k\helper-goed2k-start-private-session.ps1"
+    ServerStop = Join-Path $toolingRoot "subsystems\goed2k\helper-goed2k-stop-private-session.ps1"
 }
 foreach ($requiredPath in $paths.Values) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {

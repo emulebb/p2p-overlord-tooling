@@ -19,7 +19,7 @@ $ErrorActionPreference = "Stop"
 $projectDir = if ($env:OVERLORD_PROJECT_DIR) {
     $env:OVERLORD_PROJECT_DIR
 } else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
 $tmpDir = if ($env:OVERLORD_TMP_DIR) {
     $env:OVERLORD_TMP_DIR
@@ -220,7 +220,7 @@ function Assert-EmuleHarnessReadyState {
 $buildHelperPath = Join-Path $PSScriptRoot "helper-emule-harness-build-debug.ps1"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-emule-harness-clean-runtime.ps1"
 $readyReaderPath = Join-Path $PSScriptRoot "helper-emule-harness-read-ready-file.ps1"
-$networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
+$networkResolverPath = Join-Path $PSScriptRoot "..\network\helper-network-resolve-adapter.ps1"
 $runtimeRoot = if ($ProfileRoot) {
     [System.IO.Path]::GetFullPath($ProfileRoot)
 } else {

@@ -43,8 +43,8 @@ $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-agent-clean-runtime.ps1"
 $refreshNetworkingHelperPath = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"
 $setTargetServerHelperPath = Join-Path $PSScriptRoot "helper-agent-set-target-server-entry.ps1"
-$networkResolverPath = Join-Path $PSScriptRoot "helper-network-resolve-adapter.ps1"
-$sessionMetadataHelperPath = Join-Path $PSScriptRoot "subsystems\agent\SessionMetadata.ps1"
+$networkResolverPath = Join-Path $PSScriptRoot "..\network\helper-network-resolve-adapter.ps1"
+$sessionMetadataHelperPath = Join-Path $PSScriptRoot "SessionMetadata.ps1"
 
 if (-not (Test-Path $launchHelperPath)) {
     throw "Agent launch helper not found at $launchHelperPath"

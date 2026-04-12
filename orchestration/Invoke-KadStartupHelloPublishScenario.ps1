@@ -234,13 +234,13 @@ function Resolve-EmuleHarnessRuntimeExePath {
         [string]$ToolingRoot
     )
 
-    $resolverPath = Join-Path $ToolingRoot "helper-emule-harness-resolve-harness-debug-dir.ps1"
+    $resolverPath = Join-Path $ToolingRoot "subsystems\emule-harness\helper-emule-harness-resolve-harness-debug-dir.ps1"
     $harnessDebugDir = & $resolverPath
     return (Join-Path $harnessDebugDir "eMule_v072a_parity.exe")
 }
 
 $toolingRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$networkResolverPath = Join-Path $toolingRoot "helper-network-resolve-adapter.ps1"
+$networkResolverPath = Join-Path $toolingRoot "subsystems\network\helper-network-resolve-adapter.ps1"
 $manifest = Get-Content -Raw $ScenarioManifestPath | ConvertFrom-Json
 $requiredMilestoneIds = @(Get-RequiredMilestoneIds -Manifest $manifest)
 $resolvedAdapter = & $networkResolverPath -PreferredInterfaceAlias $InterfaceAlias
@@ -256,13 +256,13 @@ if (-not $env:OVERLORD_LOG_DIR) {
 
 $requiredPaths = @(
     (Join-Path $toolingRoot "profiles\\New-EmuleHarnessProfile.ps1"),
-    (Join-Path $toolingRoot "helper-emule-harness-start-parity-session.ps1"),
-    (Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"),
-    (Join-Path $toolingRoot "helper-agent-start-parity-session.ps1"),
-    (Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"),
-    (Join-Path $toolingRoot "helper-agent-post-seed-popular.ps1"),
-    (Join-Path $toolingRoot "helper-agent-extract-publish-log.ps1"),
-    (Join-Path $toolingRoot "helper-parity-compare-udp-jsonl.py")
+    (Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-parity-session.ps1"),
+    (Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"),
+    (Join-Path $toolingRoot "subsystems\agent\helper-agent-start-parity-session.ps1"),
+    (Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"),
+    (Join-Path $toolingRoot "subsystems\agent\helper-agent-post-seed-popular.ps1"),
+    (Join-Path $toolingRoot "subsystems\agent\helper-agent-extract-publish-log.ps1"),
+    (Join-Path $toolingRoot "subsystems\parity\helper-parity-compare-udp-jsonl.py")
 )
 foreach ($requiredPath in $requiredPaths) {
     if (-not (Test-Path $requiredPath)) {
@@ -297,8 +297,8 @@ $agentSession = $null
 $emuleHarnessTraceSlice = $null
 $agentPublishArtifacts = $null
 $agentSessionMetadata = $null
-$emuleHarnessStopScriptPath = Join-Path $toolingRoot "helper-emule-harness-stop-parity-session.ps1"
-$agentStopScriptPath = Join-Path $toolingRoot "helper-agent-stop-parity-session.ps1"
+$emuleHarnessStopScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-stop-parity-session.ps1"
+$agentStopScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-stop-parity-session.ps1"
 
 try {
     $seedRoot = Join-Path $toolingRoot ".local\emule-harness-seeds\$SeedBundleId"
@@ -350,7 +350,7 @@ try {
     }
     $runManifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8NoBOM $manifestPath
 
-    $emuleHarnessStartScriptPath = Join-Path $toolingRoot "helper-emule-harness-start-parity-session.ps1"
+    $emuleHarnessStartScriptPath = Join-Path $toolingRoot "subsystems\emule-harness\helper-emule-harness-start-parity-session.ps1"
     $emuleHarnessSession = & $emuleHarnessStartScriptPath `
         -InterfaceAlias $resolvedInterfaceAlias `
         -CapturePort $EmuleHarnessUdpPort `
@@ -359,7 +359,7 @@ try {
         -ProfileRoot $profile.ProfileRoot
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "emule-harness-started" -Details "eMule harness launched with profile root $($profile.ProfileRoot)"
 
-    $agentStartScriptPath = Join-Path $toolingRoot "helper-agent-start-parity-session.ps1"
+    $agentStartScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-start-parity-session.ps1"
     $agentSession = & $agentStartScriptPath `
         -InterfaceIndex $AgentInterfaceIndex `
         -InterfaceAlias $resolvedInterfaceAlias `
@@ -368,7 +368,7 @@ try {
     Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "agent-started" -Details "Agent launched and exposed stats at $($agentSession.StatsUrl)"
 
-    $seedScriptPath = Join-Path $toolingRoot "helper-agent-post-seed-popular.ps1"
+    $seedScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-post-seed-popular.ps1"
     $publishAttempt = Invoke-SeedPopularWithRetry `
         -ScriptPath $seedScriptPath `
         -Ed2kHash $manifest.agent.seedRequest.hash `
@@ -384,7 +384,7 @@ try {
     }
 
     $null = Get-AgentStatsSlice -StatsUrl $agentSession.StatsUrl -DestinationPath $agentStatsPath
-    $agentExtractScriptPath = Join-Path $toolingRoot "helper-agent-extract-publish-log.ps1"
+    $agentExtractScriptPath = Join-Path $toolingRoot "subsystems\agent\helper-agent-extract-publish-log.ps1"
     $agentPublishArtifacts = & $agentExtractScriptPath -SessionDir $agentSession.SessionDir
     Set-MilestonePassed -MilestoneMap $milestoneMap -Id "agent-artifacts-captured" -Details "Agent publish log saved to $($agentPublishArtifacts.PublishLogPath)"
 
@@ -408,7 +408,7 @@ try {
     $agentSessionMetadataPath = Join-Path $agentSession.SessionDir "agent-session.json"
     $agentSessionMetadata = Get-Content -Raw $agentSessionMetadataPath | ConvertFrom-Json
     if ($agentSessionMetadata.PacketDumpPath -and $emuleHarnessSession.PacketDumpPath) {
-        $compareToolPath = Join-Path $toolingRoot "helper-parity-compare-udp-jsonl.py"
+        $compareToolPath = Join-Path $toolingRoot "subsystems\parity\helper-parity-compare-udp-jsonl.py"
         $compareOutput = & python $compareToolPath `
             --emule-harness $emuleHarnessSession.PacketDumpPath `
             --agent $agentSessionMetadata.PacketDumpPath `

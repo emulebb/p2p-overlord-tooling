@@ -20,7 +20,7 @@ $ErrorActionPreference = "Stop"
 $projectDir = if ($env:OVERLORD_PROJECT_DIR) {
     $env:OVERLORD_PROJECT_DIR
 } else {
-    (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
 
 $runtimeDir = Join-Path $projectDir "overlord-agents\runtime"
