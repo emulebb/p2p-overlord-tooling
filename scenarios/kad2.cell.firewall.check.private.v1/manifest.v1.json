@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.firewall.check.private.v1",
+  "description": "Planned KAD2 private firewall-check cell for UDP reachability and ack shaping.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "firewall.check.private",
+    "availability": "planned",
+    "expectedBranch": "firewall-check",
+    "comparisonMode": "state-machine-layer",
+    "requiredHarnessHooks": [
+      "firewall_check_reply",
+      "timeout_and_retry"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "kad2.firewall.check.private",
+      "hooks": [
+        "firewall_check_reply",
+        "timeout_and_retry"
+      ]
+    }
+  }
+}

@@ -5,7 +5,7 @@ Imports canonical eMule harness seed files into an untracked local seed bundle.
 
 .DESCRIPTION
 Copies the operator-supplied `nodes.dat` and `server.met` into
-`overlord-tooling/.local/emule-harness-seeds/<bundle-id>/` and writes a machine-readable
+`p2p-overlord-tooling/.local/emule-harness-seeds/<bundle-id>/` and writes a machine-readable
 manifest with file hashes. Source paths are intentionally not persisted.
 #>
 

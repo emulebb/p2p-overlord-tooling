@@ -29,6 +29,8 @@ rules, quality gates, or deltas that are not shared across the workspace.
   backlog.
 - `%OVERLORD_PROJECT_DIR%\p2p-overlord-agents\docs\README.md` is the canonical
   agents/protocol docs home.
+- Service and package names remain on the stable `overlord-*` prefixes even
+  though repo directories use `p2p-overlord-*`.
 
 ## Path And Environment Rules
 
@@ -68,6 +70,9 @@ rules, quality gates, or deltas that are not shared across the workspace.
 
 - The runnable eMule reference build is called `emule-harness` in shared docs,
   tooling, scenarios, and artifacts.
+- The only mutable app variant for parity work is the tracing harness at
+  `%EMULE_WORKSPACE_ROOT%\workspaces\v0.72a\app\eMule-v0.72a-tracing-harness`.
+  Do not patch other app variants for this workspace program.
 - All eMule harness builds must go through the canonical eMule-build entrypoint
   from `%EMULE_WORKSPACE_ROOT%`:
   - `%EMULE_WORKSPACE_ROOT%\repos\eMule-build\workspace.ps1 build-app`
@@ -110,8 +115,9 @@ rules, quality gates, or deltas that are not shared across the workspace.
 
 ## Operational Constraints
 
-- Do not modify the direct coordinator or agent `.cmd` launcher scripts that
-  are treated as stable operator entrypoints.
+- Treat the direct coordinator and agent `.cmd` launcher scripts as stable
+  operator entrypoints. Change them only when required to preserve canonical
+  repo layout or operator runtime correctness.
 - The system is Windows-first today, but keep Windows-specific logic isolated
   so future multi-platform support stays viable.
 - Avoid Windows command-length failures by breaking work into file-sized

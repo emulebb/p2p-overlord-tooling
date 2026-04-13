@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.campaign.search-families.v1",
+  "description": "KAD2 keyword-search campaign over private and live plaintext/obfuscated cells.",
+  "scenarioKind": "campaign",
+  "protocol": "kad2",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "kad2"
+  },
+  "campaign": {
+    "availability": "available",
+    "members": [
+      {
+        "scenarioId": "kad2.cell.keyword.search.triplet.private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "kad2.cell.keyword.search.plaintext.realnet.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "kad2.cell.keyword.search.obfuscated.realnet.v1",
+        "required": true
+      }
+    ]
+  }
+}

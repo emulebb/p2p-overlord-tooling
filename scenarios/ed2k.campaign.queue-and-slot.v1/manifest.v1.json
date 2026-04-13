@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.campaign.queue-and-slot.v1",
+  "description": "Planned ED2K queue-and-slot campaign over downloader and listener queue-only cells.",
+  "scenarioKind": "campaign",
+  "protocol": "ed2k",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k"
+  },
+  "campaign": {
+    "availability": "planned",
+    "members": [
+      {
+        "scenarioId": "ed2k.cell.downloader.plaintext.direct.queue-only.fresh.private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.downloader.obfuscated.direct.queue-only.fresh.private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.listener.plaintext.inbound.queue-only.fresh.private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.listener.obfuscated.inbound.queue-only.fresh.private.v1",
+        "required": true
+      }
+    ]
+  }
+}

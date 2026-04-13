@@ -231,6 +231,7 @@ $verboseLogPath = Join-Path $runtimeRoot "logs\eMule_Verbose.log"
 $packetDumpDir = Join-Path $runtimeRoot "logs"
 $preferencesPath = Join-Path $runtimeRoot "config\preferences.ini"
 $readyFilePath = Join-Path $runtimeRoot "harness.ready"
+$parityHookConfigPath = Join-Path $runtimeRoot "parity-hooks.v1.json"
 $oracleWorkDir = $oracleHarnessDebugDir
 $dumpcapPath = "C:\Program Files\Wireshark\dumpcap.exe"
 
@@ -332,13 +333,18 @@ try {
         throw "dumpcap did not create capture file at $pcapPath within 15 seconds"
     }
 
+    $emuleHarnessArgs = @(
+        "-configdir=""$runtimeRoot""",
+        "-readyfile=""$readyFilePath""",
+        "-ignoreinstances"
+    )
+    if (Test-Path -LiteralPath $parityHookConfigPath -PathType Leaf) {
+        $emuleHarnessArgs += "-hookconfigfile=""$parityHookConfigPath"""
+    }
+
     $emuleHarnessProcess = Start-Process `
         -FilePath $emuleHarnessExePath `
-        -ArgumentList @(
-            "-configdir=""$runtimeRoot""",
-            "-readyfile=""$readyFilePath""",
-            "-ignoreinstances"
-        ) `
+        -ArgumentList $emuleHarnessArgs `
         -WorkingDirectory $oracleWorkDir `
         -PassThru `
         -WindowStyle Minimized
@@ -378,6 +384,8 @@ try {
         EmuleHarnessProfileRoot = $runtimeRoot
         EmuleHarnessReadyFilePath = $readyFilePath
         EmuleHarnessReadyState = $readyState
+        ParityHookConfigPath = if (Test-Path -LiteralPath $parityHookConfigPath -PathType Leaf) { $parityHookConfigPath } else { $null }
+        ParityHookEventLogPath = $readyState.ParityHookEventsFile
         EmuleHarnessPid = $emuleHarnessProcess.Id
         StartedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     }

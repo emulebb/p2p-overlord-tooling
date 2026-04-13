@@ -1,3 +1,5 @@
+#Requires -Version 7.6
+
 function New-AgentSessionMetadata {
     param(
         [Parameter(Mandatory = $true)]

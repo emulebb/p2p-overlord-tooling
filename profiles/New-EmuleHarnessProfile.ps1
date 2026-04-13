@@ -132,6 +132,36 @@ $preferencesText = ConvertTo-IniString -Sections $preferenceSections
     (New-Object System.Text.UTF8Encoding($false))
 )
 
+$parityHookConfigPath = $null
+$parityHookEventLogPath = $null
+$parityHookConfig = $null
+if ($manifest.ContainsKey("parity") -and $null -ne $manifest.parity -and $manifest.parity.ContainsKey("harnessHookConfig")) {
+    $parityHookConfig = $manifest.parity.harnessHookConfig
+}
+elseif ($manifest.ContainsKey("emuleHarness") -and $null -ne $manifest.emuleHarness -and $manifest.emuleHarness.ContainsKey("parityHookConfig")) {
+    $parityHookConfig = $manifest.emuleHarness.parityHookConfig
+}
+
+if ($null -ne $parityHookConfig) {
+    if ($parityHookConfig -isnot [hashtable]) {
+        $parityHookConfig = @{} + $parityHookConfig
+    }
+
+    $parityHookConfigPath = Join-Path $resolvedProfileRoot "parity-hooks.v1.json"
+    $parityHookEventLogPath = Join-Path $profileLogsRoot "parity-hooks.jsonl"
+    if (-not $parityHookConfig.Contains("schemaVersion")) {
+        $parityHookConfig["schemaVersion"] = "parity-hooks/v1"
+    }
+    if (-not $parityHookConfig.Contains("eventLogPath")) {
+        $parityHookConfig["eventLogPath"] = $parityHookEventLogPath
+    }
+    if (-not $parityHookConfig.Contains("scenarioId")) {
+        $parityHookConfig["scenarioId"] = $manifest.scenarioId
+    }
+
+    $parityHookConfig | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $parityHookConfigPath -Encoding utf8NoBOM
+}
+
 Copy-Item -LiteralPath $nodesSourcePath -Destination (Join-Path $profileConfigRoot "nodes.dat") -Force
 Copy-Item -LiteralPath $serverSourcePath -Destination (Join-Path $profileConfigRoot "server.met") -Force
 
@@ -160,6 +190,8 @@ $profileManifest = [ordered]@{
         logsRoot = $profileLogsRoot
         tempRoot = $profileTempRoot
         incomingRoot = $profileIncomingRoot
+        parityHookConfigPath = $parityHookConfigPath
+        parityHookEventLogPath = $parityHookEventLogPath
     }
 }
 
@@ -172,4 +204,6 @@ $profileManifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8NoBOM $pr
     PreferencesPath = $preferencesPath
     NodesDatPath = (Join-Path $profileConfigRoot "nodes.dat")
     ServerMetPath = (Join-Path $profileConfigRoot "server.met")
+    ParityHookConfigPath = $parityHookConfigPath
+    ParityHookEventLogPath = $parityHookEventLogPath
 }

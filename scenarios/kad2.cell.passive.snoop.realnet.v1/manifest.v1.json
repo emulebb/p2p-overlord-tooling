@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.passive.snoop.realnet.v1",
+  "description": "Planned KAD2 real-network passive-snoop cell for unsolicited search cadence and replay handling.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "passive.snoop.realnet",
+    "availability": "planned",
+    "expectedBranch": "passive-snoop",
+    "comparisonMode": "wire-layer"
+  }
+}

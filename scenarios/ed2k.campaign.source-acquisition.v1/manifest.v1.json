@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.campaign.source-acquisition.v1",
+  "description": "ED2K source-acquisition campaign over private callback coverage and live plaintext/obfuscated download evidence.",
+  "scenarioKind": "campaign",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k"
+  },
+  "campaign": {
+    "availability": "available",
+    "members": [
+      {
+        "scenarioId": "ed2k.cell.downloader.plaintext.callback.callback-issued.fresh.private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.downloader.plaintext.direct.serving.fresh.realnet.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.downloader.obfuscated.direct.serving.fresh.realnet.v1",
+        "required": true
+      }
+    ]
+  }
+}

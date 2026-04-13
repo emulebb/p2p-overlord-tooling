@@ -2,6 +2,16 @@
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.server.emule-harness.agent.roundtrip.realnet.v1",
   "description": "Real-network ED2K server roundtrip transfer: eMule harness seeds a deterministic binary to the agent, then the agent re-offers the same file and a fresh eMule harness profile downloads it back.",
+  "scenarioKind": "legacy",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "legacy.listener.roundtrip.realnet",
+    "availability": "available",
+    "expectedBranch": "server-session->download->reoffer->listener-download",
+    "comparisonMode": "acceptance-layer"
+  },
   "interfaceAlias": "hide.me",
   "seedBundleId": "canonical",
   "serverSelection": {

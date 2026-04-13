@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.notes.publish.private.v1",
+  "description": "Planned KAD2 private notes-publish cell with deterministic acceptance and rejection branches.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "notes.publish.private",
+    "availability": "planned",
+    "expectedBranch": "notes-publish",
+    "comparisonMode": "state-machine-layer",
+    "requiredHarnessHooks": [
+      "publish_acceptance",
+      "publish_rejection",
+      "timeout_and_retry"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "kad2.notes.publish.private",
+      "hooks": [
+        "publish_acceptance",
+        "publish_rejection",
+        "timeout_and_retry"
+      ]
+    }
+  }
+}

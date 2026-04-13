@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.keyword.search.plaintext.realnet.v1",
+  "description": "KAD2 real-network keyword-search cell in plaintext transport mode.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "keyword.search.plaintext.realnet",
+    "availability": "available",
+    "expectedBranch": "keyword-search.plaintext",
+    "comparisonMode": "wire-layer+acceptance-layer",
+    "requiredArtifacts": [
+      "delegatedRunSummaryPath"
+    ],
+    "requiredAgentEvidence": [
+      "agent search trace",
+      "harness search trace"
+    ]
+  },
+  "execution": {
+    "command": "run-realnet-kad-search-download-parity",
+    "arguments": [
+      "-Query",
+      "ubuntu linux",
+      "-TransportModes",
+      "PlaintextOnly",
+      "-SuccessfulDownloadCount",
+      "1"
+    ],
+    "summarySourceScenarioId": "kad.search-download.emule-harness.agent.realnet.v1"
+  }
+}

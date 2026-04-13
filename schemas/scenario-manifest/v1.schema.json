@@ -6,11 +6,7 @@
   "required": [
     "schemaVersion",
     "scenarioId",
-    "description",
-    "seedBundle",
-    "emuleHarness",
-    "agent",
-    "milestones"
+    "description"
   ],
   "properties": {
     "schemaVersion": {
@@ -24,12 +20,142 @@
       "type": "string",
       "minLength": 1
     },
+    "scenarioKind": {
+      "type": "string",
+      "enum": [
+        "legacy",
+        "cell",
+        "campaign"
+      ]
+    },
+    "protocol": {
+      "type": "string",
+      "enum": [
+        "kad2",
+        "ed2k",
+        "mixed"
+      ]
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "deterministic-private",
+        "broad-private",
+        "realnet-confidence"
+      ]
+    },
+    "parity": {
+      "type": "object",
+      "properties": {
+        "matrixId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cellId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "availability": {
+          "type": "string",
+          "enum": [
+            "available",
+            "planned"
+          ]
+        },
+        "expectedBranch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "comparisonMode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requiredArtifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requiredHarnessHooks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requiredAgentEvidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "harnessHookConfig": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "summarySourceScenarioId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "campaign": {
+      "type": "object",
+      "properties": {
+        "availability": {
+          "type": "string",
+          "enum": [
+            "available",
+            "planned"
+          ]
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "scenarioId"
+            ],
+            "properties": {
+              "scenarioId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
     "seedBundle": {
       "type": "object",
-      "required": [
-        "bundleId",
-        "requiredFiles"
-      ],
       "properties": {
         "bundleId": {
           "type": "string",
@@ -48,10 +174,6 @@
     },
     "emuleHarness": {
       "type": "object",
-      "required": [
-        "dynamicPreferenceKeys",
-        "seededPreferenceDefaults"
-      ],
       "properties": {
         "dynamicPreferenceKeys": {
           "type": "object",
@@ -74,11 +196,6 @@
     },
     "agent": {
       "type": "object",
-      "required": [
-        "controlUrl",
-        "statsUrl",
-        "seedRequest"
-      ],
       "properties": {
         "controlUrl": {
           "type": "string",
@@ -123,10 +240,6 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "id",
-          "description"
-        ],
         "properties": {
           "id": {
             "type": "string",

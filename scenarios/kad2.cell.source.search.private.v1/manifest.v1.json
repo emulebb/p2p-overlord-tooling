@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.source.search.private.v1",
+  "description": "Planned KAD2 private source-search cell with deterministic harness reply shaping.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "source.search.private",
+    "availability": "planned",
+    "expectedBranch": "source-search",
+    "comparisonMode": "state-machine-layer",
+    "requiredHarnessHooks": [
+      "source_search_reply_shape",
+      "timeout_and_retry"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "kad2.source.search.private",
+      "hooks": [
+        "source_search_reply_shape",
+        "timeout_and_retry"
+      ]
+    }
+  }
+}

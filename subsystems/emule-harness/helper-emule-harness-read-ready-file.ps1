@@ -87,5 +87,8 @@ foreach ($line in Get-Content -LiteralPath $readyPath) {
     ProfileRoot = Get-ReadyValue -Map $values -Key "profile_root"
     ConfigDir = Get-ReadyValue -Map $values -Key "config_dir"
     LogDir = Get-ReadyValue -Map $values -Key "log_dir"
+    ParityHookConfigFile = Get-ReadyValue -Map $values -Key "parity_hook_config_file"
+    ParityHookSetId = Get-ReadyValue -Map $values -Key "parity_hook_set_id"
+    ParityHookEventsFile = Get-ReadyValue -Map $values -Key "parity_hook_events_file"
     Raw = [pscustomobject]$values
 }

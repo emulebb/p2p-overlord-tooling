@@ -27,7 +27,7 @@ $projectDir = if ($env:OVERLORD_PROJECT_DIR) {
 }
 
 if (-not $RuntimeDir) {
-    $RuntimeDir = Join-Path $projectDir "overlord-agents\runtime"
+    $RuntimeDir = Join-Path $projectDir "p2p-overlord-agents\runtime"
 }
 if (-not $TempConfigPath -and $env:OVERLORD_TMP_DIR) {
     $TempConfigPath = Join-Path $env:OVERLORD_TMP_DIR "agent-real-miniupnpc.toml"

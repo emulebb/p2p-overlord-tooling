@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.downloader.plaintext.direct.queue-only.fresh.private.v1",
+  "description": "Planned ED2K downloader plaintext queue-only private cell.",
+  "scenarioKind": "cell",
+  "protocol": "ed2k",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "downloader.plaintext.direct.queue-only.fresh.private",
+    "availability": "planned",
+    "expectedBranch": "queue-only",
+    "comparisonMode": "state-machine-layer",
+    "requiredHarnessHooks": [
+      "queue_only",
+      "late_slot_grant"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "ed2k.downloader.plaintext.direct.queue-only.fresh.private",
+      "hooks": [
+        "queue_only",
+        "late_slot_grant"
+      ]
+    }
+  }
+}

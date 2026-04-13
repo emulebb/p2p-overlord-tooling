@@ -23,7 +23,7 @@ $projectDir = if ($env:OVERLORD_PROJECT_DIR) {
     (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
 
-$runtimeDir = Join-Path $projectDir "overlord-agents\runtime"
+$runtimeDir = Join-Path $projectDir "p2p-overlord-agents\runtime"
 $nodeIdPath = Join-Path $runtimeDir "overlord-kad.node-id"
 
 if ($NodeIdHex -notmatch '^[0-9a-fA-F]{32}$') {

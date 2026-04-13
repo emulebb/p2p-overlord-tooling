@@ -1,4 +1,4 @@
-name: Tracked File Privacy Guard
+name: Tracked File Guards
 
 on:
   push:
@@ -9,6 +9,7 @@ on:
       - "docs/**"
       - "cli/**"
       - "orchestration/**"
+      - "subsystems/**"
       - "schemas/**"
       - "*.ps1"
       - "*.py"
@@ -20,12 +21,13 @@ on:
       - "docs/**"
       - "cli/**"
       - "orchestration/**"
+      - "subsystems/**"
       - "schemas/**"
       - "*.ps1"
       - "*.py"
 
 jobs:
-  tracked-file-privacy-guard:
+  tracked-file-guards:
     runs-on: windows-latest
 
     steps:
@@ -35,3 +37,7 @@ jobs:
       - name: Run tracked-file privacy guard
         shell: pwsh
         run: .\overlord-tooling.ps1 guard-tracked-files
+
+      - name: Run workspace conventions guard
+        shell: pwsh
+        run: .\overlord-tooling.ps1 guard-workspace-conventions

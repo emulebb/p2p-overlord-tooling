@@ -48,6 +48,9 @@ the owning subsystem, and orchestration should not depend on helper file names.
 - `../overlord-tooling.ps1 guard-tracked-files` validates that tracked files do
   not contain committed local user-profile paths and do not use configured
   personal-name filenames.
+- `../overlord-tooling.ps1 guard-workspace-conventions` validates that tracked
+  files do not use stale `overlord-*` repo-directory references and that every
+  tracked `.ps1` starts with `#Requires -Version 7.6`.
 - Real personal identifiers must not be stored in tracked policy files; use
   local untracked policy or environment configuration for those checks.
 
@@ -59,6 +62,15 @@ the owning subsystem, and orchestration should not depend on helper file names.
 - `../overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1`
   prints the first paired eMule harness and agent deterministic scenario
   manifest.
+- `../overlord-tooling.ps1 show-parity-matrix`
+  prints the KAD2 and ED2K parity matrix inventory across `cell` and
+  `campaign` manifests.
+- `../overlord-tooling.ps1 run-parity-cell -ScenarioId <id>`
+  executes one parity cell wrapper and writes a wrapper `run-manifest.json`
+  plus `run-summary.json`.
+- `../overlord-tooling.ps1 run-parity-campaign -ScenarioId <id>`
+  executes one parity campaign by running its member cells and aggregating
+  their wrapper summaries.
 - `../overlord-tooling.ps1 run-kad-startup-hello-publish`
   runs the paired eMule harness and agent Kad startup, HELLO, and publish
   harness, resolves the eMule harness runtime from `%EMULE_WORKSPACE_ROOT%`,

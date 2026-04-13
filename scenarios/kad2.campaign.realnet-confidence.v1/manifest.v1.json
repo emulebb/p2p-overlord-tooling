@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.campaign.realnet-confidence.v1",
+  "description": "KAD2 live-confidence campaign over the currently runnable live-wire parity cells.",
+  "scenarioKind": "campaign",
+  "protocol": "kad2",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "kad2"
+  },
+  "campaign": {
+    "availability": "available",
+    "members": [
+      {
+        "scenarioId": "kad2.cell.startup.hello.publish.realnet.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "kad2.cell.keyword.search.plaintext.realnet.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "kad2.cell.keyword.search.obfuscated.realnet.v1",
+        "required": true
+      }
+    ]
+  }
+}

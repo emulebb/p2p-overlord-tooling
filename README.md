@@ -63,6 +63,9 @@ modules or functions rather than depending on helper file paths.
 
 - `.\overlord-tooling.ps1 guard-tracked-files` scans tracked files for user-profile
   path leaks and configured personal-name filename leaks.
+- `.\overlord-tooling.ps1 guard-workspace-conventions` scans tracked files for
+  stale `overlord-*` repo-directory references and tracked `.ps1` files that
+  are missing the required `#Requires -Version 7.6` header.
 - Repo-specific personal identifier checks should come from local untracked
   policy or environment configuration, not from tracked source.
 - The same guard is enforced in GitHub Actions for pushes and pull requests.
@@ -74,6 +77,15 @@ modules or functions rather than depending on helper file paths.
   `.local/emule-harness-seeds/canonical/` bundle without persisting the source paths.
 - `.\overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1`
   prints the first paired eMule harness and agent scenario contract.
+- `.\overlord-tooling.ps1 show-parity-matrix`
+  prints the KAD2 and ED2K parity inventory, including runnable cells,
+  campaigns, and planned harness-hook gaps.
+- `.\overlord-tooling.ps1 run-parity-cell -ScenarioId <id>`
+  runs one parity cell manifest and writes a wrapper run manifest plus summary
+  that points back at the delegated legacy scenario artifacts.
+- `.\overlord-tooling.ps1 run-parity-campaign -ScenarioId <id>`
+  runs a campaign by executing its member cells and aggregating their wrapper
+  summaries.
 - `.\overlord-tooling.ps1 run-kad-startup-hello-publish` materializes a
   scenario-owned eMule harness profile with a manifest-owned minimal
   `preferences.ini`, launches the eMule harness with an explicit profile-root
@@ -86,3 +98,6 @@ modules or functions rather than depending on helper file paths.
   deterministic binary from the eMule harness to the agent, restarts the agent,
   and verifies that a fresh eMule harness profile can download the same file
   back over the live server path.
+- `.\overlord-tooling.ps1 run-realnet-kad-search-download-parity`
+  drives the paired live Kad search and ED2K download parity scenario in
+  plaintext, obfuscated, or combined mode.

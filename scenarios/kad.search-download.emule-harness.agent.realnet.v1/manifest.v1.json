@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad.search-download.emule-harness.agent.realnet.v1",
+  "description": "Real-network harness versus agent Kad search parity with downstream native ED2K download evidence in plaintext and obfuscated modes.",
+  "scenarioKind": "legacy",
+  "protocol": "mixed",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "mixed",
+    "cellId": "legacy.search-download.realnet",
+    "availability": "available",
+    "expectedBranch": "kad-search->candidate-selection->ed2k-download",
+    "comparisonMode": "wire-layer+state-machine-layer+acceptance-layer"
+  },
+  "search": {
+    "query": "ubuntu linux"
+  },
+  "transportModes": [
+    "PlaintextOnly",
+    "ObfuscatedOnly"
+  ],
+  "artifacts": {
+    "runSummary": "run-summary.json",
+    "runManifest": "run-manifest.json"
+  }
+}

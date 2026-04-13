@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.server.triplet.validation.v1",
+  "description": "Focused private ED2K server triplet validation for multi-source, multi-file, and callback-request branches.",
+  "scenarioKind": "legacy",
+  "protocol": "ed2k",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "legacy.server.triplet.validation.private",
+    "availability": "available",
+    "expectedBranch": "server-source-search->callback-request-or-serving",
+    "comparisonMode": "state-machine-layer"
+  },
+  "cases": [
+    "multi-file",
+    "multi-source",
+    "callback-limit"
+  ],
+  "artifacts": {
+    "runSummary": "run-summary.json"
+  }
+}

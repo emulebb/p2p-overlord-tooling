@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.downloader.plaintext.direct.serving.fresh.private.v1",
+  "description": "ED2K downloader plaintext direct-serving private cell through the local server harness.",
+  "scenarioKind": "cell",
+  "protocol": "ed2k",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "downloader.plaintext.direct.serving.fresh.private",
+    "availability": "available",
+    "expectedBranch": "server-login->hello->request->serving",
+    "comparisonMode": "state-machine-layer",
+    "requiredArtifacts": [
+      "delegatedRunSummaryPath"
+    ],
+    "requiredHarnessHooks": [
+      "hello_branch_shape",
+      "part_frame_variants"
+    ],
+    "requiredAgentEvidence": [
+      "ed2k tcp dump",
+      "transfer manifest"
+    ]
+  },
+  "execution": {
+    "command": "run-private-emule-harness-ed2k-server-download",
+    "summarySourceScenarioId": "ed2k.server.emule-harness.agent.private.v1"
+  }
+}

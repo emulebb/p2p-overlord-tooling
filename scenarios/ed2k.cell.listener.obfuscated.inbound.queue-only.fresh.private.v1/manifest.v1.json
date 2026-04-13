@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.listener.obfuscated.inbound.queue-only.fresh.private.v1",
+  "description": "Planned ED2K listener obfuscated inbound queue-only private cell.",
+  "scenarioKind": "cell",
+  "protocol": "ed2k",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "listener.obfuscated.inbound.queue-only.fresh.private",
+    "availability": "planned",
+    "expectedBranch": "listener-queue-waiting.obfuscated",
+    "comparisonMode": "state-machine-layer",
+    "requiredHarnessHooks": [
+      "obfuscated_handshake",
+      "listener_queue_only",
+      "queue_rank_refresh"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "ed2k.listener.obfuscated.inbound.queue-only.fresh.private",
+      "hooks": [
+        "obfuscated_handshake",
+        "listener_queue_only",
+        "queue_rank_refresh"
+      ]
+    }
+  }
+}

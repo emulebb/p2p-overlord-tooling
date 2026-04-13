@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.listener.plaintext.inbound.serving.fresh.realnet.v1",
+  "description": "ED2K listener plaintext inbound-serving real-network cell from the roundtrip scenario.",
+  "scenarioKind": "cell",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "listener.plaintext.inbound.serving.fresh.realnet",
+    "availability": "available",
+    "expectedBranch": "listener-hello->accept-upload->serve",
+    "comparisonMode": "acceptance-layer",
+    "requiredArtifacts": [
+      "delegatedRunSummaryPath"
+    ],
+    "requiredAgentEvidence": [
+      "roundtrip transfer manifest"
+    ]
+  },
+  "execution": {
+    "command": "run-realnet-emule-harness-ed2k-server-roundtrip",
+    "summarySourceScenarioId": "ed2k.server.emule-harness.agent.roundtrip.realnet.v1"
+  }
+}

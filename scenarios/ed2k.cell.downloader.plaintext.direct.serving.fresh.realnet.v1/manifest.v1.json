@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.downloader.plaintext.direct.serving.fresh.realnet.v1",
+  "description": "ED2K downloader plaintext direct-serving real-network cell.",
+  "scenarioKind": "cell",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "downloader.plaintext.direct.serving.fresh.realnet",
+    "availability": "available",
+    "expectedBranch": "source-acquisition->hello->serving",
+    "comparisonMode": "acceptance-layer",
+    "requiredArtifacts": [
+      "delegatedRunSummaryPath"
+    ],
+    "requiredAgentEvidence": [
+      "source-search trace",
+      "transfer manifest"
+    ]
+  },
+  "execution": {
+    "command": "run-realnet-kad-search-download-parity",
+    "arguments": [
+      "-Query",
+      "ubuntu linux",
+      "-TransportModes",
+      "PlaintextOnly",
+      "-SuccessfulDownloadCount",
+      "1"
+    ],
+    "summarySourceScenarioId": "kad.search-download.emule-harness.agent.realnet.v1"
+  }
+}

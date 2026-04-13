@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.campaign.realnet-confidence.v1",
+  "description": "ED2K live-confidence campaign over the currently runnable real-network downloader and listener cells.",
+  "scenarioKind": "campaign",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k"
+  },
+  "campaign": {
+    "availability": "available",
+    "members": [
+      {
+        "scenarioId": "ed2k.cell.downloader.plaintext.direct.serving.fresh.realnet.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.downloader.obfuscated.direct.serving.fresh.realnet.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.listener.plaintext.inbound.serving.fresh.realnet.v1",
+        "required": true
+      }
+    ]
+  }
+}

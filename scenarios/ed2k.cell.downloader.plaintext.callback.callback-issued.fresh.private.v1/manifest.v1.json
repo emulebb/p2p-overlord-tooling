@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.downloader.plaintext.callback.callback-issued.fresh.private.v1",
+  "description": "ED2K downloader plaintext callback-issued private cell from the focused triplet validation.",
+  "scenarioKind": "cell",
+  "protocol": "ed2k",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "downloader.plaintext.callback.callback-issued.fresh.private",
+    "availability": "available",
+    "expectedBranch": "callback-request-issued",
+    "comparisonMode": "state-machine-layer",
+    "requiredArtifacts": [
+      "delegatedRunSummaryPath"
+    ],
+    "requiredHarnessHooks": [
+      "callback_request_shape"
+    ],
+    "requiredAgentEvidence": [
+      "callback counters"
+    ]
+  },
+  "execution": {
+    "command": "validate-ed2k-server-triplet",
+    "summarySourceScenarioId": "ed2k.server.triplet.validation.v1"
+  }
+}

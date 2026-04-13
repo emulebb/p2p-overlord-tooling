@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.notes.search.private.v1",
+  "description": "Planned KAD2 private notes-search cell with deterministic harness reply shaping.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "notes.search.private",
+    "availability": "planned",
+    "expectedBranch": "notes-search",
+    "comparisonMode": "state-machine-layer",
+    "requiredHarnessHooks": [
+      "notes_search_reply_shape",
+      "timeout_and_retry"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "kad2.notes.search.private",
+      "hooks": [
+        "notes_search_reply_shape",
+        "timeout_and_retry"
+      ]
+    }
+  }
+}

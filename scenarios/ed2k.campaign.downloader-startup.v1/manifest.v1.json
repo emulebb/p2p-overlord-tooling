@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.campaign.downloader-startup.v1",
+  "description": "ED2K downloader-startup campaign over private direct-serving and live transport cells.",
+  "scenarioKind": "campaign",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k"
+  },
+  "campaign": {
+    "availability": "available",
+    "members": [
+      {
+        "scenarioId": "ed2k.cell.downloader.plaintext.direct.serving.fresh.private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.downloader.plaintext.direct.serving.fresh.kad-private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.downloader.plaintext.direct.serving.fresh.realnet.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.downloader.obfuscated.direct.serving.fresh.realnet.v1",
+        "required": true
+      }
+    ]
+  }
+}

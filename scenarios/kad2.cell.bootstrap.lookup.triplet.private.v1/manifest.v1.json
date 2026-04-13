@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.bootstrap.lookup.triplet.private.v1",
+  "description": "KAD2 private bootstrap and iterative lookup cell using the local harness triplet.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "bootstrap.lookup.triplet.private",
+    "availability": "available",
+    "expectedBranch": "bootstrap->lookup",
+    "comparisonMode": "state-machine-layer",
+    "requiredArtifacts": [
+      "summaryPath"
+    ],
+    "requiredHarnessHooks": [
+      "bootstrap_reply_shape",
+      "lookup_progress_markers"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "kad2.bootstrap.lookup.triplet.private",
+      "hooks": [
+        "bootstrap_reply_shape",
+        "lookup_progress_markers"
+      ]
+    }
+  },
+  "execution": {
+    "command": "run-private-harness-kad-triplet",
+    "summarySourceScenarioId": "kad.harness.triplet.local.v1"
+  }
+}

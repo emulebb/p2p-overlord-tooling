@@ -1,6 +1,17 @@
 {
+  "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "kad.harness.triplet.local.v1",
   "description": "Local loopback-only Kad cluster with three eMule harness peers and one agent, validating publish plus keyword search on ubuntu linux.",
+  "scenarioKind": "legacy",
+  "protocol": "kad2",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "legacy.triplet.private",
+    "availability": "available",
+    "expectedBranch": "bootstrap->publish->keyword-search",
+    "comparisonMode": "state-machine-layer"
+  },
   "coordinator": {
     "url": "http://127.0.0.1:13300"
   },

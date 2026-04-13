@@ -97,6 +97,7 @@ if (-not [string]::IsNullOrWhiteSpace($SeedFilePath) -and -not (Test-Path -Liter
 
 $profile = [System.IO.Path]::GetFullPath($ProfileRoot)
 $readyFile = Join-Path $profile "harness.ready"
+$parityHookConfigPath = Join-Path $profile "parity-hooks.v1.json"
 $logsRoot = Join-Path $profile "logs"
 $traceLogPath = Join-Path $logsRoot "emule-harness-kad-trace.log"
 $verboseLogPath = Join-Path $logsRoot "eMule_Verbose.log"
@@ -150,6 +151,9 @@ if (-not [string]::IsNullOrWhiteSpace($SearchResultsPath)) {
 if (-not [string]::IsNullOrWhiteSpace($SearchDownloadHashPath)) {
     $emuleHarnessArgs += ('-searchdownloadhashfile="{0}"' -f $SearchDownloadHashPath)
 }
+if (Test-Path -LiteralPath $parityHookConfigPath -PathType Leaf) {
+    $emuleHarnessArgs += ('-hookconfigfile="{0}"' -f $parityHookConfigPath)
+}
 
 $emuleHarnessProcess = Start-Process `
     -FilePath $emuleHarnessExePath `
@@ -192,6 +196,8 @@ $metadata = [pscustomobject]@{
     EmuleHarnessExePath = $emuleHarnessExePath
     EmuleHarnessProfileRoot = $profile
     EmuleHarnessReadyState = $readyState
+    ParityHookConfigPath = if (Test-Path -LiteralPath $parityHookConfigPath -PathType Leaf) { $parityHookConfigPath } else { $null }
+    ParityHookEventLogPath = $readyState.ParityHookEventsFile
     SeedFilePath = $SeedFilePath
     ExportLinkPath = $ExportLinkPath
     DownloadLinkPath = $DownloadLinkPath

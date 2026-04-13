@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.keyword.search.triplet.private.v1",
+  "description": "KAD2 private keyword-search cell using the loopback harness triplet and canonical ubuntu linux query.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "keyword.search.triplet.private",
+    "availability": "available",
+    "expectedBranch": "keyword-search",
+    "comparisonMode": "state-machine-layer",
+    "requiredArtifacts": [
+      "summaryPath"
+    ],
+    "requiredHarnessHooks": [
+      "search_reply_shape",
+      "search_result_progress"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "kad2.keyword.search.triplet.private",
+      "hooks": [
+        "search_reply_shape",
+        "search_result_progress"
+      ]
+    }
+  },
+  "execution": {
+    "command": "run-private-harness-kad-triplet",
+    "summarySourceScenarioId": "kad.harness.triplet.local.v1"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.campaign.listener-serving.v1",
+  "description": "ED2K listener-serving campaign over the currently available real-network roundtrip listener cell.",
+  "scenarioKind": "campaign",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k"
+  },
+  "campaign": {
+    "availability": "available",
+    "members": [
+      {
+        "scenarioId": "ed2k.cell.listener.plaintext.inbound.serving.fresh.realnet.v1",
+        "required": true
+      }
+    ]
+  }
+}

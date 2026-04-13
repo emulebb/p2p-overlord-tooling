@@ -2,6 +2,16 @@
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "kad.startup.hello.publish.realnet.v1",
   "description": "Paired eMule harness and agent real-network Kad startup, HELLO, and manual publish validation run.",
+  "scenarioKind": "legacy",
+  "protocol": "kad2",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "legacy.startup.hello.publish.realnet",
+    "availability": "available",
+    "expectedBranch": "bootstrap->hello->publish",
+    "comparisonMode": "wire-layer+acceptance-layer"
+  },
   "requiredMilestoneIds": [
     "seed-bundle-ready",
     "emule-harness-profile-materialized",

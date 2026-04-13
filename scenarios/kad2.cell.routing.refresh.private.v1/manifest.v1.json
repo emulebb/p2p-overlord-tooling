@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.routing.refresh.private.v1",
+  "description": "Planned KAD2 private routing-refresh cell covering split-sensitive lookup and delayed contact refresh.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "routing.refresh.private",
+    "availability": "planned",
+    "expectedBranch": "routing-refresh",
+    "comparisonMode": "state-machine-layer",
+    "requiredHarnessHooks": [
+      "contact_ordering",
+      "delayed_response"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "kad2.routing.refresh.private",
+      "hooks": [
+        "contact_ordering",
+        "delayed_response"
+      ]
+    }
+  }
+}

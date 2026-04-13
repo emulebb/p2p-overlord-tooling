@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.downloader.obfuscated.callback.callback-issued.fresh.private.v1",
+  "description": "Planned ED2K downloader obfuscated callback-issued private cell.",
+  "scenarioKind": "cell",
+  "protocol": "ed2k",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "downloader.obfuscated.callback.callback-issued.fresh.private",
+    "availability": "planned",
+    "expectedBranch": "callback-request-issued.obfuscated",
+    "comparisonMode": "state-machine-layer",
+    "requiredHarnessHooks": [
+      "callback_request_shape",
+      "obfuscated_callback_connect"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "ed2k.downloader.obfuscated.callback.callback-issued.fresh.private",
+      "hooks": [
+        "callback_request_shape",
+        "obfuscated_callback_connect"
+      ]
+    }
+  }
+}

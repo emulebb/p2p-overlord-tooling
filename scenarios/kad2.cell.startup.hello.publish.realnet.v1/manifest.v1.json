@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.startup.hello.publish.realnet.v1",
+  "description": "KAD2 real-network startup, HELLO, and publish parity cell against the tracing harness.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "startup.hello.publish.realnet",
+    "availability": "available",
+    "expectedBranch": "bootstrap->hello->publish",
+    "comparisonMode": "wire-layer+acceptance-layer",
+    "requiredArtifacts": [
+      "agentPacketDumpPath",
+      "emuleHarnessPacketDumpPath",
+      "udpParityPath"
+    ],
+    "requiredAgentEvidence": [
+      "publish-log",
+      "stats"
+    ]
+  },
+  "execution": {
+    "command": "run-kad-startup-hello-publish",
+    "summarySourceScenarioId": "kad.startup.hello.publish.realnet.v1"
+  }
+}
