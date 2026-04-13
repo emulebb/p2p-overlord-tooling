@@ -12,7 +12,7 @@
     "availability": "available",
     "members": [
       {
-        "scenarioId": "kad2.cell.startup.hello.publish.realnet.v1",
+        "scenarioId": "kad2.cell.hello.senderkey.ack.triplet.private.v1",
         "required": true
       },
       {

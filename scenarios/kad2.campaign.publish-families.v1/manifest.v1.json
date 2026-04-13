@@ -1,7 +1,7 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "kad2.campaign.publish-families.v1",
-  "description": "KAD2 publish campaign over the currently available startup, keyword-publish, and source-publish cells.",
+  "description": "KAD2 publish campaign over the currently available deterministic private keyword-publish and source-publish cells.",
   "scenarioKind": "campaign",
   "protocol": "kad2",
   "tier": "broad-private",
@@ -11,10 +11,6 @@
   "campaign": {
     "availability": "available",
     "members": [
-      {
-        "scenarioId": "kad2.cell.startup.hello.publish.realnet.v1",
-        "required": true
-      },
       {
         "scenarioId": "kad2.cell.keyword.publish.triplet.private.v1",
         "required": true

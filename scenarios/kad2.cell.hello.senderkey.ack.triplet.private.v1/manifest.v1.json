@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.cell.hello.senderkey.ack.triplet.private.v1",
+  "description": "KAD2 private HELLO/HELLO_RES/HELLO_RES_ACK cell validating sender-key-carrying hello branches in the local harness triplet.",
+  "scenarioKind": "cell",
+  "protocol": "kad2",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "kad2",
+    "cellId": "hello.senderkey.ack.triplet.private",
+    "availability": "available",
+    "expectedBranch": "bootstrap->hello->hello_res->hello_res_ack",
+    "comparisonMode": "state-machine-layer",
+    "requiredArtifacts": [
+      "summaryPath"
+    ],
+    "requiredHarnessHooks": [
+      "hello_branch_shape",
+      "key_registration_markers"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "kad2.hello.senderkey.ack.triplet.private",
+      "hooks": [
+        "hello_branch_shape",
+        "key_registration_markers"
+      ]
+    }
+  },
+  "execution": {
+    "command": "run-private-harness-kad-triplet",
+    "summarySourceScenarioId": "kad.harness.triplet.local.v1"
+  }
+}

@@ -37,7 +37,7 @@ function ConvertTo-ToolingScriptInvocationArgs {
     for ($index = 0; $index -lt $Tokens.Count; $index++) {
         $token = [string]$Tokens[$index]
         if ($token.StartsWith("-")) {
-            $parameterName = $token.TrimStart("-")
+            $parameterName = $token.TrimStart("-").TrimEnd(":")
             $nextIsValue = $index + 1 -lt $Tokens.Count -and -not ([string]$Tokens[$index + 1]).StartsWith("-")
             if ($nextIsValue) {
                 $named[$parameterName] = $Tokens[$index + 1]
@@ -158,6 +158,9 @@ function Invoke-ToolingParityCell {
     }
 
     $status = if ($delegatedRun) { Get-ScenarioSummaryStatus -RunSummary $delegatedRun.RunSummary } else { "failed" }
+    $requiredArtifacts = if ($manifest.parity.ContainsKey("requiredArtifacts")) { @($manifest.parity.requiredArtifacts) } else { @() }
+    $requiredHarnessHooks = if ($manifest.parity.ContainsKey("requiredHarnessHooks")) { @($manifest.parity.requiredHarnessHooks) } else { @() }
+    $requiredAgentEvidence = if ($manifest.parity.ContainsKey("requiredAgentEvidence")) { @($manifest.parity.requiredAgentEvidence) } else { @() }
     $summary = [ordered]@{
         schemaVersion = "run-summary/v1"
         scenarioId = $ScenarioId
@@ -170,9 +173,9 @@ function Invoke-ToolingParityCell {
             cellId = $manifest.parity.cellId
             expectedBranch = $manifest.parity.expectedBranch
             comparisonMode = $manifest.parity.comparisonMode
-            requiredArtifacts = @($manifest.parity.requiredArtifacts)
-            requiredHarnessHooks = @($manifest.parity.requiredHarnessHooks)
-            requiredAgentEvidence = @($manifest.parity.requiredAgentEvidence)
+            requiredArtifacts = $requiredArtifacts
+            requiredHarnessHooks = $requiredHarnessHooks
+            requiredAgentEvidence = $requiredAgentEvidence
         }
         delegated = [ordered]@{
             command = $commandName
@@ -190,6 +193,7 @@ function Invoke-ToolingParityCell {
         finishedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     }
     if ($delegatedRun) { $summary.delegatedSummary = $delegatedRun.RunSummary }
+    if ($delegatedRun -and $delegatedRun.RunSummary.ContainsKey("firstDivergence")) { $summary.firstDivergence = $delegatedRun.RunSummary.firstDivergence }
     if (-not [string]::IsNullOrWhiteSpace($failureMessage)) { $summary.error = $failureMessage }
     Write-JsonFile -Path $artifacts.RunSummaryPath -Value $summary
     [pscustomobject]@{ Manifest = $manifest; RunSummary = $summary; RunSummaryPath = $artifacts.RunSummaryPath }
@@ -216,6 +220,12 @@ function Invoke-ToolingParityCampaign {
         $memberNote = if ($member.ContainsKey("note")) { $member.note } else { $null }
         try {
             $memberResult = Invoke-ToolingParityCell -RepoRoot $RepoRoot -ScenarioId $memberScenarioId
+            $memberError = if ($memberResult.RunSummary.PSObject.Properties.Name -contains "error") {
+                $memberResult.RunSummary.error
+            }
+            else {
+                $null
+            }
             [ordered]@{
                 scenarioId = $memberScenarioId
                 required = $memberRequired
@@ -223,7 +233,7 @@ function Invoke-ToolingParityCampaign {
                 status = $memberResult.RunSummary.status
                 runId = $memberResult.RunSummary.runId
                 summaryPath = $memberResult.RunSummary.artifactPaths.summaryPath
-                error = $memberResult.RunSummary.error
+                error = $memberError
             }
         }
         catch {

@@ -66,7 +66,7 @@ if (Test-Path $builtPdbPath) {
 
 [pscustomobject]@{
     BuildScriptPath = $workspaceScriptPath
-    AppVariant = 'tracing-harness'
+    BuildCommand = 'build-app'
     BuiltExePath    = $builtExePath
     RuntimeExePath  = $runtimeExePath
     RuntimePdbPath  = if (Test-Path $runtimePdbPath) { $runtimePdbPath } else { $null }

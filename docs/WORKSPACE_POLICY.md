@@ -77,9 +77,10 @@ rules, quality gates, or deltas that are not shared across the workspace.
   from `%EMULE_WORKSPACE_ROOT%`:
   - `%EMULE_WORKSPACE_ROOT%\repos\eMule-build\workspace.ps1 build-app`
   - `-EmuleWorkspaceRoot %EMULE_WORKSPACE_ROOT%`
-  - `-AppVariant tracing-harness`
   - `-Config Debug`
   - `-Platform x64`
+- `build-app` builds the workspace app set; harness tooling then consumes the
+  `tracing-harness` output from the canonical workspace path.
 - Do not present direct raw output directories as the supported primary build
   flow.
 - Before launching the harness on the real network, ensure the active profile

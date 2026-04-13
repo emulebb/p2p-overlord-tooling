@@ -183,7 +183,8 @@ function Start-AgentPrivateEd2kSession {
         [UInt64]$ServerSessionRotationSeconds = 45,
         [string]$ProbeSearchTerm = "ubuntu linux",
         [int]$LaunchTimeoutSeconds = 300,
-        [switch]$EnableObfuscation
+        [switch]$EnableObfuscation,
+        [switch]$EnableKadNotesPublish
     )
 
     Invoke-ToolingScript -ScriptPath (Resolve-AgentSubsystemPath -Name "StartPrivateEd2kSession") -NamedArguments $PSBoundParameters

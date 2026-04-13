@@ -1,16 +1,19 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "kad2.cell.source.search.private.v1",
-  "description": "Planned KAD2 private source-search cell with deterministic harness reply shaping.",
+  "description": "KAD2 private source-search cell with deterministic harness reply shaping against the loopback harness triplet.",
   "scenarioKind": "cell",
   "protocol": "kad2",
   "tier": "broad-private",
   "parity": {
     "matrixId": "kad2",
     "cellId": "source.search.private",
-    "availability": "planned",
+    "availability": "available",
     "expectedBranch": "source-search",
     "comparisonMode": "state-machine-layer",
+    "requiredArtifacts": [
+      "summaryPath"
+    ],
     "requiredHarnessHooks": [
       "source_search_reply_shape",
       "timeout_and_retry"
@@ -22,5 +25,13 @@
         "timeout_and_retry"
       ]
     }
+  },
+  "execution": {
+    "command": "run-private-harness-kad-triplet",
+    "arguments": [
+      "-ScenarioManifestPath",
+      "p2p-overlord-tooling\\scenarios\\kad.harness.triplet.local.source-search.v1\\manifest.v1.json"
+    ],
+    "summarySourceScenarioId": "kad.harness.triplet.local.source-search.v1"
   }
 }

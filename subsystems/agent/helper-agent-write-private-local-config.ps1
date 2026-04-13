@@ -31,7 +31,8 @@ param(
     [UInt64]$ServerReconnectIntervalSeconds = 5,
     [UInt64]$ServerSessionRotationSeconds = 45,
     [string]$ProbeSearchTerm = "ubuntu linux",
-    [switch]$EnableObfuscation
+    [switch]$EnableObfuscation,
+    [switch]$EnableKadNotesPublish
 )
 
 Set-StrictMode -Version Latest
@@ -57,6 +58,7 @@ if (Test-Path -LiteralPath $configPath) {
 }
 
 $obfuscationEnabled = if ($EnableObfuscation) { "true" } else { "false" }
+$seedNotesPublishEnabled = if ($EnableKadNotesPublish) { "true" } else { "false" }
 $bootstrapNodesValue = if ($DisableKad -or [string]::IsNullOrWhiteSpace($EmuleHarnessBootstrapNode)) {
     "[]"
 } else {
@@ -123,7 +125,7 @@ search_phase2_fanout = 50
 keyword_result_cap = 5000
 source_result_cap = 1000
 notes_result_cap = 1000
-seed_notes_publish_enabled = false
+seed_notes_publish_enabled = $seedNotesPublishEnabled
 obfuscation_enabled = $obfuscationEnabled
 enable_mock_results = false
 

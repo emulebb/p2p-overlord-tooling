@@ -147,9 +147,144 @@ function Parse-Ed2kLinkFile {
 
     [pscustomobject]@{
         Link = $link
-        FileName = $matches.Name
+        FileName = [System.Uri]::UnescapeDataString($matches.Name)
         FileSize = [UInt64]$matches.Size
         FileHash = $matches.Hash.ToLowerInvariant()
+    }
+}
+
+function Resolve-ScenarioSearchTargetRecord {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Manifest,
+        [pscustomobject[]]$HarnessLinkRecords = @()
+    )
+
+    $targetRefProperty = $Manifest.search.PSObject.Properties["targetRef"]
+    $targetRef = if ($null -ne $targetRefProperty -and -not [string]::IsNullOrWhiteSpace([string]$targetRefProperty.Value)) {
+        [string]$targetRefProperty.Value
+    }
+    else {
+        "manualPublish"
+    }
+
+    if ($targetRef -eq "manualPublish") {
+        return [pscustomobject]@{
+            TargetRef = $targetRef
+            FileHash = [string]$Manifest.agent.manualPublish.hash
+            FileSize = [UInt64]$Manifest.agent.manualPublish.size
+            FileName = [string]$Manifest.agent.manualPublish.canonicalName
+        }
+    }
+
+    $harnessRecord = @($HarnessLinkRecords | Where-Object { [string]$_.HarnessId -eq $targetRef } | Select-Object -First 1)[0]
+    if ($null -eq $harnessRecord) {
+        throw "Search targetRef '$targetRef' did not match any harness link record"
+    }
+
+    [pscustomobject]@{
+        TargetRef = $targetRef
+        FileHash = [string]$harnessRecord.FileHash
+        FileSize = [UInt64]$harnessRecord.FileSize
+        FileName = [string]$harnessRecord.FileName
+    }
+}
+
+function Resolve-ScenarioSearchDefinition {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Manifest,
+        [pscustomobject[]]$HarnessLinkRecords = @()
+    )
+
+    $searchKindProperty = $Manifest.search.PSObject.Properties["kind"]
+    $searchKind = if ($null -ne $searchKindProperty -and -not [string]::IsNullOrWhiteSpace([string]$searchKindProperty.Value)) {
+        [string]$searchKindProperty.Value
+    }
+    else {
+        "keyword"
+    }
+
+    $requiredFileNamesProperty = $Manifest.search.PSObject.Properties["requiredFileNames"]
+    [string[]]$requiredFileNames = if ($null -ne $requiredFileNamesProperty -and $null -ne $requiredFileNamesProperty.Value) {
+        @($requiredFileNamesProperty.Value | ForEach-Object { [string]$_ })
+    }
+    else {
+        @()
+    }
+
+    switch ($searchKind) {
+        "keyword" {
+            $query = [string]$Manifest.search.query
+            if ([string]::IsNullOrWhiteSpace($query)) {
+                throw "Scenario search.query is required for keyword searches"
+            }
+            if (@($requiredFileNames).Count -eq 0) {
+                $requiredFileNames = @($HarnessLinkRecords | ForEach-Object { [string]$_.FileName })
+            }
+            return [pscustomobject]@{
+                Kind = $searchKind
+                Query = $query
+                FileHash = $null
+                FileSize = $null
+                TargetRef = $null
+                RequiredFileNames = $requiredFileNames
+                Payload = [ordered]@{
+                    protocol = "kad2"
+                    kind = "keyword"
+                    query = $query
+                }
+            }
+        }
+        "source" {
+            $targetRecord = Resolve-ScenarioSearchTargetRecord -Manifest $Manifest -HarnessLinkRecords $HarnessLinkRecords
+            if (@($requiredFileNames).Count -eq 0) {
+                $requiredFileNames = @([string]$targetRecord.FileName)
+            }
+            return [pscustomobject]@{
+                Kind = $searchKind
+                Query = $null
+                FileHash = [string]$targetRecord.FileHash
+                FileSize = [UInt64]$targetRecord.FileSize
+                TargetRef = [string]$targetRecord.TargetRef
+                RequiredFileNames = $requiredFileNames
+                Payload = [ordered]@{
+                    protocol = "kad2"
+                    kind = "source"
+                    file_hash = [ordered]@{
+                        kind = "ed2k"
+                        value = [string]$targetRecord.FileHash
+                    }
+                    file_size = [UInt64]$targetRecord.FileSize
+                }
+            }
+        }
+        "notes" {
+            $targetRecord = Resolve-ScenarioSearchTargetRecord -Manifest $Manifest -HarnessLinkRecords $HarnessLinkRecords
+            if (@($requiredFileNames).Count -eq 0) {
+                $requiredFileNames = @([string]$targetRecord.FileName)
+            }
+            return [pscustomobject]@{
+                Kind = $searchKind
+                Query = $null
+                FileHash = [string]$targetRecord.FileHash
+                FileSize = [UInt64]$targetRecord.FileSize
+                TargetRef = [string]$targetRecord.TargetRef
+                RequiredFileNames = $requiredFileNames
+                Payload = [ordered]@{
+                    protocol = "kad2"
+                    kind = "notes"
+                    file_hash = [ordered]@{
+                        kind = "ed2k"
+                        value = [string]$targetRecord.FileHash
+                    }
+                    file_size = [UInt64]$targetRecord.FileSize
+                }
+            }
+        }
+        default {
+            throw "Unsupported scenario search.kind '$searchKind'"
+        }
     }
 }
 
@@ -247,12 +382,160 @@ function Wait-HarnessContactReady {
                     MatchedLine = $match.Line
                 }
             }
+
+            $loopbackFallback = Get-HarnessLoopbackBootstrapReadyEvidence -HarnessSession $HarnessSession
+            if ($null -ne $loopbackFallback) {
+                return [pscustomobject]@{
+                    Ready = $true
+                    MatchedLine = $loopbackFallback.MatchedLine
+                }
+            }
         }
 
         Start-Sleep -Seconds 2
     }
 
+    $failure = Get-HarnessKadFailureFingerprint -HarnessSession $HarnessSession
+    if ($null -ne $failure) {
+        throw ("Harness session {0} did not validate any Kad contact within {1} seconds; first divergence={2}; stage={3}; evidence={4}" -f `
+            $HarnessSession.EmuleHarnessProfileRoot, `
+            $TimeoutSeconds, `
+            $failure.code, `
+            $failure.stage, `
+            $failure.evidenceLine)
+    }
+
     throw "Harness session $($HarnessSession.EmuleHarnessProfileRoot) did not validate any Kad contact within $TimeoutSeconds seconds"
+}
+
+function Get-HarnessLoopbackBootstrapReadyEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$HarnessSession
+    )
+
+    if (-not (Test-Path -LiteralPath $HarnessSession.VerboseLogPath)) {
+        return $null
+    }
+
+    $verboseLines = @(Get-Content -LiteralPath $HarnessSession.VerboseLogPath)
+    $portLine = $verboseLines |
+        Where-Object { $_ -match 'Received possible external Kad Port ' } |
+        Select-Object -Last 1
+    if ([string]::IsNullOrWhiteSpace($portLine)) {
+        return $null
+    }
+
+    $bootstrapLine = $verboseLines |
+        Where-Object { $_ -match 'Inc Kad2 Bootstrap Packet from ' } |
+        Select-Object -Last 1
+    if (-not [string]::IsNullOrWhiteSpace($bootstrapLine)) {
+        return [pscustomobject]@{
+            MatchedLine = $bootstrapLine
+        }
+    }
+
+    $suppressedAckLine = $verboseLines |
+        Where-Object { $_ -match 'Parity harness loopback suppressed HELLO_RES ACK request' } |
+        Select-Object -Last 1
+    if (-not [string]::IsNullOrWhiteSpace($suppressedAckLine)) {
+        return [pscustomobject]@{
+            MatchedLine = $suppressedAckLine
+        }
+    }
+
+    $null
+}
+
+function Get-HarnessKadFailureFingerprint {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$HarnessSession
+    )
+
+    if (-not (Test-Path -LiteralPath $HarnessSession.VerboseLogPath)) {
+        return $null
+    }
+
+    $verboseLines = @(Get-Content -LiteralPath $HarnessSession.VerboseLogPath)
+    $senderKeyLine = $verboseLines |
+        Where-Object { $_ -match "Process_KADEMLIA2_HELLO_RES: Remote clients demands ACK, but didn't send any Senderkey!" } |
+        Select-Object -Last 1
+    if (-not [string]::IsNullOrWhiteSpace($senderKeyLine)) {
+        return [ordered]@{
+            code = "hello_res_ack_missing_senderkey"
+            stage = "hello_res"
+            evidenceLine = $senderKeyLine
+        }
+    }
+
+    $bootstrapPacketLine = $verboseLines |
+        Where-Object { $_ -match 'Inc Kad2 Bootstrap Packet from ' } |
+        Select-Object -Last 1
+    if (-not [string]::IsNullOrWhiteSpace($bootstrapPacketLine)) {
+        return [ordered]@{
+            code = "bootstrap_seen_without_contact_validation"
+            stage = "bootstrap"
+            evidenceLine = $bootstrapPacketLine
+        }
+    }
+
+    $kadStartLine = $verboseLines |
+        Where-Object { $_ -match 'Starting Kademlia' } |
+        Select-Object -Last 1
+    if (-not [string]::IsNullOrWhiteSpace($kadStartLine)) {
+        return [ordered]@{
+            code = "kad_started_without_contact_validation"
+            stage = "startup"
+            evidenceLine = $kadStartLine
+        }
+    }
+
+    $null
+}
+
+function Get-HarnessKadObservations {
+    param(
+        [pscustomobject[]]$HarnessSessions = @()
+    )
+
+    @(
+        foreach ($session in @($HarnessSessions)) {
+            $fingerprint = Get-HarnessKadFailureFingerprint -HarnessSession $session
+            [ordered]@{
+                sessionDir = $session.SessionDir
+                profileRoot = $session.EmuleHarnessProfileRoot
+                firstDivergence = $fingerprint
+            }
+        }
+    )
+}
+
+function Select-ScenarioFirstDivergence {
+    param(
+        [object[]]$HarnessKadObservations = @()
+    )
+
+    foreach ($code in @(
+        "hello_res_ack_missing_senderkey",
+        "bootstrap_seen_without_contact_validation",
+        "kad_started_without_contact_validation"
+    )) {
+        $match = $HarnessKadObservations |
+            Where-Object { $null -ne $_.firstDivergence -and [string]$_.firstDivergence.code -eq $code } |
+            Select-Object -First 1
+        if ($null -ne $match) {
+            return [ordered]@{
+                code = [string]$match.firstDivergence.code
+                stage = [string]$match.firstDivergence.stage
+                evidenceLine = [string]$match.firstDivergence.evidenceLine
+                sessionDir = [string]$match.sessionDir
+                profileRoot = [string]$match.profileRoot
+            }
+        }
+    }
+
+    $null
 }
 
 function Invoke-AgentManualPublishWhenReady {
@@ -359,25 +642,67 @@ function Wait-AgentManualPublish {
     throw "Agent manual Kad publish did not become observable at $StatsUrl within $TimeoutSeconds seconds"
 }
 
-function Invoke-CoordinatorKeywordSearch {
+function Invoke-CoordinatorSearchJob {
     param(
         [Parameter(Mandatory = $true)]
         [string]$CoordinatorUrl,
         [Parameter(Mandatory = $true)]
-        [string]$Query
+        [object]$SearchPayload
     )
 
-    $payload = [pscustomobject]@{
-        protocol = "kad2"
-        kind = "keyword"
-        query = $Query
-    }
-
-    Invoke-RestMethod `
+    $response = Invoke-WebRequest `
         -Method Post `
         -Uri ("{0}/api/search" -f $CoordinatorUrl.TrimEnd("/")) `
         -ContentType "application/json" `
-        -Body ($payload | ConvertTo-Json -Depth 5)
+        -Body ($SearchPayload | ConvertTo-Json -Depth 8) `
+        -TimeoutSec 30 `
+        -SkipHttpErrorCheck
+
+    $responseBodyText = [string]$response.Content
+    $responseBody = $null
+    if (-not [string]::IsNullOrWhiteSpace($responseBodyText)) {
+        try {
+            $responseBody = $responseBodyText | ConvertFrom-Json
+        }
+        catch {
+        }
+    }
+
+    if ([int]$response.StatusCode -ge 400) {
+        $errorMessage = if ($null -ne $responseBody -and $null -ne $responseBody.error -and -not [string]::IsNullOrWhiteSpace([string]$responseBody.error)) {
+            [string]$responseBody.error
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($responseBodyText)) {
+            $responseBodyText.Trim()
+        }
+        else {
+            "unexpected empty error response"
+        }
+
+        throw "Coordinator search creation failed with HTTP $($response.StatusCode): $errorMessage"
+    }
+
+    if ($null -ne $responseBody) {
+        return $responseBody
+    }
+
+    throw "Coordinator search creation returned HTTP $($response.StatusCode) without a JSON body"
+}
+
+function Test-TransientCoordinatorSearchCreationFailure {
+    param(
+        [string]$Message
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Message)) {
+        return $false
+    }
+
+    return (
+        $Message -match 'Coordinator search creation failed with HTTP 503:' -or
+        $Message -match "Can't reach database server at 127\.0\.0\.1:5432" -or
+        $Message -match 'no ready kad2 agents'
+    )
 }
 
 function Get-CoordinatorSearchJob {
@@ -415,10 +740,32 @@ function Test-SearchContainsRequiredFiles {
         [pscustomobject]$SearchJob,
         [Parameter(Mandatory = $true)]
         [string[]]$RequiredFileNames,
-        [int]$ExpectedMinimumResults = 0
+        [int]$ExpectedMinimumResults = 0,
+        [string]$SearchKind = "keyword",
+        [string]$ExpectedFileHash,
+        [UInt64]$ExpectedFileSize = 0
     )
 
     if ([int]$SearchJob.result_count -lt $ExpectedMinimumResults) {
+        return $false
+    }
+
+    if ($SearchKind -in @("source", "notes") -and -not [string]::IsNullOrWhiteSpace($ExpectedFileHash)) {
+        foreach ($record in @($SearchJob.results)) {
+            $recordMatchesHash = @($record.hashes) | Where-Object {
+                [string]$_.kind -eq "ed2k" -and [string]$_.value -eq $ExpectedFileHash
+            } | Select-Object -First 1
+            if ($null -eq $recordMatchesHash) {
+                continue
+            }
+
+            if ($ExpectedFileSize -gt 0 -and [UInt64]$record.size -ne $ExpectedFileSize) {
+                continue
+            }
+
+            return $true
+        }
+
         return $false
     }
 
@@ -442,6 +789,9 @@ function Wait-CoordinatorSearchResultSet {
         [string[]]$RequiredFileNames,
         [Parameter(Mandatory = $true)]
         [int]$ExpectedMinimumResults,
+        [string]$SearchKind = "keyword",
+        [string]$ExpectedFileHash,
+        [UInt64]$ExpectedFileSize = 0,
         [int]$TimeoutSeconds = 180
     )
 
@@ -453,7 +803,10 @@ function Wait-CoordinatorSearchResultSet {
             Test-SearchContainsRequiredFiles `
                 -SearchJob $lastJob `
                 -RequiredFileNames $RequiredFileNames `
-                -ExpectedMinimumResults $ExpectedMinimumResults
+                -ExpectedMinimumResults $ExpectedMinimumResults `
+                -SearchKind $SearchKind `
+                -ExpectedFileHash $ExpectedFileHash `
+                -ExpectedFileSize $ExpectedFileSize
         ) {
             return $lastJob
         }
@@ -491,6 +844,8 @@ $agentBootstrapReadyContacts = if ($null -ne $manifest.agent.bootstrapReadyConta
 else {
     10
 }
+$seedNotesPublishEnabledProperty = $manifest.agent.PSObject.Properties["seedNotesPublishEnabled"]
+$seedNotesPublishEnabled = $null -ne $seedNotesPublishEnabledProperty -and [bool]$seedNotesPublishEnabledProperty.Value
 
 if (-not $env:OVERLORD_TMP_DIR) {
     throw "OVERLORD_TMP_DIR is not set"
@@ -552,6 +907,7 @@ $harnessSessions = @()
 $harnessPublishSummaries = @()
 $harnessContactSummaries = @()
 $harnessLinkRecords = @()
+$harnessKadObservations = @()
 $agentSession = $null
 $agentStats = $null
 $searchAttempts = @()
@@ -565,7 +921,7 @@ $runManifest = [ordered]@{
     startedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     artifactRoot = $artifactRoot
     coordinatorUrl = $manifest.coordinator.url
-    searchQuery = $manifest.search.query
+    searchRequest = $manifest.search
     harnessCount = @($manifest.harnesses).Count
 }
 $runManifest | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8NoBOM $runManifestPath
@@ -621,7 +977,14 @@ try {
         $harnessProfiles += $profile
         $harnessSessions += $session
         Wait-Path -Path $linkPath -TimeoutSeconds 60
-        $harnessLinkRecords += (Parse-Ed2kLinkFile -Path $linkPath)
+        $parsedLinkRecord = Parse-Ed2kLinkFile -Path $linkPath
+        $harnessLinkRecords += [pscustomobject]@{
+            HarnessId = [string]$harness.id
+            Link = [string]$parsedLinkRecord.Link
+            FileName = [string]$parsedLinkRecord.FileName
+            FileSize = [UInt64]$parsedLinkRecord.FileSize
+            FileHash = [string]$parsedLinkRecord.FileHash
+        }
     }
 
     foreach ($session in @($harnessSessions)) {
@@ -640,7 +1003,8 @@ try {
         -KadPort ([UInt16]$manifest.agent.kadPort) `
         -Ed2kPort ([UInt16]$manifest.agent.ed2kPort) `
         -P2pBindIp $manifest.agent.p2pBindIp `
-        -KadBootstrapReadyContacts ([UInt32]$agentBootstrapReadyContacts)
+        -KadBootstrapReadyContacts ([UInt32]$agentBootstrapReadyContacts) `
+        -EnableKadNotesPublish:$seedNotesPublishEnabled
 
     $agentStats = Wait-AgentControlReady -StatsUrl $agentSession.StatsUrl -TimeoutSeconds 180
     $agentStats = Wait-AgentKadBootstrapReady `
@@ -663,17 +1027,56 @@ try {
         $harnessPublishSummaries += (Get-HarnessPublishSummary -HarnessSession $session)
     }
 
-    $requiredFileNames = @($manifest.harnesses | ForEach-Object { [string]$_.seedFileName })
+    $searchDefinition = Resolve-ScenarioSearchDefinition -Manifest $manifest -HarnessLinkRecords $harnessLinkRecords
+    [string[]]$requiredFileNames = @(
+        @($searchDefinition.RequiredFileNames) |
+            ForEach-Object { [string]$_ } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+    if (@($requiredFileNames).Count -eq 0 -and [string]$searchDefinition.Kind -eq "keyword") {
+        $requiredFileNames = @(
+            @($harnessLinkRecords) |
+                ForEach-Object { [string]$_.FileName } |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
+    }
+    if (@($requiredFileNames).Count -eq 0) {
+        throw "Scenario search required file list resolved to zero names for kind '$($searchDefinition.Kind)'"
+    }
     for ($attempt = 1; $attempt -le [int]$manifest.search.retryCount; $attempt++) {
-        $searchJob = Invoke-CoordinatorKeywordSearch `
-            -CoordinatorUrl $manifest.coordinator.url `
-            -Query $manifest.search.query
+        $searchJob = $null
+        try {
+            $searchJob = Invoke-CoordinatorSearchJob `
+                -CoordinatorUrl $manifest.coordinator.url `
+                -SearchPayload $searchDefinition.Payload
+        }
+        catch {
+            $attemptRecord = [ordered]@{
+                attempt = $attempt
+                jobId = $null
+                status = "create_failed"
+                resultCount = 0
+                matchedNames = @()
+                error = $_.Exception.Message
+            }
+            $searchAttempts += [pscustomobject]$attemptRecord
+
+            if ($attempt -lt [int]$manifest.search.retryCount -and (Test-TransientCoordinatorSearchCreationFailure -Message $_.Exception.Message)) {
+                Start-Sleep -Seconds $SearchRetryDelaySeconds
+                continue
+            }
+
+            throw
+        }
 
         $finalJob = Wait-CoordinatorSearchResultSet `
             -CoordinatorUrl $manifest.coordinator.url `
             -JobId $searchJob.job_id `
             -RequiredFileNames $requiredFileNames `
             -ExpectedMinimumResults ([int]$manifest.search.expectedMinimumResults) `
+            -SearchKind $searchDefinition.Kind `
+            -ExpectedFileHash $searchDefinition.FileHash `
+            -ExpectedFileSize $(if ($null -ne $searchDefinition.FileSize) { [UInt64]$searchDefinition.FileSize } else { [UInt64]0 }) `
             -TimeoutSeconds $SearchTimeoutSeconds
 
         $attemptRecord = [ordered]@{
@@ -682,6 +1085,7 @@ try {
             status = $finalJob.status
             resultCount = $finalJob.result_count
             matchedNames = @(Get-SearchMatchedNames -SearchJob $finalJob)
+            error = $null
         }
         $searchAttempts += [pscustomobject]$attemptRecord
 
@@ -689,7 +1093,10 @@ try {
             Test-SearchContainsRequiredFiles `
                 -SearchJob $finalJob `
                 -RequiredFileNames $requiredFileNames `
-                -ExpectedMinimumResults ([int]$manifest.search.expectedMinimumResults)
+                -ExpectedMinimumResults ([int]$manifest.search.expectedMinimumResults) `
+                -SearchKind $searchDefinition.Kind `
+                -ExpectedFileHash $searchDefinition.FileHash `
+                -ExpectedFileSize $(if ($null -ne $searchDefinition.FileSize) { [UInt64]$searchDefinition.FileSize } else { [UInt64]0 })
         ) {
             $successfulSearch = $finalJob
             break
@@ -701,7 +1108,7 @@ try {
     }
 
     if ($null -eq $successfulSearch) {
-        throw "Coordinator keyword search never returned the expected harness file set"
+        throw "Coordinator $($searchDefinition.Kind) search never returned the expected result set"
     }
 
     $successfulSearch | ConvertTo-Json -Depth 12 | Set-Content -Encoding utf8NoBOM $searchResultPath
@@ -742,7 +1149,8 @@ try {
 
     foreach ($logPath in @(
         (Join-Path $env:OVERLORD_LOG_DIR "coordinator_stdout.log"),
-        (Join-Path $env:OVERLORD_LOG_DIR "coordinator_stderr.log")
+        (Join-Path $env:OVERLORD_LOG_DIR "coordinator_stderr.log"),
+        (Join-Path $env:OVERLORD_LOG_DIR "coordinator_server.log")
     )) {
         Copy-IfExists -Path $logPath -DestinationRoot $coordinatorArtifactRoot
     }
@@ -774,13 +1182,19 @@ try {
             sourceAckedContacts = $agentStats.publish_observability.latest_source_batch.acked_contacts
         }
         search = [ordered]@{
-            query = $manifest.search.query
+            kind = $searchDefinition.Kind
+            query = $searchDefinition.Query
+            fileHash = $searchDefinition.FileHash
+            fileSize = $searchDefinition.FileSize
+            targetRef = $searchDefinition.TargetRef
             attempts = @($searchAttempts)
             finalJobId = $successfulSearch.job_id
             finalStatus = $successfulSearch.status
             finalResultCount = $successfulSearch.result_count
             matchedNames = @(Get-SearchMatchedNames -SearchJob $successfulSearch)
         }
+        harnessKadObservations = @($harnessKadObservations)
+        firstDivergence = $null
         finishedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     }
     $runSummary | ConvertTo-Json -Depth 12 | Set-Content -Encoding utf8NoBOM $runSummaryPath
@@ -791,6 +1205,8 @@ catch {
     throw
 }
 finally {
+    $harnessKadObservations = Get-HarnessKadObservations -HarnessSessions $harnessSessions
+
     if (-not $KeepSessionsRunning) {
         foreach ($session in @($harnessSessions)) {
             Stop-EmuleHarnessParitySession -SessionDir $session.SessionDir | Out-Null
@@ -818,6 +1234,8 @@ finally {
             harnessBuildUsedFallback = $buildUsedFallback
             harnessBuildFallbackReason = $buildFallbackReason
             failedReason = $failedReason
+            harnessKadObservations = @($harnessKadObservations)
+            firstDivergence = (Select-ScenarioFirstDivergence -HarnessKadObservations $harnessKadObservations)
             searchAttempts = @($searchAttempts)
             finishedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
         }

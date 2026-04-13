@@ -27,7 +27,8 @@ param(
     [UInt64]$ServerSessionRotationSeconds = 45,
     [string]$ProbeSearchTerm = "ubuntu linux",
     [int]$LaunchTimeoutSeconds = 300,
-    [switch]$EnableObfuscation
+    [switch]$EnableObfuscation,
+    [switch]$EnableKadNotesPublish
 )
 
 Set-StrictMode -Version Latest
@@ -77,6 +78,9 @@ $configWriterParams = @{
 }
 if ($EnableObfuscation) {
     $configWriterParams.EnableObfuscation = $true
+}
+if ($EnableKadNotesPublish) {
+    $configWriterParams.EnableKadNotesPublish = $true
 }
 $configResult = & $configWriterPath @configWriterParams
 

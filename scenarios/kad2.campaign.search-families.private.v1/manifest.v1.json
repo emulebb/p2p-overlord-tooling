@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad2.campaign.search-families.private.v1",
+  "description": "KAD2 deterministic private search-family campaign over keyword, source, and notes searches on the loopback harness triplet.",
+  "scenarioKind": "campaign",
+  "protocol": "kad2",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "kad2"
+  },
+  "campaign": {
+    "availability": "available",
+    "members": [
+      {
+        "scenarioId": "kad2.cell.keyword.search.triplet.private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "kad2.cell.source.search.private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "kad2.cell.notes.search.private.v1",
+        "required": true
+      }
+    ]
+  }
+}
