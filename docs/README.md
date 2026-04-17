@@ -51,6 +51,9 @@ the owning subsystem, and orchestration should not depend on helper file names.
 - `../overlord-tooling.ps1 guard-workspace-conventions` validates that tracked
   files do not use stale `overlord-*` repo-directory references and that every
   tracked `.ps1` starts with `#Requires -Version 7.6`.
+- Tracked safe exceptions for public references must stay narrow and justified
+  in the repo policy; local personal identifiers still belong in untracked
+  policy or environment configuration.
 - Real personal identifiers must not be stored in tracked policy files; use
   local untracked policy or environment configuration for those checks.
 

@@ -22,5 +22,6 @@
       "reason": "Tracked content must not contain committed Unix home-directory paths.",
       "regex": "/home/[A-Za-z0-9_][A-Za-z0-9._-]*"
     }
-  ]
+  ],
+  "contentAllowRules": []
 }
