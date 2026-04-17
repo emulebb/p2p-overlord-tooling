@@ -85,6 +85,54 @@ function Add-UniqueString {
     }
 }
 
+function Get-FileRecordObservedSourceCount {
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$FileRecord
+    )
+
+    $maxObservedSourceCount = 0
+
+    foreach ($source in @($FileRecord.sources)) {
+        $extra = $source.PSObject.Properties["extra"]
+        if ($null -eq $extra -or $null -eq $extra.Value) {
+            continue
+        }
+
+        $sourceCountProperty = $extra.Value.PSObject.Properties["source_count"]
+        if ($null -eq $sourceCountProperty -or $null -eq $sourceCountProperty.Value) {
+            continue
+        }
+
+        $candidateValue = [int]$sourceCountProperty.Value
+        if ($candidateValue -gt $maxObservedSourceCount) {
+            $maxObservedSourceCount = $candidateValue
+        }
+    }
+
+    foreach ($tag in @($FileRecord.tags)) {
+        $tagKey = [string]$tag.key
+        if ($tagKey -notin @("tag_15", "ed2k_source_count")) {
+            continue
+        }
+
+        if ($null -eq $tag.value) {
+            continue
+        }
+
+        $candidateValue = [int]$tag.value
+        if ($candidateValue -gt $maxObservedSourceCount) {
+            $maxObservedSourceCount = $candidateValue
+        }
+    }
+
+    if ($maxObservedSourceCount -gt 0) {
+        return $maxObservedSourceCount
+    }
+
+    return @($FileRecord.sources).Count
+}
+
 function Wait-AgentKadReady {
     param(
         [Parameter(Mandatory = $true)]
@@ -138,7 +186,7 @@ function Merge-ResultBatch {
                 hash = $hash
                 size = if ($null -ne $file.size) { [UInt64]$file.size } else { $null }
                 contentType = if ($null -ne $file.content_type) { [string]$file.content_type } else { $null }
-                sourceCount = @($file.sources).Count
+                sourceCount = Get-FileRecordObservedSourceCount -FileRecord $file
                 names = [System.Collections.Generic.List[string]]::new()
                 batchHits = 0
             }
@@ -149,7 +197,7 @@ function Merge-ResultBatch {
             Add-UniqueString -Target $entry.names -Value ([string]$name)
         }
         $entry.batchHits = [int]$entry.batchHits + 1
-        $entry.sourceCount = [Math]::Max([int]$entry.sourceCount, @($file.sources).Count)
+        $entry.sourceCount = [Math]::Max([int]$entry.sourceCount, (Get-FileRecordObservedSourceCount -FileRecord $file))
         if ($null -eq $entry.size -and $null -ne $file.size) {
             $entry.size = [UInt64]$file.size
         }
