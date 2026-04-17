@@ -18,7 +18,7 @@ param(
     [string]$ControlUrl = "http://127.0.0.1:13301",
     [int]$ListenPort = 0,
     [int]$KadReadyTimeoutSeconds = 120,
-    [int]$MinimumPeerCount = 20,
+    [int]$MinimumPeerCount = 8,
     [int]$TimeoutSeconds = 180
 )
 
@@ -90,7 +90,7 @@ function Wait-AgentKadReady {
         [Parameter(Mandatory = $true)]
         [string]$StatsUrl,
         [int]$TimeoutSeconds = 120,
-        [int]$MinimumPeerCount = 20
+        [int]$MinimumPeerCount = 8
     )
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)

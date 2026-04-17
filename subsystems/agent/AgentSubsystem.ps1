@@ -117,7 +117,7 @@ function Run-AgentKadSearch {
         [string]$ControlUrl = "http://127.0.0.1:13301",
         [int]$ListenPort = 0,
         [int]$KadReadyTimeoutSeconds = 120,
-        [int]$MinimumPeerCount = 20,
+        [int]$MinimumPeerCount = 8,
         [int]$TimeoutSeconds = 180
     )
 

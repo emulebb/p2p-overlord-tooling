@@ -24,6 +24,7 @@ param(
     [int]$AgentTransferProgressProbeTimeoutSeconds = 120,
     [int]$HarnessProgressProbeTimeoutSeconds = 90,
     [int]$SuccessfulDownloadCount = 2,
+    [int]$AgentKadMinimumPeerCount = 8,
     [UInt64]$MaxCandidateSizeBytes = 16777216,
     [string]$InterfaceAlias = "hide.me",
     [string[]]$PreferredHashes = @(),
@@ -690,6 +691,12 @@ function New-CandidateRecord {
     }
     elseif ([string]::IsNullOrWhiteSpace($resolvedName)) {
         $missingReason = "missing-name"
+    }
+    else {
+        $replayabilityReason = Get-CandidateReplayabilityReason -Name $resolvedName -Size $resolvedSize
+        if (-not [string]::IsNullOrWhiteSpace($replayabilityReason)) {
+            $missingReason = $replayabilityReason
+        }
     }
 
     [pscustomobject]@{
@@ -1802,6 +1809,46 @@ function Get-PreferredExtensionRank {
     }
 }
 
+function Get-CandidateReplayabilityReason {
+    param(
+        [string]$Name,
+        [UInt64]$Size
+    )
+
+    if ($Size -lt 65536) {
+        return "too-small-for-replay"
+    }
+
+    $extension = [System.IO.Path]::GetExtension([string]$Name).ToLowerInvariant()
+    if ([string]::IsNullOrWhiteSpace($extension)) {
+        return $null
+    }
+
+    $blockedExtensions = @(
+        ".torrent",
+        ".asc",
+        ".sig",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".svg",
+        ".ttf",
+        ".yaml",
+        ".yml",
+        ".json",
+        ".xml",
+        ".html",
+        ".htm"
+    )
+    if ($blockedExtensions -contains $extension) {
+        return "non-replayable-extension"
+    }
+
+    return $null
+}
+
 function Select-CommonCandidates {
     param(
         [Parameter(Mandatory = $true)]
@@ -1837,15 +1884,16 @@ function Select-CommonCandidates {
         }
     }
 
-    if (@($PinnedHashes).Count -gt 0) {
+    $normalizedPinnedHashes = @(
+        @($PinnedHashes) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
+            ForEach-Object { ([string]$_).Trim().ToLowerInvariant() }
+    )
+
+    if ($normalizedPinnedHashes.Count -gt 0) {
         $selectedPinnedCandidates = [System.Collections.Generic.List[object]]::new()
         $selectionOrder = 0
-        foreach ($pinnedHash in @($PinnedHashes)) {
-            $normalizedHash = ([string]$pinnedHash).Trim().ToLowerInvariant()
-            if ([string]::IsNullOrWhiteSpace($normalizedHash)) {
-                continue
-            }
-
+        foreach ($normalizedHash in $normalizedPinnedHashes) {
             $pinnedHarnessRecord = if ($harnessByHash.ContainsKey($normalizedHash)) { $harnessByHash[$normalizedHash] } else { $null }
             $pinnedAgentRecord = if ($agentByHash.ContainsKey($normalizedHash)) { $agentByHash[$normalizedHash] } else { $null }
             $selectedPinnedCandidates.Add((New-CandidateRecord `
@@ -1893,8 +1941,10 @@ function Select-CommonCandidates {
     $selected = $candidates |
         Sort-Object `
             @{ Expression = "PreferredHashRank"; Descending = $true }, `
-            @{ Expression = "ExtensionRank"; Descending = $true }, `
             @{ Expression = { $_.HarnessSourceCount + $_.AgentSourceCount + $_.AgentBatchHits }; Descending = $true }, `
+            @{ Expression = "HarnessSourceCount"; Descending = $true }, `
+            @{ Expression = "AgentSourceCount"; Descending = $true }, `
+            @{ Expression = "ExtensionRank"; Descending = $true }, `
             @{ Expression = "Size"; Descending = $false }, `
             @{ Expression = "Hash"; Descending = $false } |
         Select-Object -First $MaxCandidates
@@ -2103,6 +2153,7 @@ foreach ($mode in $modeDefinitions) {
             -Query $Query `
             -ControlUrl $agentSession.ControlUrl `
             -OutputRoot $agentSearchRoot `
+            -MinimumPeerCount $AgentKadMinimumPeerCount `
             -TimeoutSeconds $SearchTimeoutSeconds
         $harnessSnapshot = Wait-HarnessSearchSnapshot `
             -Path $harnessSearchPath `
@@ -2184,6 +2235,12 @@ foreach ($mode in $modeDefinitions) {
                 AgentStartupPhaseState = $null
                 HarnessStartupPhaseState = $null
                 FirstDivergentStartupPhase = $null
+                HarnessDownloadedPath = $null
+                HarnessDownloadedSize = [UInt64]0
+                HarnessCompletionKind = $null
+                AgentTransferManifestPath = $null
+                AgentTransferCompleted = $false
+                AgentTransferCollectedRoot = $null
                 SourceAcquisitionState = "agent_candidate_selected"
                 SourceSearchCompletionState = $null
                 SourceAcquisitionStarted = $false
