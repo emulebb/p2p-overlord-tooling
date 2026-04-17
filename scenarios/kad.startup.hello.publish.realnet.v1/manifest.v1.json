@@ -65,8 +65,8 @@
     "controlUrl": "http://127.0.0.1:13301",
     "statsUrl": "http://127.0.0.1:13301/api/internal/stats",
     "seedRequest": {
-      "hash": "5E6E4C0D5B8D44C27DDA2B67A3F24E89",
-      "canonicalName": "ubuntu linux.iso",
+      "hash": "00112233445566778899AABBCCDDEEFF",
+      "canonicalName": "synthetic-manual-publish.iso",
       "size": 734003200,
       "sourceCount": 1
     }
