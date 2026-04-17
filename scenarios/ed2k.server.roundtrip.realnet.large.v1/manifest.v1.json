@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.server.roundtrip.realnet.large.v1",
+  "description": "Real-network ED2K server roundtrip transfer with a large deterministic binary so the same-host source-hint path can exercise modern HASHSETREQUEST2 and AICH-adjacent large-file behavior against a live server selected from server.met.",
+  "scenarioKind": "legacy",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "legacy.listener.roundtrip.realnet.large_file",
+    "availability": "available",
+    "expectedBranch": "server-session->download->large-file-hashset->reoffer->listener-download",
+    "comparisonMode": "acceptance-layer"
+  },
+  "interfaceAlias": "hide.me",
+  "seedBundleId": "canonical",
+  "serverSelection": {
+    "maxCandidates": 32,
+    "connectTimeoutMilliseconds": 5000
+  },
+  "harnessSeeder": {
+    "tcpPort": 46671,
+    "udpPort": 46673,
+    "serverUdpPort": 0,
+    "webPort": 47111
+  },
+  "harnessDownloader": {
+    "tcpPort": 46681,
+    "udpPort": 46683,
+    "serverUdpPort": 0,
+    "webPort": 47121
+  },
+  "agent": {
+    "controlPort": 13301,
+    "kadPort": 41000,
+    "ed2kPort": 41001,
+    "capturePort": 41000
+  },
+  "file": {
+    "name": "rt-realnet-large.bin",
+    "sizeBytes": 10485760,
+    "pattern": "ubuntu-linux-ed2k-roundtrip-large"
+  },
+  "timeouts": {
+    "agentDownloadSeconds": 900,
+    "harnessDownloadSeconds": 900,
+    "initialPublishDelaySeconds": 35,
+    "agentRepublishDelaySeconds": 35,
+    "harnessReadySeconds": 120
+  }
+}
