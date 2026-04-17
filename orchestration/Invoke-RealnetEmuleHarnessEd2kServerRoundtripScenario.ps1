@@ -203,6 +203,32 @@ function Copy-IfExists {
     }
 }
 
+function Get-HarnessArtifactPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Session,
+        [object]$StoppedSession,
+        [Parameter(Mandatory = $true)]
+        [string]$PropertyName
+    )
+
+    if ($StoppedSession -and $StoppedSession.PSObject.Properties.Name -contains $PropertyName) {
+        $stoppedValue = $StoppedSession.$PropertyName
+        if (-not [string]::IsNullOrWhiteSpace([string]$stoppedValue)) {
+            return [string]$stoppedValue
+        }
+    }
+
+    if ($Session -and $Session.PSObject.Properties.Name -contains $PropertyName) {
+        $sessionValue = $Session.$PropertyName
+        if (-not [string]::IsNullOrWhiteSpace([string]$sessionValue)) {
+            return [string]$sessionValue
+        }
+    }
+
+    return $null
+}
+
 function Remove-DirectoryIfExists {
     param(
         [Parameter(Mandatory = $true)]
@@ -216,6 +242,7 @@ function Remove-DirectoryIfExists {
 
 $toolingRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $manifest = Get-Content -Raw $ScenarioManifestPath | ConvertFrom-Json
+$resolvedScenarioManifestPath = (Resolve-Path $ScenarioManifestPath).Path
 
 if (-not $env:OVERLORD_TMP_DIR) {
     throw "OVERLORD_TMP_DIR is not set"
@@ -257,20 +284,27 @@ foreach ($requiredPath in @($profileScriptPath)) {
 
 $resolvedAdapter = Resolve-OverlordNetworkAdapter -PreferredInterfaceAlias $manifest.interfaceAlias
 $bindAddr = [string]$resolvedAdapter.IPAddress
+$selectedServerSourcePath = if ([string]::IsNullOrWhiteSpace($ServerMetPath)) {
+    Join-Path $toolingRoot ".local\emule-harness-seeds\$($manifest.seedBundleId)\server.met"
+} else {
+    $ServerMetPath
+}
 
 $selectedServer = Select-Ed2kLiveServer `
-    -SourcePath $(if ([string]::IsNullOrWhiteSpace($ServerMetPath)) { (Join-Path $toolingRoot ".local\emule-harness-seeds\$($manifest.seedBundleId)\server.met") } else { $ServerMetPath }) `
+    -SourcePath $selectedServerSourcePath `
     -MaxCandidates ([int]$manifest.serverSelection.maxCandidates) `
     -ConnectTimeoutMilliseconds ([int]$manifest.serverSelection.connectTimeoutMilliseconds)
 
 $runManifest = [ordered]@{
     schemaVersion = "run-manifest/v1"
     scenarioId = $manifest.scenarioId
+    scenarioManifestPath = $resolvedScenarioManifestPath
     runId = $runId
     startedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     artifactRoot = $artifactRoot
     interfaceAlias = $resolvedAdapter.InterfaceAlias
     bindAddr = $bindAddr
+    serverSelectionSourcePath = $selectedServerSourcePath
     selectedServer = $selectedServer
 }
 $runManifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8NoBOM $runManifestPath
@@ -278,7 +312,9 @@ $runManifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8NoBOM $runMan
 $agentStage1Session = $null
 $agentStage2Session = $null
 $seederSession = $null
+$stoppedSeederSession = $null
 $downloaderSession = $null
+$stoppedDownloaderSession = $null
 $parsedLink = $null
 $failedReason = $null
 $agentDirectDownloadLink = $null
@@ -359,21 +395,26 @@ try {
         -FileHash $parsedLink.FileHash `
         -DestinationRoot $agentStage1ArtifactsRoot
 
+    if (-not $KeepSessionsRunning) {
+        $stoppedSeederSession = Stop-EmuleHarnessParitySession -SessionDir $seederSession.SessionDir
+    }
+
     Copy-IfExists -Path $agentStage1Session.AgentLogPath -DestinationRoot $agentStage1ArtifactsRoot
     Copy-IfExists -Path $agentStage1Session.PacketDumpPath -DestinationRoot $agentStage1ArtifactsRoot
-    Copy-IfExists -Path $seederSession.ExportLinkPath -DestinationRoot $seederArtifactsRoot
-    Copy-IfExists -Path $seederSession.TraceLogPath -DestinationRoot $seederArtifactsRoot
-    Copy-IfExists -Path $seederSession.VerboseLogPath -DestinationRoot $seederArtifactsRoot
-    Copy-IfExists -Path $seederSession.StatusLogPath -DestinationRoot $seederArtifactsRoot
-    Copy-IfExists -Path $seederSession.EmuleHarnessUdpDumpPath -DestinationRoot $seederArtifactsRoot
-    Copy-IfExists -Path $seederSession.EmuleHarnessEd2kTcpDumpPath -DestinationRoot $seederArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $seederSession -StoppedSession $stoppedSeederSession -PropertyName "ExportLinkPath") -DestinationRoot $seederArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $seederSession -StoppedSession $stoppedSeederSession -PropertyName "TraceLogPath") -DestinationRoot $seederArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $seederSession -StoppedSession $stoppedSeederSession -PropertyName "VerboseLogPath") -DestinationRoot $seederArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $seederSession -StoppedSession $stoppedSeederSession -PropertyName "StatusLogPath") -DestinationRoot $seederArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $seederSession -StoppedSession $stoppedSeederSession -PropertyName "EmuleHarnessUdpDumpPath") -DestinationRoot $seederArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $seederSession -StoppedSession $stoppedSeederSession -PropertyName "EmuleHarnessEd2kTcpDumpPath") -DestinationRoot $seederArtifactsRoot
 
     if (-not [bool]$agentTransferManifest.completed -or -not [bool]$agentTransferSummary.Completed) {
         throw "Agent did not complete the real-server download for $($parsedLink.FileHash)"
     }
 
-    Stop-EmuleHarnessParitySession -SessionDir $seederSession.SessionDir | Out-Null
-    $seederSession = $null
+    if ($stoppedSeederSession) {
+        $seederSession = $null
+    }
 
     Stop-AgentParitySession -SessionDir $agentStage1Session.SessionDir | Out-Null
     $agentStage1Session = $null
@@ -437,22 +478,32 @@ try {
     $downloadedFilePath = Join-Path $downloaderProfile.IncomingRoot $parsedLink.FileName
     $downloadedFile = Wait-FileCompleted -Path $downloadedFilePath -ExpectedSize $parsedLink.FileSize -TimeoutSeconds ([int]$manifest.timeouts.harnessDownloadSeconds)
 
+    if (-not $KeepSessionsRunning) {
+        $stoppedDownloaderSession = Stop-EmuleHarnessParitySession -SessionDir $downloaderSession.SessionDir
+    }
+
     Copy-IfExists -Path $agentStage2Session.AgentLogPath -DestinationRoot $agentStage2ArtifactsRoot
     Copy-IfExists -Path $agentStage2Session.PacketDumpPath -DestinationRoot $agentStage2ArtifactsRoot
-    Copy-IfExists -Path $downloaderSession.TraceLogPath -DestinationRoot $downloaderArtifactsRoot
-    Copy-IfExists -Path $downloaderSession.VerboseLogPath -DestinationRoot $downloaderArtifactsRoot
-    Copy-IfExists -Path $downloaderSession.StatusLogPath -DestinationRoot $downloaderArtifactsRoot
-    Copy-IfExists -Path $downloaderSession.EmuleHarnessUdpDumpPath -DestinationRoot $downloaderArtifactsRoot
-    Copy-IfExists -Path $downloaderSession.EmuleHarnessEd2kTcpDumpPath -DestinationRoot $downloaderArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $downloaderSession -StoppedSession $stoppedDownloaderSession -PropertyName "TraceLogPath") -DestinationRoot $downloaderArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $downloaderSession -StoppedSession $stoppedDownloaderSession -PropertyName "VerboseLogPath") -DestinationRoot $downloaderArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $downloaderSession -StoppedSession $stoppedDownloaderSession -PropertyName "StatusLogPath") -DestinationRoot $downloaderArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $downloaderSession -StoppedSession $stoppedDownloaderSession -PropertyName "EmuleHarnessUdpDumpPath") -DestinationRoot $downloaderArtifactsRoot
+    Copy-IfExists -Path (Get-HarnessArtifactPath -Session $downloaderSession -StoppedSession $stoppedDownloaderSession -PropertyName "EmuleHarnessEd2kTcpDumpPath") -DestinationRoot $downloaderArtifactsRoot
     Copy-IfExists -Path $downloadedFile.FullName -DestinationRoot $downloaderArtifactsRoot
+
+    if ($stoppedDownloaderSession) {
+        $downloaderSession = $null
+    }
 
     $runSummary = [ordered]@{
         schemaVersion = "run-summary/v1"
         scenarioId = $manifest.scenarioId
+        scenarioManifestPath = $resolvedScenarioManifestPath
         runId = $runId
         completed = $true
         bindAddr = $bindAddr
         selectedServer = $selectedServer
+        serverSelectionSourcePath = $selectedServerSourcePath
         fileHash = $parsedLink.FileHash
         fileName = $parsedLink.FileName
         fileSize = $parsedLink.FileSize
