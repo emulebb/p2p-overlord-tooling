@@ -8,9 +8,7 @@ Posts one native ED2K download request to the live agent control API.
 param(
     [Parameter(Mandatory = $true)]
     [string]$FileHash,
-    [Parameter(Mandatory = $true)]
     [string]$FileName,
-    [Parameter(Mandatory = $true)]
     [UInt64]$FileSize,
     [string]$SourceIp,
     [UInt16]$SourceTcpPort,
@@ -42,16 +40,20 @@ if (-not [string]::IsNullOrWhiteSpace($SourceIp)) {
     $sources = @([pscustomobject]$source)
 }
 
-$payload = [pscustomobject]@{
+$payload = [ordered]@{
     kind = "ed2k_download"
     fileHash = $FileHash.ToLowerInvariant()
-    fileName = $FileName
-    fileSize = $FileSize
     sources = $sources
+}
+if (-not [string]::IsNullOrWhiteSpace($FileName)) {
+    $payload.fileName = $FileName
+}
+if ($PSBoundParameters.ContainsKey("FileSize") -and $FileSize -ne 0) {
+    $payload.fileSize = $FileSize
 }
 
 Invoke-RestMethod `
     -Method Post `
     -Uri ("{0}/api/internal/enrich" -f $ControlUrl.TrimEnd("/")) `
     -ContentType "application/json" `
-    -Body ($payload | ConvertTo-Json -Depth 5)
+    -Body ([pscustomobject]$payload | ConvertTo-Json -Depth 5)
