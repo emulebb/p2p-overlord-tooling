@@ -20,9 +20,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path $PSScriptRoot
+. (Join-Path $PSScriptRoot "..\RuntimeContext.ps1")
+
+$runtimeContext = Get-ToolingRuntimeContext -SourcePath $PSCommandPath
 if ([string]::IsNullOrWhiteSpace($SourcePath)) {
-    $SourcePath = Join-Path $repoRoot ".local\emule-harness-seeds\canonical\server.met"
+    $SourcePath = Join-Path $runtimeContext.ToolingRoot ".local\emule-harness-seeds\canonical\server.met"
 }
 
 if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
