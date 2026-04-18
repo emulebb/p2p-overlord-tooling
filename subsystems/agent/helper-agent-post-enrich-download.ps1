@@ -14,6 +14,7 @@ param(
     [UInt16]$SourceTcpPort,
     [UInt32]$SourceClientId,
     [string]$SourceUserHash,
+    [byte]$SourceObfuscationOptions,
     [string]$ControlUrl = "http://127.0.0.1:13301"
 )
 
@@ -35,6 +36,9 @@ if (-not [string]::IsNullOrWhiteSpace($SourceIp)) {
     }
     if (-not [string]::IsNullOrWhiteSpace($SourceUserHash)) {
         $source.userHash = $SourceUserHash
+    }
+    if ($PSBoundParameters.ContainsKey("SourceObfuscationOptions")) {
+        $source.obfuscationOptions = [int]$SourceObfuscationOptions
     }
 
     $sources = @([pscustomobject]$source)

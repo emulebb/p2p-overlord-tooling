@@ -528,6 +528,12 @@ else {
 }
 $effectiveEnableObfuscation = [bool]($EnableObfuscation -or [bool]$manifest.server.enableObfuscation)
 $expectedTransportMode = if ($effectiveEnableObfuscation) { "obfuscated" } else { "plaintext" }
+$sameHostTransferRationale = if ($effectiveEnableObfuscation) {
+    "local_server_source_search"
+}
+else {
+    "local_server_plus_loopback_source_hint"
+}
 $seedExportTimeoutSeconds = Get-HarnessSeedExportTimeoutSeconds `
     -FileSizeBytes $effectiveFileSizeBytes `
     -BaseTimeoutSeconds ([int]$manifest.timeouts.harnessReadySeconds)
@@ -659,10 +665,15 @@ try {
         -FileHash $parsedLink.FileHash `
         -TimeoutSeconds $ServerPublishTimeoutSeconds
 
-    $agentDirectDownloadLink = Add-Ed2kLinkSource `
-        -Link $parsedLink.Link `
-        -SourceIp $manifest.server.host `
-        -SourceTcpPort ([UInt16]$manifest.harnessSeeder.tcpPort)
+    $agentDirectDownloadLink = if ($effectiveEnableObfuscation) {
+        $parsedLink.Link
+    }
+    else {
+        Add-Ed2kLinkSource `
+            -Link $parsedLink.Link `
+            -SourceIp $manifest.server.host `
+            -SourceTcpPort ([UInt16]$manifest.harnessSeeder.tcpPort)
+    }
 
     Remove-DirectoryIfExists -Path (Join-Path $agentScenarioRoot "agent-state")
     Remove-DirectoryIfExists -Path (Join-Path $agentScenarioRoot "agent-logs")
@@ -685,13 +696,17 @@ try {
         Start-Sleep -Seconds ([int]$manifest.timeouts.initialPublishDelaySeconds)
     }
 
-    Post-AgentEnrichDownload `
-        -FileHash $parsedLink.FileHash `
-        -FileName $parsedLink.FileName `
-        -FileSize $parsedLink.FileSize `
-        -SourceIp $manifest.server.host `
-        -SourceTcpPort ([UInt16]$manifest.harnessSeeder.tcpPort) `
-        -ControlUrl $agentStage1Session.ControlUrl | Out-Null
+    $postAgentDownloadParams = @{
+        FileHash = $parsedLink.FileHash
+        FileName = $parsedLink.FileName
+        FileSize = $parsedLink.FileSize
+        ControlUrl = $agentStage1Session.ControlUrl
+    }
+    if (-not $effectiveEnableObfuscation) {
+        $postAgentDownloadParams.SourceIp = $manifest.server.host
+        $postAgentDownloadParams.SourceTcpPort = [UInt16]$manifest.harnessSeeder.tcpPort
+    }
+    Post-AgentEnrichDownload @postAgentDownloadParams | Out-Null
 
     $agentTransferManifestPath = Join-Path $agentStage1Session.TransferRoot ($parsedLink.FileHash.ToLowerInvariant()) "resume-manifest.json"
     $agentTransferManifest = Wait-TransferManifestState -ManifestPath $agentTransferManifestPath -TimeoutSeconds ([int]$manifest.timeouts.agentDownloadSeconds)
@@ -798,12 +813,18 @@ try {
         -ServerPort ([int]$manifest.server.tcpPort) `
         -DestinationPath (Join-Path $downloaderProfile.ProfileRoot "config\server.met") | Out-Null
 
-    [System.IO.File]::WriteAllText(
-        $downloadLinkPath,
-        (Add-Ed2kLinkSource `
+    $harnessDirectDownloadLink = if ($effectiveEnableObfuscation) {
+        $parsedLink.Link
+    }
+    else {
+        Add-Ed2kLinkSource `
             -Link $parsedLink.Link `
             -SourceIp $manifest.server.host `
-            -SourceTcpPort ([UInt16]$manifest.agent.ed2kPort)) + [Environment]::NewLine,
+            -SourceTcpPort ([UInt16]$manifest.agent.ed2kPort)
+    }
+    [System.IO.File]::WriteAllText(
+        $downloadLinkPath,
+        $harnessDirectDownloadLink + [Environment]::NewLine,
         (New-Object System.Text.UTF8Encoding($false))
     )
     $harnessDirectDownloadLink = (Get-Content -LiteralPath $downloadLinkPath -Raw).Trim()
@@ -900,7 +921,7 @@ try {
         transportMode = $expectedTransportMode
         sameHostTransferMode = [ordered]@{
             enabled = $true
-            rationale = "local_server_plus_loopback_source_hint"
+            rationale = $sameHostTransferRationale
             agentDownloadLink = $agentDirectDownloadLink
             harnessDownloadLink = $harnessDirectDownloadLink
         }
