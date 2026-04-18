@@ -92,7 +92,7 @@ $sessionStartUtc = (Get-Date).ToUniversalTime()
 $agentProcess = $null
 
 try {
-    $launchResult = & $launchHelperPath
+    $launchResult = & $launchHelperPath -LogRoot $configResult.LogRoot
     $agentProcess = Get-Process -Id $launchResult.AgentPid -ErrorAction SilentlyContinue
     if (-not $agentProcess) {
         throw "Agent process overlord-agent-emule.exe (PID $($launchResult.AgentPid)) is not running after launch"

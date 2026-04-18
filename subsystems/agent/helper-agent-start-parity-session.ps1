@@ -175,7 +175,7 @@ try {
         throw "dumpcap did not create capture file at $pcapPath within 15 seconds"
     }
 
-    $launchResult = & $launchHelperPath
+    $launchResult = & $launchHelperPath -LogRoot $networkingRefresh.AgentLogRoot
     $agentProcess = Get-Process -Id $launchResult.AgentPid -ErrorAction SilentlyContinue
     if (-not $agentProcess) {
         throw "Agent process overlord-agent-emule.exe (PID $($launchResult.AgentPid)) is not running after launch"

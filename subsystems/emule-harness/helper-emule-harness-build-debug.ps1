@@ -41,6 +41,8 @@ $buildArguments = @(
     'build-app'
     '-EmuleWorkspaceRoot'
     $emuleWorkspaceRoot
+    '-AppVariant'
+    'tracing-harness'
     '-Config'
     'Debug'
     '-Platform'
@@ -72,6 +74,7 @@ if (Test-Path $builtPdbPath) {
 [pscustomobject]@{
     BuildScriptPath = $workspaceScriptPath
     BuildCommand = 'build-app'
+    BuildVariant = 'tracing-harness'
     BuiltExePath    = $builtExePath
     RuntimeExePath  = $runtimeExePath
     RuntimePdbPath  = if (Test-Path $runtimePdbPath) { $runtimePdbPath } else { $null }

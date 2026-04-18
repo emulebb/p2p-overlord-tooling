@@ -277,7 +277,7 @@ try {
             throw "Agent launch helper not found at $launchHelperPath"
         }
 
-        $launchResult = & $launchHelperPath
+        $launchResult = & $launchHelperPath -LogRoot $metadata.LogDir
         $agentProcess = Get-Process -Id $launchResult.AgentPid -ErrorAction SilentlyContinue
         if (-not $agentProcess) {
             throw "Agent process overlord-agent-emule.exe (PID $($launchResult.AgentPid)) is not running after launch"
