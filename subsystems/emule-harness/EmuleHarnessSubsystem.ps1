@@ -109,7 +109,7 @@ function Start-EmuleHarnessPrivateEd2kSession {
         [string]$SearchTerm,
         [string]$SearchResultsPath,
         [string]$SearchDownloadHashPath,
-        [ValidateSet("Debug", "Release")]
+        [ValidateSet("Debug")]
         [string]$BuildConfig = "Debug",
         [switch]$SkipRuntimeCleanup
     )

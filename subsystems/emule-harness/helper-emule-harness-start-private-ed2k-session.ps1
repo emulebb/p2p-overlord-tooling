@@ -2,6 +2,12 @@
 <#
 .SYNOPSIS
 Starts one minimized eMule harness for a private Kad+ED2K run.
+
+.DESCRIPTION
+Launches the canonical debug tracing-harness parity binary for private and
+roundtrip scenarios. The retained `BuildConfig` parameter is debug-only for
+operator compatibility; this workspace does not support a separate Release
+tracing-harness flow.
 #>
 
 [CmdletBinding()]
@@ -16,25 +22,13 @@ param(
     [string]$SearchTerm,
     [string]$SearchResultsPath,
     [string]$SearchDownloadHashPath,
-    [ValidateSet("Debug", "Release")]
+    [ValidateSet("Debug")]
     [string]$BuildConfig = "Debug",
     [switch]$SkipRuntimeCleanup
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
-function Normalize-DirectoryPath {
-    param(
-        [string]$Path
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Path)) {
-        return $null
-    }
-
-    return ([System.IO.Path]::GetFullPath($Path)).TrimEnd('\')
-}
 
 $tmpDir = if ($env:OVERLORD_TMP_DIR) {
     $env:OVERLORD_TMP_DIR
@@ -44,68 +38,58 @@ $tmpDir = if ($env:OVERLORD_TMP_DIR) {
 
 $readyReaderPath = Join-Path $PSScriptRoot "helper-emule-harness-read-ready-file.ps1"
 $cleanupHelperPath = Join-Path $PSScriptRoot "helper-emule-harness-clean-runtime.ps1"
+$buildHelperPath = Join-Path $PSScriptRoot "helper-emule-harness-build-debug.ps1"
+$debugDirResolverPath = Join-Path $PSScriptRoot "helper-emule-harness-resolve-harness-debug-dir.ps1"
+$readyStateHelperPath = Join-Path $PSScriptRoot "EmuleHarnessReadyState.ps1"
 
-function Resolve-EmuleHarnessDir {
-    param(
-        [Parameter(Mandatory = $true)]
-        [ValidateSet("Debug", "Release")]
-        [string]$Configuration
-    )
-
-    $emuleWorkspaceRoot = if ($env:EMULE_WORKSPACE_ROOT) {
-        [System.IO.Path]::GetFullPath($env:EMULE_WORKSPACE_ROOT)
-    } else {
-        throw "EMULE_WORKSPACE_ROOT is not set"
+foreach ($requiredPath in @($readyReaderPath, $cleanupHelperPath, $buildHelperPath, $debugDirResolverPath, $readyStateHelperPath)) {
+    if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+        throw "Required helper path not found at $requiredPath"
     }
-
-    $buildManifestPath = Join-Path $emuleWorkspaceRoot "repos\eMule-build\deps.psd1"
-    if (-not (Test-Path -LiteralPath $buildManifestPath -PathType Leaf)) {
-        throw "Canonical eMule-build manifest not found at $buildManifestPath"
-    }
-
-    $buildManifest = Import-PowerShellDataFile -LiteralPath $buildManifestPath
-    $workspaceName = $buildManifest.Workspace.Name
-    if ([string]::IsNullOrWhiteSpace($workspaceName)) {
-        throw "Workspace name was not declared in $buildManifestPath"
-    }
-
-    $harnessDir = [System.IO.Path]::GetFullPath(
-        (Join-Path $emuleWorkspaceRoot "workspaces\$workspaceName\app\eMule-v0.72a-tracing-harness\srchybrid\x64\$Configuration")
-    )
-    if (-not (Test-Path -LiteralPath $harnessDir -PathType Container)) {
-        throw "eMule harness $Configuration directory not found at $harnessDir"
-    }
-
-    return $harnessDir
 }
 
-$emuleHarnessDir = Resolve-EmuleHarnessDir -Configuration $BuildConfig
-$emuleHarnessExePath = Join-Path $emuleHarnessDir "eMule_v072a_parity.exe"
+. $readyStateHelperPath
+Assert-EmuleHarnessDebugBuildConfig -BuildConfig $BuildConfig -ParameterName "BuildConfig"
 
-if (-not (Test-Path -LiteralPath $emuleHarnessExePath)) {
-    throw "eMule harness executable not found at $emuleHarnessExePath — run helper-emule-harness-build-debug.ps1 first"
-}
-if (-not (Test-Path -LiteralPath $cleanupHelperPath)) {
-    throw "eMule harness cleanup helper not found at $cleanupHelperPath"
-}
-if (-not (Test-Path -LiteralPath $readyReaderPath -PathType Leaf)) {
-    throw "eMule harness ready-file reader not found at $readyReaderPath"
-}
 if (-not [string]::IsNullOrWhiteSpace($SeedFilePath) -and -not (Test-Path -LiteralPath $SeedFilePath)) {
     throw "Seed file not found at $SeedFilePath"
 }
 
 $profile = [System.IO.Path]::GetFullPath($ProfileRoot)
+$preferencesPath = Join-Path $profile "config\preferences.ini"
 $readyFile = Join-Path $profile "harness.ready"
 $parityHookConfigPath = Join-Path $profile "parity-hooks.v1.json"
 $logsRoot = Join-Path $profile "logs"
 $traceLogPath = Join-Path $logsRoot "emule-harness-kad-trace.log"
 $verboseLogPath = Join-Path $logsRoot "eMule_Verbose.log"
 $statusLogPath = Join-Path $profile "status.log"
+$canonicalHarnessDebugDir = [System.IO.Path]::GetFullPath((& $debugDirResolverPath -AllowMissing))
+$emuleHarnessExePath = Join-Path $canonicalHarnessDebugDir "eMule_v072a_parity.exe"
 
 if (-not $SkipRuntimeCleanup) {
     & $cleanupHelperPath -CapturePort 0 | Out-Null
+    $buildResult = & $buildHelperPath | Select-Object -Last 1
+    if (-not $buildResult.RuntimeExePath) {
+        throw "eMule harness build helper did not return a runtime executable path"
+    }
+    $emuleHarnessExePath = [System.IO.Path]::GetFullPath([string]$buildResult.RuntimeExePath)
 }
+elseif (-not (Test-Path -LiteralPath $emuleHarnessExePath -PathType Leaf)) {
+    $buildResult = & $buildHelperPath | Select-Object -Last 1
+    if (-not $buildResult.RuntimeExePath) {
+        throw "eMule harness build helper did not return a runtime executable path"
+    }
+    $emuleHarnessExePath = [System.IO.Path]::GetFullPath([string]$buildResult.RuntimeExePath)
+}
+
+if (-not (Test-Path -LiteralPath $emuleHarnessExePath -PathType Leaf)) {
+    throw "Canonical eMule harness parity executable not found at $emuleHarnessExePath"
+}
+if (-not (Test-Path -LiteralPath $preferencesPath -PathType Leaf)) {
+    throw "preferences.ini not found at $preferencesPath"
+}
+$emuleHarnessDir = Split-Path -Parent $emuleHarnessExePath
+$expectedReadyState = Get-ExpectedEmuleHarnessReadyState -PreferencesPath $preferencesPath -RuntimeRoot $profile
 
 $sessionName = "private-emule-harness-{0}" -f (Get-Date -Format "yyyyMMdd-HHmmss")
 $sessionDir = Join-Path $tmpDir $sessionName
@@ -162,25 +146,14 @@ $emuleHarnessProcess = Start-Process `
     -PassThru `
     -WindowStyle Minimized
 
-$deadline = (Get-Date).AddSeconds(90)
-while ((Get-Date) -lt $deadline) {
-    if (Test-Path -LiteralPath $readyFile) {
-        break
-    }
-    Start-Sleep -Milliseconds 250
-}
-if (-not (Test-Path -LiteralPath $readyFile)) {
-    & $cleanupHelperPath -CapturePort 0 -EmuleHarnessPids @($emuleHarnessProcess.Id) | Out-Null
-    throw "Timed out waiting for eMule harness readiness marker at $readyFile"
-}
+    Wait-EmuleHarnessReadyFile -ReadyFilePath $readyFile -EmuleHarnessProcess $emuleHarnessProcess
+    $readyState = & $readyReaderPath -Path $readyFile
+    Assert-EmuleHarnessReadyState `
+        -ExpectedState $expectedReadyState `
+        -ReadyState $readyState `
+        -ExpectedEmuleHarnessPid $emuleHarnessProcess.Id
 
-$readyState = & $readyReaderPath -Path $readyFile
-if ((Normalize-DirectoryPath -Path $readyState.ProfileRoot) -ne (Normalize-DirectoryPath -Path $profile)) {
-    & $cleanupHelperPath -CapturePort 0 -EmuleHarnessPids @($emuleHarnessProcess.Id) | Out-Null
-    throw "eMule harness reported profile root '$($readyState.ProfileRoot)' instead of '$profile'"
-}
-
-$udpDumpPath = Get-ChildItem -LiteralPath $logsRoot -Filter "emule-harness-udp-dump-*.jsonl" -ErrorAction SilentlyContinue |
+    $udpDumpPath = Get-ChildItem -LiteralPath $logsRoot -Filter "emule-harness-udp-dump-*.jsonl" -ErrorAction SilentlyContinue |
     Where-Object { $_.LastWriteTimeUtc -ge $sessionStartUtc.AddSeconds(-5) } |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1 -ExpandProperty FullName

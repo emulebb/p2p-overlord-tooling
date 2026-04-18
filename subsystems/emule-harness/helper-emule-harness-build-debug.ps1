@@ -1,7 +1,12 @@
 #Requires -Version 7.6
 <#
 .SYNOPSIS
-Builds the x64 Debug eMule harness runtime executable.
+Builds the only supported x64 Debug eMule harness runtime executable.
+
+.DESCRIPTION
+Invokes the canonical `workspace.ps1 build-app` entrypoint for the tracing
+harness and refreshes the distinct `eMule_v072a_parity.exe` runtime binary used
+by both parity and private scenario launchers.
 #>
 
 [CmdletBinding()]
