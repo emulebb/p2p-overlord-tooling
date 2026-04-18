@@ -37,6 +37,9 @@ $resolvedSourceCatalogPath = if ([string]::IsNullOrWhiteSpace($SourceCatalogPath
 } else {
     [System.IO.Path]::GetFullPath($SourceCatalogPath)
 }
+$serverTcpObfuscationFlag = 0x00000400
+$tcpFlags = if ($EnableObfuscation) { $serverTcpObfuscationFlag } else { 0 }
+$auxPort = if ($EnableObfuscation) { [int]$TcpPort } else { 0 }
 
 foreach ($path in @($resolvedScenarioRoot, $runtimeRoot, $logRoot)) {
     New-Item -ItemType Directory -Path $path -Force | Out-Null
@@ -60,9 +63,8 @@ $config = [ordered]@{
     database_dsn = ""
     database_table = "shared_files"
     search_batch_size = 25
-    tcp_flags = 0
-    aux_port = 0
-    protocol_obfuscation = [bool]$EnableObfuscation
+    tcp_flags = $tcpFlags
+    aux_port = $auxPort
     server_udp = $true
     udp_port_offset = $UDPPortOffset
     soft_files_limit = 5000

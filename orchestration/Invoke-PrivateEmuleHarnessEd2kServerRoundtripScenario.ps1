@@ -229,19 +229,61 @@ function Wait-TransferManifestState {
         [int]$TimeoutSeconds = 300
     )
 
+    function Read-TransferManifestSnapshot {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$Path
+        )
+
+        if (-not (Test-Path -LiteralPath $Path)) {
+            return $null
+        }
+
+        try {
+            $raw = Get-Content -Raw -LiteralPath $Path -ErrorAction Stop
+            if ([string]::IsNullOrWhiteSpace($raw)) {
+                return $null
+            }
+
+            $manifest = $raw | ConvertFrom-Json -ErrorAction Stop
+            if ($null -eq $manifest) {
+                return $null
+            }
+
+            if (-not ($manifest.PSObject.Properties.Name -contains 'completed')) {
+                return $null
+            }
+
+            return $manifest
+        } catch {
+            return $null
+        }
+    }
+
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $latestManifest = $null
     while ((Get-Date) -lt $deadline) {
-        if (Test-Path -LiteralPath $ManifestPath) {
-            $manifest = Get-Content -Raw $ManifestPath | ConvertFrom-Json
-            if ($manifest.completed) {
+        $manifest = Read-TransferManifestSnapshot -Path $ManifestPath
+        if ($null -ne $manifest) {
+            $latestManifest = $manifest
+            if ([bool]$manifest.completed) {
                 return $manifest
             }
         }
         Start-Sleep -Seconds 2
     }
 
+    if ($null -ne $latestManifest) {
+        return $latestManifest
+    }
+
+    $finalManifest = Read-TransferManifestSnapshot -Path $ManifestPath
+    if ($null -ne $finalManifest) {
+        return $finalManifest
+    }
+
     if (Test-Path -LiteralPath $ManifestPath) {
-        return (Get-Content -Raw $ManifestPath | ConvertFrom-Json)
+        throw "Transfer manifest at $ManifestPath never stabilized into a readable shape within $TimeoutSeconds seconds"
     }
 
     throw "Transfer manifest did not appear at $ManifestPath within $TimeoutSeconds seconds"
@@ -501,7 +543,11 @@ function Get-Ed2kDumpTransportModes {
                 $_.direction -ne "meta" -and
                 -not [string]::IsNullOrWhiteSpace([string]$_.transport_mode)
             } |
-            Select-Object -ExpandProperty transport_mode -Unique
+            ForEach-Object {
+                $mode = [string]$_.transport_mode
+                if ($mode -eq "user_hash") { "obfuscated" } else { $mode }
+            } |
+            Select-Object -Unique
     )
 }
 

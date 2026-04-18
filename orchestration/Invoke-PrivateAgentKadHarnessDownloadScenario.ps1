@@ -392,7 +392,11 @@ function Get-Ed2kDumpTransportModes {
                 $_.direction -ne "meta" -and
                 -not [string]::IsNullOrWhiteSpace([string]$_.transport_mode)
             } |
-            Select-Object -ExpandProperty transport_mode -Unique
+            ForEach-Object {
+                $mode = [string]$_.transport_mode
+                if ($mode -eq "user_hash") { "obfuscated" } else { $mode }
+            } |
+            Select-Object -Unique
     )
 }
 
