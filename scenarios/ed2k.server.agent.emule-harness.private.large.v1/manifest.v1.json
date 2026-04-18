@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.server.agent.emule-harness.private.large.v1",
+  "description": "Private local ED2K server download where the agent ingests a deterministic large file, reconnects to a local goed2k-server, and a fresh eMule harness profile downloads it with modern AICH evidence on loopback.",
+  "scenarioKind": "legacy",
+  "protocol": "ed2k",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "legacy.server.private.agent_seed.large_file",
+    "availability": "available",
+    "expectedBranch": "server-session->agent-local-ingest->server-publish->harness-download",
+    "comparisonMode": "acceptance-layer"
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "tcpPort": 42261,
+    "adminPort": 42280,
+    "udpPortOffset": 4,
+    "adminToken": "local-goed2k-token",
+    "enableObfuscation": false
+  },
+  "harnessDownloader": {
+    "tcpPort": 42282,
+    "udpPort": 42292,
+    "serverUdpPort": 0,
+    "webPort": 47131,
+    "kadUdpKey": 4228201
+  },
+  "agent": {
+    "controlPort": 13321,
+    "kadPort": 41220,
+    "ed2kPort": 41221
+  },
+  "file": {
+    "name": "ubuntu-linux-agent-private-server-large.bin",
+    "sizeBytes": 10485760,
+    "pattern": "ubuntu-linux-ed2k-agent-private-server-large"
+  },
+  "timeouts": {
+    "serverPublishSeconds": 180,
+    "agentRepublishDelaySeconds": 10,
+    "harnessDownloadSeconds": 900
+  }
+}

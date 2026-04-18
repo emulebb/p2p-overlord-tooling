@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad.emule-harness.agent.download.private.large.v1",
+  "description": "Private local Kad plus ED2K large-file download from the eMule harness to the agent with explicit modern AICH evidence on loopback.",
+  "scenarioKind": "legacy",
+  "protocol": "kad",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "legacy.kad.private.harness_seed.large_file",
+    "availability": "available",
+    "expectedBranch": "kad-bootstrap->publish->source-resolution->large-file-hashset",
+    "comparisonMode": "acceptance-layer"
+  },
+  "emuleHarness": {
+    "bindAddr": "127.0.0.2",
+    "tcpPort": 42362,
+    "udpPort": 42372,
+    "serverUdpPort": 0,
+    "webPort": 47141,
+    "kadUdpKey": 4236201
+  },
+  "agent": {
+    "p2pBindIp": "127.0.0.3",
+    "controlPort": 13331,
+    "kadPort": 41320,
+    "ed2kPort": 41321
+  },
+  "file": {
+    "name": "ubuntu-linux-kad-private-large.bin",
+    "sizeBytes": 10485760,
+    "pattern": "ubuntu-linux-kad-private-large"
+  },
+  "timeouts": {
+    "publishSeconds": 180,
+    "downloadSeconds": 900
+  }
+}

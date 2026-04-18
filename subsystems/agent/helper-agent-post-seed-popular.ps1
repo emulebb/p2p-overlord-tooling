@@ -39,8 +39,20 @@ $payload = @(
 $uri = "{0}/api/internal/seed-popular" -f $ControlUrl.TrimEnd("/")
 $json = $payload | ConvertTo-Json -Depth 5 -AsArray
 
-Invoke-RestMethod `
+$response = Invoke-WebRequest `
     -Method Post `
     -Uri $uri `
     -ContentType "application/json" `
-    -Body $json
+    -Body $json `
+    -SkipHttpErrorCheck
+
+if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
+    $body = [string]$response.Content
+    throw "Agent seed-popular request failed with HTTP $($response.StatusCode): $body"
+}
+
+if ([string]::IsNullOrWhiteSpace([string]$response.Content)) {
+    return $null
+}
+
+$response.Content | ConvertFrom-Json

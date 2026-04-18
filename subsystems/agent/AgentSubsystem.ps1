@@ -9,6 +9,7 @@ function Get-AgentSubsystemPathMap {
     [ordered]@{
         CollectEd2kTransfer = Join-Path $PSScriptRoot "helper-agent-collect-ed2k-transfer.ps1"
         ExtractPublishLog = Join-Path $PSScriptRoot "helper-agent-extract-publish-log.ps1"
+        PostIngestLocalFile = Join-Path $PSScriptRoot "helper-agent-post-ingest-local-file.ps1"
         PostEnrichDownload = Join-Path $PSScriptRoot "helper-agent-post-enrich-download.ps1"
         PostSeedPopular = Join-Path $PSScriptRoot "helper-agent-post-seed-popular.ps1"
         RefreshRuntimeNetworking = Join-Path $PSScriptRoot "helper-agent-refresh-runtime-networking.ps1"
@@ -59,6 +60,19 @@ function Extract-AgentPublishLog {
     )
 
     Invoke-ToolingScript -ScriptPath (Resolve-AgentSubsystemPath -Name "ExtractPublishLog") -NamedArguments $PSBoundParameters
+}
+
+function Post-AgentIngestLocalFile {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourcePath,
+        [Parameter(Mandatory = $true)]
+        [string]$CanonicalName,
+        [string]$ControlUrl = "http://127.0.0.1:13301"
+    )
+
+    Invoke-ToolingScript -ScriptPath (Resolve-AgentSubsystemPath -Name "PostIngestLocalFile") -NamedArguments $PSBoundParameters
 }
 
 function Post-AgentEnrichDownload {

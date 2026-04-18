@@ -103,6 +103,7 @@ function Start-EmuleHarnessPrivateEd2kSession {
         [string]$ProfileRoot,
         [string]$SeedFilePath,
         [string]$ExportLinkPath,
+        [string]$ExportAichPath,
         [string]$AgentBootstrapNode,
         [string]$ExportSourceIp,
         [string]$DownloadLinkPath,

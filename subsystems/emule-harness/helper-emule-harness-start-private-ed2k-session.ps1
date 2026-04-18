@@ -16,6 +16,7 @@ param(
     [string]$ProfileRoot,
     [string]$SeedFilePath,
     [string]$ExportLinkPath,
+    [string]$ExportAichPath,
     [string]$AgentBootstrapNode,
     [string]$ExportSourceIp,
     [string]$DownloadLinkPath,
@@ -98,7 +99,7 @@ $metadataPath = Join-Path $sessionDir "emule-harness-session.json"
 $sessionStartUtc = (Get-Date).ToUniversalTime()
 $readyState = $null
 
-foreach ($path in @($readyFile, $ExportLinkPath, $statusLogPath)) {
+foreach ($path in @($readyFile, $ExportLinkPath, $ExportAichPath, $statusLogPath)) {
     if (Test-Path -LiteralPath $path) {
         Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
     }
@@ -119,6 +120,9 @@ if (-not [string]::IsNullOrWhiteSpace($SeedFilePath)) {
 }
 if (-not [string]::IsNullOrWhiteSpace($ExportLinkPath)) {
     $emuleHarnessArgs += ('-exportlinkfile="{0}"' -f $ExportLinkPath)
+}
+if (-not [string]::IsNullOrWhiteSpace($ExportAichPath)) {
+    $emuleHarnessArgs += ('-exportaichfile="{0}"' -f $ExportAichPath)
 }
 if (-not [string]::IsNullOrWhiteSpace($ExportSourceIp)) {
     $emuleHarnessArgs += ('-exportsourceip="{0}"' -f $ExportSourceIp)
@@ -173,6 +177,7 @@ $metadata = [pscustomobject]@{
     ParityHookEventLogPath = $readyState.ParityHookEventsFile
     SeedFilePath = $SeedFilePath
     ExportLinkPath = $ExportLinkPath
+    ExportAichPath = $ExportAichPath
     DownloadLinkPath = $DownloadLinkPath
     SearchTerm = $SearchTerm
     SearchResultsPath = $SearchResultsPath

@@ -16,6 +16,10 @@ param(
     [ValidateSet("Debug")]
     [string]$EmuleHarnessBuildConfig = "Debug",
     [int]$ServerPublishTimeoutSeconds = 180,
+    [UInt64]$FileSizeBytes = 0,
+    [string]$FileName,
+    [string]$FilePattern,
+    [switch]$EnableObfuscation,
     [switch]$KeepSessionsRunning
 )
 
@@ -90,7 +94,13 @@ function New-DeterministicBinaryFile {
     try {
         [UInt64]$written = 0
         while ($written -lt $SizeBytes) {
-            $chunk = [Math]::Min($buffer.Length, [int]($SizeBytes - $written))
+            $remaining = $SizeBytes - $written
+            $chunk = if ($remaining -gt [UInt64]$buffer.Length) {
+                $buffer.Length
+            }
+            else {
+                [int]$remaining
+            }
             for ($index = 0; $index -lt $chunk; $index++) {
                 $buffer[$index] = $patternBytes[($written + [UInt64]$index) % [UInt64]$patternBytes.Length]
             }
@@ -255,6 +265,29 @@ function Copy-IfExists {
     }
 }
 
+function Copy-IfSmall {
+    param(
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationRoot,
+        [UInt64]$MaxSizeBytes = 67108864
+    )
+
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $item = Get-Item -LiteralPath $Path
+    if ($item.PSIsContainer) {
+        return
+    }
+    if ([UInt64]$item.Length -gt $MaxSizeBytes) {
+        return
+    }
+
+    Copy-Item -LiteralPath $Path -Destination (Join-Path $DestinationRoot $item.Name) -Force
+}
+
 function Get-HarnessArtifactPath {
     param(
         [Parameter(Mandatory = $true)]
@@ -401,9 +434,83 @@ function Get-Ed2kDumpRecordEvidence {
     }
 }
 
+function Get-Ed2kDumpRecords {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DumpPath
+    )
+
+    @(
+        Get-Content -LiteralPath $DumpPath |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { $_ | ConvertFrom-Json }
+    )
+}
+
+function Test-Ed2kDumpHasOpcode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DumpPath,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("send", "recv")]
+        [string]$Direction,
+        [Parameter(Mandatory = $true)]
+        [string[]]$OpcodeNames
+    )
+
+    $records = Get-Ed2kDumpRecords -DumpPath $DumpPath
+    [bool]@(
+        $records |
+            Where-Object {
+                $_.direction -eq $Direction -and
+                $OpcodeNames -contains [string]$_.opcode_name
+            }
+    ).Count
+}
+
+function Get-Ed2kDumpTransportModes {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DumpPath,
+        [ValidateSet("send", "recv")]
+        [string]$Direction
+    )
+
+    $records = Get-Ed2kDumpRecords -DumpPath $DumpPath
+    @(
+        $records |
+            Where-Object {
+                ($Direction -eq $null -or $_.direction -eq $Direction) -and
+                $_.direction -ne "meta" -and
+                -not [string]::IsNullOrWhiteSpace([string]$_.transport_mode)
+            } |
+            Select-Object -ExpandProperty transport_mode -Unique
+    )
+}
+
 $toolingRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $manifest = Get-Content -Raw $ScenarioManifestPath | ConvertFrom-Json
 $resolvedScenarioManifestPath = (Resolve-Path $ScenarioManifestPath).Path
+$effectiveFileName = if ($PSBoundParameters.ContainsKey("FileName") -and -not [string]::IsNullOrWhiteSpace($FileName)) {
+    $FileName
+}
+else {
+    [string]$manifest.file.name
+}
+$effectiveFileSizeBytes = if ($PSBoundParameters.ContainsKey("FileSizeBytes") -and [UInt64]$FileSizeBytes -gt 0) {
+    [UInt64]$FileSizeBytes
+}
+else {
+    [UInt64]$manifest.file.sizeBytes
+}
+$effectiveFilePattern = if ($PSBoundParameters.ContainsKey("FilePattern") -and -not [string]::IsNullOrWhiteSpace($FilePattern)) {
+    $FilePattern
+}
+else {
+    [string]$manifest.file.pattern
+}
+$effectiveEnableObfuscation = [bool]($EnableObfuscation -or [bool]$manifest.server.enableObfuscation)
+$expectedTransportMode = if ($effectiveEnableObfuscation) { "obfuscated" } else { "plaintext" }
 
 if (-not $env:OVERLORD_TMP_DIR) {
     throw "OVERLORD_TMP_DIR is not set"
@@ -486,7 +593,7 @@ try {
         AdminToken = [string]$manifest.server.adminToken
         LaunchTimeoutSeconds = 120
     }
-    if ($manifest.server.enableObfuscation) {
+    if ($effectiveEnableObfuscation) {
         $serverStartParams.EnableObfuscation = $true
     }
     $serverSession = Start-Goed2kPrivateSession @serverStartParams
@@ -508,8 +615,10 @@ try {
         -ServerPort ([int]$manifest.server.tcpPort) `
         -DestinationPath (Join-Path $seederProfile.ProfileRoot "config\server.met") | Out-Null
 
-    $seedFilePath = Join-Path $seederProfile.IncomingRoot $manifest.file.name
-    New-DeterministicBinaryFile -Path $seedFilePath -SizeBytes ([UInt64]$manifest.file.sizeBytes) -Pattern ([string]$manifest.file.pattern)
+    Set-EmuleHarnessObfuscationMode -Mode $(if ($effectiveEnableObfuscation) { "ObfuscatedPreferred" } else { "PlaintextOnly" }) -ProfileRoot $seederProfile.ProfileRoot | Out-Null
+
+    $seedFilePath = Join-Path $seederProfile.IncomingRoot $effectiveFileName
+    New-DeterministicBinaryFile -Path $seedFilePath -SizeBytes $effectiveFileSizeBytes -Pattern $effectiveFilePattern
 
     $seederSession = Start-EmuleHarnessPrivateEd2kSession `
         -ProfileRoot $seederProfile.ProfileRoot `
@@ -548,7 +657,8 @@ try {
         -ServerPort ([UInt16]$manifest.server.tcpPort) `
         -ServerConnectTimeoutSeconds 8 `
         -ServerReconnectIntervalSeconds 5 `
-        -ServerSessionRotationSeconds 0
+        -ServerSessionRotationSeconds 0 `
+        -EnableObfuscation:$effectiveEnableObfuscation
     Wait-AgentControlReady -StatsUrl $agentStage1Session.StatsUrl -TimeoutSeconds 180
 
     if ([int]$manifest.timeouts.initialPublishDelaySeconds -gt 0) {
@@ -616,6 +726,14 @@ try {
     if (-not $stage1HashsetAnswer.RequestsAich) {
         throw "Seeder harness did not answer OP_HASHSETANSWER2 with AICH"
     }
+    $stage1Compressed = Test-Ed2kDumpHasOpcode -DumpPath $seederDumpPath -Direction "send" -OpcodeNames @("OP_COMPRESSEDPART", "OP_COMPRESSEDPART_I64")
+    if (-not $stage1Compressed) {
+        throw "Seeder harness did not emit compressed part packets on the stage1 transfer"
+    }
+    $stage1TransportModes = @(Get-Ed2kDumpTransportModes -DumpPath $seederDumpPath)
+    if (-not ($stage1TransportModes -contains $expectedTransportMode)) {
+        throw "Seeder harness dump did not show expected transport mode '$expectedTransportMode' (observed: $($stage1TransportModes -join ', '))"
+    }
 
     if ($stoppedSeederSession) {
         $seederSession = $null
@@ -634,7 +752,8 @@ try {
         -ServerPort ([UInt16]$manifest.server.tcpPort) `
         -ServerConnectTimeoutSeconds 8 `
         -ServerReconnectIntervalSeconds 5 `
-        -ServerSessionRotationSeconds 0
+        -ServerSessionRotationSeconds 0 `
+        -EnableObfuscation:$effectiveEnableObfuscation
     Wait-AgentControlReady -StatsUrl $agentStage2Session.StatsUrl -TimeoutSeconds 180
 
     if ([int]$manifest.timeouts.agentRepublishDelaySeconds -gt 0) {
@@ -652,6 +771,7 @@ try {
         -EnableKademlia $false `
         -EnableEd2k $true `
         -ResetTransientState
+    Set-EmuleHarnessObfuscationMode -Mode $(if ($effectiveEnableObfuscation) { "ObfuscatedPreferred" } else { "PlaintextOnly" }) -ProfileRoot $downloaderProfile.ProfileRoot | Out-Null
 
     Write-EmuleHarnessTargetServerMet `
         -ServerIp $manifest.server.host `
@@ -693,7 +813,7 @@ try {
     Copy-IfExists -Path (Get-HarnessArtifactPath -Session $downloaderSession -StoppedSession $stoppedDownloaderSession -PropertyName "StatusLogPath") -DestinationRoot $downloaderArtifactsRoot
     Copy-IfExists -Path (Get-HarnessArtifactPath -Session $downloaderSession -StoppedSession $stoppedDownloaderSession -PropertyName "EmuleHarnessUdpDumpPath") -DestinationRoot $downloaderArtifactsRoot
     Copy-IfExists -Path (Get-HarnessArtifactPath -Session $downloaderSession -StoppedSession $stoppedDownloaderSession -PropertyName "EmuleHarnessEd2kTcpDumpPath") -DestinationRoot $downloaderArtifactsRoot
-    Copy-IfExists -Path $downloadedFile.FullName -DestinationRoot $downloaderArtifactsRoot
+    Copy-IfSmall -Path $downloadedFile.FullName -DestinationRoot $downloaderArtifactsRoot
 
     $downloaderDumpPath = Get-ChildItem -LiteralPath $downloaderArtifactsRoot -Filter "emule-harness-ed2k-tcp-dump-*.jsonl" -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTimeUtc -Descending |
@@ -708,6 +828,14 @@ try {
     $stage2HashsetAnswer = Get-Ed2kDumpRecordEvidence -DumpPath $downloaderDumpPath -OpcodeName "OP_HASHSETANSWER2" -Direction "recv"
     if (-not $stage2HashsetAnswer.RequestsAich) {
         throw "Agent stage2 did not answer OP_HASHSETANSWER2 with AICH"
+    }
+    $stage2Compressed = Test-Ed2kDumpHasOpcode -DumpPath $downloaderDumpPath -Direction "recv" -OpcodeNames @("OP_COMPRESSEDPART", "OP_COMPRESSEDPART_I64")
+    if (-not $stage2Compressed) {
+        throw "Downloader harness did not receive compressed part packets on the stage2 transfer"
+    }
+    $stage2TransportModes = @(Get-Ed2kDumpTransportModes -DumpPath $downloaderDumpPath)
+    if (-not ($stage2TransportModes -contains $expectedTransportMode)) {
+        throw "Downloader harness dump did not show expected transport mode '$expectedTransportMode' (observed: $($stage2TransportModes -join ', '))"
     }
 
     $downloaderVerboseLogPath = Get-ChildItem -LiteralPath $downloaderArtifactsRoot -Filter "eMule_Verbose.log" -ErrorAction SilentlyContinue |
@@ -749,6 +877,7 @@ try {
         serverPublishedSources = $publishedFile.sources
         agentTransferManifestPath = $agentTransferManifestPath
         harnessDownloadedFilePath = $downloadedFile.FullName
+        transportMode = $expectedTransportMode
         sameHostTransferMode = [ordered]@{
             enabled = $true
             rationale = "local_server_plus_loopback_source_hint"
@@ -760,8 +889,12 @@ try {
             agentManifestAichAcquired = [bool]$agentTransferManifest.aich_hashset_acquired
             stage1HashsetRequestAich = [bool]$stage1HashsetRequest.RequestsAich
             stage1HashsetAnswerAich = [bool]$stage1HashsetAnswer.RequestsAich
+            stage1CompressedParts = [bool]$stage1Compressed
+            stage1TransportModes = @($stage1TransportModes)
             stage2HashsetRequestAich = [bool]$stage2HashsetRequest.RequestsAich
             stage2HashsetAnswerAich = [bool]$stage2HashsetAnswer.RequestsAich
+            stage2CompressedParts = [bool]$stage2Compressed
+            stage2TransportModes = @($stage2TransportModes)
             harnessVerifierAichOk = [bool]$verifierAichOk
             agentStage1Ed2kDumpPresent = [bool](Test-Path -LiteralPath (Join-Path $agentStage1ArtifactsRoot (Split-Path -Leaf $agentStage1Ed2kDumpPath)))
             agentStage2Ed2kDumpPresent = [bool](Test-Path -LiteralPath (Join-Path $agentStage2ArtifactsRoot (Split-Path -Leaf $agentStage2Ed2kDumpPath)))
