@@ -566,6 +566,7 @@ try {
         -SeedFilePath $emuleHarnessSeedPath `
         -ExportLinkPath $emuleHarnessLinkPath `
         -ExportAichPath $emuleHarnessAichPath `
+        -ExportSourceIp ([string]$manifest.emuleHarness.bindAddr) `
         -AgentBootstrapNode $agentBootstrapNode `
         -BuildConfig $EmuleHarnessBuildConfig
 

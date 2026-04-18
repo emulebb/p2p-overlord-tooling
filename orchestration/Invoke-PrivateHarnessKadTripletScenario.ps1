@@ -956,6 +956,7 @@ try {
             ProfileRoot = $profile.ProfileRoot
             SeedFilePath = $seedPath
             ExportLinkPath = $linkPath
+            ExportSourceIp = [string]$harness.bindAddr
             AgentBootstrapNode = [string]$harness.bootstrapPeers
             BuildConfig = $HarnessBuildConfig
             SkipRuntimeCleanup = $true

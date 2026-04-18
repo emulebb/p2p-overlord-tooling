@@ -261,6 +261,7 @@ try {
         -ProfileRoot $profile.ProfileRoot `
         -SeedFilePath $emuleHarnessSeedPath `
         -ExportLinkPath $emuleHarnessLinkPath `
+        -ExportSourceIp ([string]$manifest.emuleHarness.bindAddr) `
         -AgentBootstrapNode $agentBootstrapNode `
         -BuildConfig $EmuleHarnessBuildConfig
 
