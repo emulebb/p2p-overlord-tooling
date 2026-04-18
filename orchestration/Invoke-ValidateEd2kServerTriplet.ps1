@@ -6,7 +6,7 @@ Runs focused local validation of the eMule harness + goed2k-server + agent tripl
 
 [CmdletBinding()]
 param(
-    [ValidateSet("Debug", "Release")]
+    [ValidateSet("Debug")]
     [string]$EmuleHarnessBuildConfig = "Debug"
 )
 
@@ -714,6 +714,8 @@ foreach ($requiredPath in @($paths.Profile)) {
         throw "Required validation helper not found at $requiredPath"
     }
 }
+
+Build-EmuleHarnessDebug | Out-Null
 
 $runId = "ed2k-server-triplet-validation-{0}" -f (Get-Date -Format "yyyyMMdd-HHmmss")
 $artifactRoot = Join-Path $env:OVERLORD_TMP_DIR ("overlord-tooling\runs\ed2k.server.triplet.validation.v1\{0}" -f $runId)

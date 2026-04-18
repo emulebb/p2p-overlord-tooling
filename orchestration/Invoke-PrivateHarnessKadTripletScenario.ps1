@@ -882,19 +882,7 @@ foreach ($requiredPath in @($profileScriptPath, $coordinatorStartScriptPath)) {
 
 $buildUsedFallback = $false
 $buildFallbackReason = $null
-try {
-    Build-EmuleHarnessDebug | Out-Null
-}
-catch {
-    $harnessDebugDir = Resolve-EmuleHarnessDebugDir
-    $runtimeExePath = Join-Path $harnessDebugDir "eMule_v072a_parity.exe"
-    if (-not (Test-Path -LiteralPath $runtimeExePath)) {
-        throw
-    }
-
-    $buildUsedFallback = $true
-    $buildFallbackReason = $_.Exception.Message
-}
+Build-EmuleHarnessDebug | Out-Null
 
 Clean-EmuleHarnessRuntime -CapturePort 0 | Out-Null
 

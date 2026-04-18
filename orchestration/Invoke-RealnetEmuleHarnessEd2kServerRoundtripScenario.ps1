@@ -13,7 +13,7 @@ which downloads the same file back from the agent.
 [CmdletBinding()]
 param(
     [string]$ScenarioManifestPath = (Join-Path $PSScriptRoot "..\scenarios\ed2k.server.emule-harness.agent.roundtrip.realnet.v1\manifest.v1.json"),
-    [ValidateSet("Debug", "Release")]
+    [ValidateSet("Debug")]
     [string]$EmuleHarnessBuildConfig = "Debug",
     [string]$ServerMetPath,
     [switch]$KeepSessionsRunning
@@ -319,6 +319,8 @@ $parsedLink = $null
 $failedReason = $null
 $agentDirectDownloadLink = $null
 $harnessDirectDownloadLink = $null
+
+Build-EmuleHarnessDebug | Out-Null
 
 try {
     $seederProfile = & $profileScriptPath `

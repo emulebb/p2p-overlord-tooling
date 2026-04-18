@@ -13,7 +13,7 @@ to complete.
 [CmdletBinding()]
 param(
     [string]$ScenarioManifestPath = (Join-Path $PSScriptRoot "..\scenarios\kad.emule-harness.ed2k.download.private.v1\manifest.v1.json"),
-    [ValidateSet("Debug", "Release")]
+    [ValidateSet("Debug")]
     [string]$EmuleHarnessBuildConfig = "Debug",
     [switch]$EnableObfuscation,
     [int]$EmuleHarnessPublishTimeoutSeconds = 180,
@@ -218,6 +218,8 @@ foreach ($requiredPath in @($profileScriptPath)) {
         throw "Required scenario helper not found at $requiredPath"
     }
 }
+
+Build-EmuleHarnessDebug | Out-Null
 
 $profile = & $profileScriptPath `
     -ProfileRoot $emuleHarnessProfileRoot `

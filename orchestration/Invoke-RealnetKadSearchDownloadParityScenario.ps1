@@ -13,7 +13,7 @@ transfer traces can be compared.
 [CmdletBinding()]
 param(
     [string]$Query = "ebook",
-    [ValidateSet("Debug", "Release")]
+    [ValidateSet("Debug")]
     [string]$EmuleHarnessBuildConfig = "Debug",
     [ValidateSet("All", "PlaintextOnly", "ObfuscatedOnly")]
     [string]$TransportModes = "All",

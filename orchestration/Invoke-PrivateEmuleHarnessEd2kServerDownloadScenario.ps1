@@ -7,7 +7,7 @@ Runs a deterministic private eMule harness-to-agent ED2K download through a loca
 [CmdletBinding()]
 param(
     [string]$ScenarioManifestPath = (Join-Path $PSScriptRoot "..\scenarios\ed2k.server.emule-harness.agent.private.v1\manifest.v1.json"),
-    [ValidateSet("Debug", "Release")]
+    [ValidateSet("Debug")]
     [string]$EmuleHarnessBuildConfig = "Debug",
     [int]$ServerPublishTimeoutSeconds = 180,
     [int]$DownloadTimeoutSeconds = 300,
@@ -202,6 +202,8 @@ foreach ($requiredPath in @($profileScriptPath)) {
         throw "Required scenario helper not found at $requiredPath"
     }
 }
+
+Build-EmuleHarnessDebug | Out-Null
 
 $profile = & $profileScriptPath `
     -ProfileRoot $emuleHarnessProfileRoot `
