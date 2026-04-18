@@ -490,14 +490,14 @@ function Get-Ed2kDumpTransportModes {
         [Parameter(Mandatory = $true)]
         [string]$DumpPath,
         [ValidateSet("send", "recv")]
-        [string]$Direction
+        [string]$Direction = ""
     )
 
     $records = Get-Ed2kDumpRecords -DumpPath $DumpPath
     @(
         $records |
             Where-Object {
-                ($Direction -eq $null -or $_.direction -eq $Direction) -and
+                ([string]::IsNullOrWhiteSpace($Direction) -or $_.direction -eq $Direction) -and
                 $_.direction -ne "meta" -and
                 -not [string]::IsNullOrWhiteSpace([string]$_.transport_mode)
             } |
