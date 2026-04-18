@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.server.emule-harness.agent.roundtrip.private.large.v1",
+  "description": "Private local ED2K server roundtrip with a large deterministic file so the harness and agent exercise the modern HASHSETREQUEST2/HASHSETANSWER2 plus AICH path entirely on loopback through a local goed2k-server.",
+  "scenarioKind": "legacy",
+  "protocol": "ed2k",
+  "tier": "deterministic-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "legacy.listener.roundtrip.private.large_file",
+    "availability": "available",
+    "expectedBranch": "server-session->download->large-file-hashset->reoffer->listener-download",
+    "comparisonMode": "acceptance-layer"
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "tcpPort": 42161,
+    "adminPort": 42180,
+    "udpPortOffset": 4,
+    "adminToken": "local-goed2k-token",
+    "enableObfuscation": false
+  },
+  "harnessSeeder": {
+    "tcpPort": 42062,
+    "udpPort": 42072,
+    "serverUdpPort": 0,
+    "webPort": 47111,
+    "kadUdpKey": 4206201
+  },
+  "harnessDownloader": {
+    "tcpPort": 42082,
+    "udpPort": 42092,
+    "serverUdpPort": 0,
+    "webPort": 47121,
+    "kadUdpKey": 4208201
+  },
+  "agent": {
+    "controlPort": 13301,
+    "kadPort": 41120,
+    "ed2kPort": 41121
+  },
+  "file": {
+    "name": "ubuntu-linux-private-roundtrip-large.bin",
+    "sizeBytes": 10485760,
+    "pattern": "ubuntu-linux-ed2k-private-roundtrip-large"
+  },
+  "timeouts": {
+    "agentDownloadSeconds": 900,
+    "harnessDownloadSeconds": 900,
+    "initialPublishDelaySeconds": 10,
+    "agentRepublishDelaySeconds": 10,
+    "harnessReadySeconds": 180
+  }
+}
