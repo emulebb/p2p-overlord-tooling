@@ -63,6 +63,21 @@ function Wait-Path {
     throw "Timed out waiting for path $Path"
 }
 
+function Get-HarnessSeedExportTimeoutSeconds {
+    param(
+        [Parameter(Mandatory = $true)]
+        [UInt64]$FileSizeBytes,
+        [Parameter(Mandatory = $true)]
+        [int]$BaseTimeoutSeconds
+    )
+
+    $oneGiB = 1GB
+    $extraSecondsPerGiB = 300
+    $sizeGiB = [math]::Ceiling(([double]$FileSizeBytes) / [double]$oneGiB)
+    $scaledTimeout = $BaseTimeoutSeconds + ([int]$sizeGiB * $extraSecondsPerGiB)
+    return [Math]::Max($BaseTimeoutSeconds, $scaledTimeout)
+}
+
 function New-DeterministicBinaryFile {
     param(
         [Parameter(Mandatory = $true)]
@@ -420,6 +435,9 @@ else {
 }
 $effectiveEnableObfuscation = [bool]$EnableObfuscation
 $expectedTransportMode = if ($effectiveEnableObfuscation) { "obfuscated" } else { "plaintext" }
+$seedExportTimeoutSeconds = Get-HarnessSeedExportTimeoutSeconds `
+    -FileSizeBytes $effectiveFileSizeBytes `
+    -BaseTimeoutSeconds 60
 $agentP2pBindIp = if ($null -ne $manifest.agent -and -not [string]::IsNullOrWhiteSpace([string]$manifest.agent.p2pBindIp)) {
     [string]$manifest.agent.p2pBindIp
 }
@@ -503,8 +521,8 @@ try {
         -AgentBootstrapNode $agentBootstrapNode `
         -BuildConfig $EmuleHarnessBuildConfig
 
-    Wait-Path -Path $emuleHarnessLinkPath -TimeoutSeconds 60
-    Wait-Path -Path $emuleHarnessAichPath -TimeoutSeconds 60
+    Wait-Path -Path $emuleHarnessLinkPath -TimeoutSeconds $seedExportTimeoutSeconds
+    Wait-Path -Path $emuleHarnessAichPath -TimeoutSeconds $seedExportTimeoutSeconds
     $parsedLink = Parse-Ed2kLinkFile -Path $emuleHarnessLinkPath
     $aichSidecar = Get-Content -LiteralPath $emuleHarnessAichPath -Raw | ConvertFrom-Json
 

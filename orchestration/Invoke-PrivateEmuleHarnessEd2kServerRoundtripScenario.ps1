@@ -71,6 +71,21 @@ function Wait-Path {
     throw "Timed out waiting for path $Path"
 }
 
+function Get-HarnessSeedExportTimeoutSeconds {
+    param(
+        [Parameter(Mandatory = $true)]
+        [UInt64]$FileSizeBytes,
+        [Parameter(Mandatory = $true)]
+        [int]$BaseTimeoutSeconds
+    )
+
+    $oneGiB = 1GB
+    $extraSecondsPerGiB = 300
+    $sizeGiB = [math]::Ceiling(([double]$FileSizeBytes) / [double]$oneGiB)
+    $scaledTimeout = $BaseTimeoutSeconds + ([int]$sizeGiB * $extraSecondsPerGiB)
+    return [Math]::Max($BaseTimeoutSeconds, $scaledTimeout)
+}
+
 function New-DeterministicBinaryFile {
     param(
         [Parameter(Mandatory = $true)]
@@ -511,6 +526,9 @@ else {
 }
 $effectiveEnableObfuscation = [bool]($EnableObfuscation -or [bool]$manifest.server.enableObfuscation)
 $expectedTransportMode = if ($effectiveEnableObfuscation) { "obfuscated" } else { "plaintext" }
+$seedExportTimeoutSeconds = Get-HarnessSeedExportTimeoutSeconds `
+    -FileSizeBytes $effectiveFileSizeBytes `
+    -BaseTimeoutSeconds ([int]$manifest.timeouts.harnessReadySeconds)
 
 if (-not $env:OVERLORD_TMP_DIR) {
     throw "OVERLORD_TMP_DIR is not set"
@@ -627,7 +645,7 @@ try {
         -ExportSourceIp $manifest.server.host `
         -BuildConfig $EmuleHarnessBuildConfig
 
-    Wait-Path -Path $seedLinkPath -TimeoutSeconds ([int]$manifest.timeouts.harnessReadySeconds)
+    Wait-Path -Path $seedLinkPath -TimeoutSeconds $seedExportTimeoutSeconds
     $parsedLink = Parse-Ed2kLinkFile -Path $seedLinkPath
     if ([string]::IsNullOrWhiteSpace([string]$parsedLink.AichRoot)) {
         throw "Seeder export link did not contain an AICH hash"
