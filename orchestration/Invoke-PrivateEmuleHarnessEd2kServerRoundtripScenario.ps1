@@ -104,23 +104,25 @@ function New-DeterministicBinaryFile {
         throw "Pattern must not be empty"
     }
 
-    $buffer = New-Object byte[] 65536
+    $tileSize = [Math]::Max($patternBytes.Length, [Math]::Min(1MB, [int][Math]::Min([UInt64]$SizeBytes, [UInt64]1MB)))
+    $buffer = New-Object byte[] $tileSize
+    for ($offset = 0; $offset -lt $buffer.Length;) {
+        $copyLength = [Math]::Min($patternBytes.Length, $buffer.Length - $offset)
+        [Array]::Copy($patternBytes, 0, $buffer, $offset, $copyLength)
+        $offset += $copyLength
+    }
     $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
     try {
-        [UInt64]$written = 0
-        while ($written -lt $SizeBytes) {
-            $remaining = $SizeBytes - $written
+        [UInt64]$remaining = $SizeBytes
+        while ($remaining -gt 0) {
             $chunk = if ($remaining -gt [UInt64]$buffer.Length) {
                 $buffer.Length
             }
             else {
                 [int]$remaining
             }
-            for ($index = 0; $index -lt $chunk; $index++) {
-                $buffer[$index] = $patternBytes[($written + [UInt64]$index) % [UInt64]$patternBytes.Length]
-            }
             $stream.Write($buffer, 0, $chunk)
-            $written += [UInt64]$chunk
+            $remaining -= [UInt64]$chunk
         }
     }
     finally {
