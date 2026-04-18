@@ -19,5 +19,19 @@ Current live-transfer coverage includes:
 
 - `ed2k.server.emule-harness.agent.roundtrip.realnet.v1` for a real-network
   same-server ED2K roundtrip between the eMule harness and the agent
+- `ed2k.server.roundtrip.realnet.large.v1` for the large-file real-network
+  ED2K roundtrip gate on the modern `FileIdentifier` path
 - `kad.search-download.emule-harness.agent.realnet.v1` for paired live Kad
   search and downstream ED2K download evidence
+
+Current deterministic local transfer coverage includes:
+
+- `ed2k.server.emule-harness.agent.roundtrip.private.large.v1` for same-host
+  ED2K roundtrip evidence on the modern `FileIdentifier` /
+  `OP_HASHSETREQUEST2` path
+- `ed2k.server.agent.emule-harness.private.large.v1` for focused local
+  agent->harness ED2K server-download evidence
+- `kad.emule-harness.agent.download.private.large.v1` for harness->agent
+  Kad-discovered large-file transfer on loopback
+- `kad.agent.emule-harness.download.private.large.v1` for agent->harness
+  Kad-discovered large-file transfer on loopback
