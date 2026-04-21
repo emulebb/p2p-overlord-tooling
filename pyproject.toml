@@ -1,0 +1,33 @@
+[project]
+name = "p2p-overlord-tooling"
+version = "0.0.0"
+description = "Workspace tooling and pytest E2E parity scenarios for p2p-overlord."
+requires-python = ">=3.11"
+
+[project.scripts]
+overlord-tooling = "overlord_tooling.cli:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "e2e: launches parity runtimes and performs end-to-end transfers",
+    "local: deterministic private/local scenario",
+    "live: real-network scenario that requires VPN/UPnP/network prerequisites",
+    "ed2k: ED2K protocol scenario",
+    "kad: Kad protocol scenario",
+    "plaintext: plaintext protocol transport variant",
+    "obfuscated: obfuscated protocol transport variant",
+    "compressed: requires compressed part traffic evidence",
+    "harness_to_agent: transfer direction from eMule harness to agent",
+    "agent_to_harness: transfer direction from agent to eMule harness",
+    "roundtrip: bidirectional transfer scenario",
+    "slow: long-running parity scenario",
+    "requires_vpn: requires hide.me VPN binding",
+]

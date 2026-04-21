@@ -49,10 +49,8 @@ rules, quality gates, or deltas that are not shared across the workspace.
 - Prefer granular commits and small coherent changes.
 - Persist reusable automation, scenarios, profiles, schemas, and helper logic
   under `%OVERLORD_PROJECT_DIR%\p2p-overlord-tooling`.
-- Thin PowerShell wrappers may use `helper-<area>-<action>.ps1`, but reusable
-  logic belongs in the structured tooling layout.
-- Tracked text files use LF by default. `.ps1`, `.cmd`, and `.bat` may use
-  CRLF.
+- Do not add shell wrapper launchers to the canonical repos.
+- Tracked text files use LF by default.
 - Do not store personal information, user-specific filesystem paths, or
   user-identifying data results in tracked source or markdown files.
 
@@ -73,16 +71,9 @@ rules, quality gates, or deltas that are not shared across the workspace.
 - The only mutable app variant for parity work is the tracing harness at
   `%EMULE_WORKSPACE_ROOT%\workspaces\v0.72a\app\eMule-v0.72a-tracing-harness`.
   Do not patch other app variants for this workspace program.
-- All eMule harness builds must go through the canonical eMule-build entrypoint
-  from `%EMULE_WORKSPACE_ROOT%`:
-  - `%EMULE_WORKSPACE_ROOT%\repos\eMule-build\workspace.ps1 build-app`
-  - `-EmuleWorkspaceRoot %EMULE_WORKSPACE_ROOT%`
-  - `-Config Debug`
-  - `-Platform x64`
-- `build-app` builds the workspace app set; harness tooling then consumes the
-  `tracing-harness` output from the canonical workspace path.
-- Do not present direct raw output directories as the supported primary build
-  flow.
+- p2p-overlord tooling consumes the existing `tracing-harness` debug output
+  from the canonical workspace path. Build orchestration for the external
+  eMule workspace is not invoked from this repo.
 - Before launching the harness on the real network, ensure the active profile
   binds to the current `hide.me` VPN IPv4 address.
 - Seeded harness `preferences.ini` files must contain only the minimal
@@ -116,10 +107,7 @@ rules, quality gates, or deltas that are not shared across the workspace.
 
 ## Operational Constraints
 
-- Treat the direct coordinator and agent `.cmd` launcher scripts as stable
-  operator entrypoints. Change them only when required to preserve canonical
-  repo layout or operator runtime correctness.
 - The system is Windows-first today, but keep Windows-specific logic isolated
   so future multi-platform support stays viable.
 - Avoid Windows command-length failures by breaking work into file-sized
-  patches or helper scripts when needed.
+  patches or direct package commands when needed.

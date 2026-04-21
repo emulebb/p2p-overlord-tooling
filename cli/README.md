@@ -2,12 +2,9 @@
 
 Stable top-level command surface for the workspace tooling platform.
 
-The root `../overlord-tooling.ps1` entrypoint delegates here so callers do not
-depend on internal file layout.
+The supported entrypoint is `python -m overlord_tooling`.
 
-`CommandRegistry.ps1` is the single source of truth for script-backed commands,
-their descriptions, and dispatch targets. Keep help text and routing derived
-from the registry instead of duplicating command metadata in the entry script.
+Command metadata and dispatch live in `../overlord_tooling/cli.py`.
 
 Current built-in commands include:
 
@@ -15,3 +12,7 @@ Current built-in commands include:
 - `layout`
 - `paths`
 - `guard-tracked-files`
+- `guard-workspace-conventions`
+- `show-scenario`
+- `show-parity-matrix`
+- `import-emule-harness-seeds`

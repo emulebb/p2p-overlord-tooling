@@ -14,90 +14,69 @@ tooling-repo notes in `./AGENTS.md`.
 
 ## Layout
 
-- `overlord-tooling.ps1` stable top-level CLI entrypoint
-- `cli/` command dispatch and CLI helpers
-- `orchestration/` run/session orchestration
+- `overlord_tooling/` Python command surface
+- `cli/` command-surface notes
+- `orchestration/` scenario orchestration notes
 - `scenarios/` versioned scenario contracts
-- `profiles/` profile templates and materializers
+- `tests/e2e/` native pytest parity scenarios
+- `profiles/` profile notes
 - `schemas/` versioned manifest and summary schemas
 - `normalizers/` trace normalization and post-processing
 - `reports/` summary generation
-- `subsystems/` subsystem-specific tooling modules and internal scripts
+- `subsystems/` retired subsystem notes and remaining Python helpers
 
 ## Supported Surface
 
 Operator-facing entrypoints are:
 
-- `overlord-tooling.ps1`
-- `orchestration/` scenario runners
+- `python -m overlord_tooling`
+- `python -m pytest tests/e2e ...` for parity E2E scenarios
 - `scenarios/` manifest contracts
 
-Subsystem-owned scripts under `subsystems/` are internal implementation
-details. They can be reorganized as the platform evolves and should not be
-treated as stable operator entrypoints.
+Legacy wrapper scripts were removed. Do not add compatibility shims for them.
 
 ## Tooling Architecture
 
-- `cli/` exposes the stable workspace command surface through a command registry
-- `orchestration/` composes subsystem entry modules into reproducible runs
+- `overlord_tooling/` exposes the stable workspace command surface
+- `tests/e2e/` composes runtimes into reproducible pytest parity runs
+- `orchestration/` keeps scenario orchestration notes
 - `scenarios/` defines versioned scenario contracts
-- `subsystems/RuntimeContext.ps1` centralizes repo-root resolution and internal script invocation
-- `subsystems/*/*Subsystem.ps1` provides the internal entry modules that orchestration imports
-- `subsystems/` owns runtime-specific logic for agent, eMule harness, goed2k, network, pcap, parity, and protocol helpers
+- runtime-specific parity logic lives in `tests/e2e/lib/`
 - `reports/` and `normalizers/` transform raw run artifacts into consumable
   summaries
 
 ## Contributor Note
 
-Do not add new root-level `helper-*` scripts. New reusable logic should live
-under the owning subsystem, and orchestration should call subsystem entry
-modules or functions rather than depending on helper file paths.
+Do not add wrapper scripts. New reusable automation should be Python modules
+under the owning package or pytest library.
 
 ## Docs
 
 - [Tooling Docs](docs/README.md)
 - [Workspace Policy](docs/WORKSPACE_POLICY.md)
-- [PowerShell Mistakes](docs/POWERSHELL_MISTAKES.md)
 
 ## Guards
 
-- `.\overlord-tooling.ps1 guard-tracked-files` scans tracked files for user-profile
+- `python -m overlord_tooling guard-tracked-files` scans tracked files for user-profile
   path leaks and configured personal-name filename leaks.
-- `.\overlord-tooling.ps1 guard-workspace-conventions` scans tracked files for
-  stale `overlord-*` repo-directory references and tracked `.ps1` files that
-  are missing the required `#Requires -Version 7.6` header.
+- `python -m overlord_tooling guard-workspace-conventions` scans the canonical
+  repos for stale `overlord-*` repo-directory references and forbidden wrapper
+  files.
 - Repo-specific personal identifier checks should come from local untracked
   policy or environment configuration, not from tracked source.
 - The same guard is enforced in GitHub Actions for pushes and pull requests.
 
 ## Deterministic Harness
 
-- `.\overlord-tooling.ps1 import-emule-harness-seeds -NodesDatPath <path> -ServerMetPath <path>`
+- `python -m overlord_tooling import-emule-harness-seeds <nodes.dat> <server.met>`
   copies the local canonical `nodes.dat` and `server.met` into the untracked
   `.local/emule-harness-seeds/canonical/` bundle without persisting the source paths.
-- `.\overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1`
+- `python -m overlord_tooling show-scenario kad.startup.hello.publish.realnet.v1`
   prints the first paired eMule harness and agent scenario contract.
-- `.\overlord-tooling.ps1 show-parity-matrix`
+- `python -m overlord_tooling show-parity-matrix`
   prints the KAD2 and ED2K parity inventory, including runnable cells,
   campaigns, and planned harness-hook gaps.
-- `.\overlord-tooling.ps1 run-parity-cell -ScenarioId <id>`
-  runs one parity cell manifest and writes a wrapper run manifest plus summary
-  that points back at the delegated legacy scenario artifacts.
-- `.\overlord-tooling.ps1 run-parity-campaign -ScenarioId <id>`
-  runs a campaign by executing its member cells and aggregating their wrapper
-  summaries.
-- `.\overlord-tooling.ps1 run-kad-startup-hello-publish` materializes a
-  scenario-owned eMule harness profile with a manifest-owned minimal
-  `preferences.ini`, launches the eMule harness with an explicit profile-root
-  override, launches the agent, triggers a deterministic manual publish,
-  resolves the eMule harness runtime from `%EMULE_WORKSPACE_ROOT%`, and writes
-  run artifacts under
-  `%OVERLORD_TMP_DIR%`.
-- `.\overlord-tooling.ps1 run-realnet-emule-harness-ed2k-server-roundtrip`
-  pins both runtimes to one reachable live ED2K server, transfers a
-  deterministic binary from the eMule harness to the agent, restarts the agent,
-  and verifies that a fresh eMule harness profile can download the same file
-  back over the live server path.
-- `.\overlord-tooling.ps1 run-realnet-kad-search-download-parity`
-  drives the paired live Kad search and ED2K download parity scenario in
-  plaintext, obfuscated, or combined mode.
+- `python -m pytest tests/e2e --collect-only`
+  lists native pytest parity scenarios without launching runtimes.
+- `python -m pytest tests/e2e -m "local and ed2k" --run-e2e --file-size-bytes 127926272`
+  runs the native local ED2K parity matrix with the 122 MiB payload size.

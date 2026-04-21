@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "kad.agent.emule-harness.download.realnet.large.v1",
+  "description": "Real-network Kad plus ED2K large-file download from an agent-ingested deterministic payload to a fresh eMule harness profile using the canonical live nodes.dat bundle.",
+  "scenarioKind": "legacy",
+  "protocol": "kad",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "legacy.kad.realnet.agent_seed.large_file",
+    "availability": "available",
+    "expectedBranch": "agent-live-ingest->kad-publish->harness-source-resolution->large-file-hashset",
+    "comparisonMode": "acceptance-layer"
+  },
+  "interfaceAlias": "hide.me",
+  "seedBundleId": "canonical",
+  "downloaderHarness": {
+    "tcpPort": 46701,
+    "udpPort": 46703,
+    "serverUdpPort": 0,
+    "webPort": 47151,
+    "kadUdpKey": 4670101
+  },
+  "agent": {
+    "capturePort": 41000,
+    "minimumKadPeerCount": 8
+  },
+  "file": {
+    "name": "ubuntu-linux-agent-kad-realnet-large.bin",
+    "sizeBytes": 10485760,
+    "pattern": "ubuntu-linux-agent-kad-realnet-large"
+  },
+  "timeouts": {
+    "kadReadySeconds": 600,
+    "agentPublishSeconds": 300,
+    "harnessDownloadSeconds": 7200
+  }
+}

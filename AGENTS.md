@@ -5,7 +5,6 @@
 - Use `../p2p-overlord-be/BACKLOG.md` as the canonical active backlog.
 - Keep a stable top-level CLI surface and put reusable logic in structured
   platform directories.
-- Legacy wrapper scripts may keep the `helper-<area>-<action>.ps1` format.
 - Add short header comments so purpose and expected inputs are obvious.
 - Prefer tooling that orchestrates existing repo commands instead of
   re-implementing product logic here.
@@ -13,7 +12,5 @@
   reports.
 - Keep subsystem-specific logic isolated under `subsystems/` when adding new
   platform features.
-- Run tooling PowerShell scripts with `pwsh`.
-- Every tracked `.ps1` file in this repo, including internal modules such as
-  `*Subsystem.ps1`, `RuntimeContext.ps1`, and CLI support files, must start
-  with `#Requires -Version 7.6`.
+- Use `python -m overlord_tooling` for the supported tooling CLI.
+- Do not add shell wrapper launchers.

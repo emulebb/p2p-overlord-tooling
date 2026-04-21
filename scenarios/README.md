@@ -7,13 +7,16 @@ Scenario identifiers should stay stable and semantic, for example
 
 The parity program uses three manifest kinds:
 
-- `legacy` for the existing runnable scenario contracts
+- `legacy` for obsolete scenario contracts retained as references
 - `cell` for one canonical parity matrix cell
 - `campaign` for a composed gate over one or more parity cells
 
-Use `..\overlord-tooling.ps1 show-parity-matrix` to list the current KAD2 and
+Use `python -m overlord_tooling show-parity-matrix` to list the current KAD2 and
 ED2K matrix inventory, including planned cells that still need deterministic
 harness shaping.
+
+Legacy `execution.command` values in manifests refer to removed runners. Native
+parity E2E execution now belongs under `..\tests\e2e\`.
 
 Current live-transfer coverage includes:
 

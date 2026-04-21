@@ -5,52 +5,49 @@ Supporting notes for the workspace tooling platform.
 ## Read First
 
 - [Workspace Policy](./WORKSPACE_POLICY.md)
-- [PowerShell Mistakes](./POWERSHELL_MISTAKES.md)
 
 ## Platform Areas
 
-- `../overlord-tooling.ps1` stable top-level CLI entrypoint
-- `../cli/` command dispatch
-- `../orchestration/` reproducible session control
+- `../overlord_tooling/` Python command surface
+- `../cli/` command-surface notes
+- `../orchestration/` scenario orchestration notes
+- `../tests/e2e/` native pytest parity scenarios
 - `../scenarios/` scenario contracts
-- `../profiles/` generated runtime profiles
+- `../profiles/` profile notes
 - `../schemas/` versioned JSON contracts
 - `../normalizers/` trace normalization
 - `../reports/` machine-readable and terminal summaries
-- `../subsystems/` subsystem modules and internal implementation scripts
+- `../subsystems/` retired subsystem notes and remaining Python helpers
 
 ## Supported Surface
 
 Treat these as the supported operator-facing surface:
 
-- `../overlord-tooling.ps1`
-- documented orchestration scripts under `../orchestration/`
+- `python -m overlord_tooling`
+- `python -m pytest tests/e2e ...` parity E2E scenarios
 - scenario manifests under `../scenarios/`
 
-Scripts under `../subsystems/` are internal implementation details that back
-the platform surface above. Contributors may refactor them freely as long as
-the supported surface and scenario behavior remain coherent.
+Legacy wrapper scripts were removed. Do not add compatibility shims for them.
 
 ## Architecture
 
-- CLI dispatch stays in `../cli/` and should come from the command registry
-- scenario composition stays in `../orchestration/`
-- shared root/path resolution stays in `../subsystems/RuntimeContext.ps1`
-- subsystem entry modules stay in `../subsystems/*/*Subsystem.ps1`
-- subsystem-owned runtime logic stays behind those subsystem entry modules
+- CLI dispatch stays in `../overlord_tooling/`
+- scenario composition moves to native pytest under `../tests/e2e/`
+- `../orchestration/` keeps scenario orchestration notes
+- runtime-owned parity logic stays in `../tests/e2e/lib/`
 - result shaping stays in `../normalizers/` and `../reports/`
 
-Do not add new repo-root `helper-*` scripts. New reusable logic belongs under
-the owning subsystem, and orchestration should not depend on helper file names.
+Do not add wrapper scripts. New reusable automation should be Python modules
+under the owning package or pytest library.
 
 ## Repo Guards
 
-- `../overlord-tooling.ps1 guard-tracked-files` validates that tracked files do
+- `python -m overlord_tooling guard-tracked-files` validates that tracked files do
   not contain committed local user-profile paths and do not use configured
   personal-name filenames.
-- `../overlord-tooling.ps1 guard-workspace-conventions` validates that tracked
-  files do not use stale `overlord-*` repo-directory references and that every
-  tracked `.ps1` starts with `#Requires -Version 7.6`.
+- `python -m overlord_tooling guard-workspace-conventions` validates that
+  tracked files do not use stale `overlord-*` repo-directory references and
+  that canonical repos do not contain forbidden wrapper files.
 - Tracked safe exceptions for public references must stay narrow and justified
   in the repo policy; local personal identifiers still belong in untracked
   policy or environment configuration.
@@ -59,23 +56,16 @@ the owning subsystem, and orchestration should not depend on helper file names.
 
 ## Harness Commands
 
-- `../overlord-tooling.ps1 import-emule-harness-seeds -NodesDatPath <path> -ServerMetPath <path>`
+- `python -m overlord_tooling import-emule-harness-seeds <nodes.dat> <server.met>`
   imports canonical eMule harness seed files into the untracked local seed
   bundle.
-- `../overlord-tooling.ps1 show-scenario kad.startup.hello.publish.realnet.v1`
+- `python -m overlord_tooling show-scenario kad.startup.hello.publish.realnet.v1`
   prints the first paired eMule harness and agent deterministic scenario
   manifest.
-- `../overlord-tooling.ps1 show-parity-matrix`
+- `python -m overlord_tooling show-parity-matrix`
   prints the KAD2 and ED2K parity matrix inventory across `cell` and
   `campaign` manifests.
-- `../overlord-tooling.ps1 run-parity-cell -ScenarioId <id>`
-  executes one parity cell wrapper and writes a wrapper `run-manifest.json`
-  plus `run-summary.json`.
-- `../overlord-tooling.ps1 run-parity-campaign -ScenarioId <id>`
-  executes one parity campaign by running its member cells and aggregating
-  their wrapper summaries.
-- `../overlord-tooling.ps1 run-kad-startup-hello-publish`
-  runs the paired eMule harness and agent Kad startup, HELLO, and publish
-  harness, resolves the eMule harness runtime from `%EMULE_WORKSPACE_ROOT%`,
-  and writes JSON manifests, summaries, and raw artifacts under
-  `%OVERLORD_TMP_DIR%`.
+- `python -m pytest tests/e2e --collect-only`
+  lists native pytest parity scenarios without launching runtimes.
+- `python -m pytest tests/e2e -m "local and ed2k" --run-e2e --file-size-bytes 127926272`
+  runs the native local ED2K parity matrix with the 122 MiB payload size.

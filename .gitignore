@@ -1,4 +1,6 @@
 *.tmp
 *.log
+__pycache__/
+*.py[cod]
 .local/
 schemas/privacy-guard/policy.local.json

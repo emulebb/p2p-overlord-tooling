@@ -1,8 +1,9 @@
 # Subsystems
 
-Subsystems own the internal implementation of the tooling platform.
+Subsystems used to own internal runtime wrappers. The wrapper files were
+removed; native pytest libraries now own active runtime orchestration.
 
-The intended split is:
+Historical ownership areas were:
 
 - `agent/` agent runtime control, local config materialization, session
   metadata, and post-download helpers
@@ -15,12 +16,5 @@ The intended split is:
 - `parity/` parity comparison utilities
 - `kad/` Kad-specific normalization and future protocol tooling
 
-These scripts are internal implementation detail. Orchestration and the stable
-CLI may depend on them, but contributors should not treat their individual file
-paths as operator-facing API.
-
-Internal conventions:
-
-- `RuntimeContext.ps1` owns repo-root resolution, shared path assertions, and internal script invocation
-- `*Subsystem.ps1` files are the supported internal entry modules for orchestration and CLI code
-- `helper-*` scripts under subsystem folders are implementation detail behind those entry modules
+Do not add wrapper scripts here. Active parity orchestration belongs under
+`../tests/e2e/lib/` or a Python package with direct tests.
