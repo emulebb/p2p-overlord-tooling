@@ -229,9 +229,12 @@ def run_harness_to_agent_stage(
     server_cfg: dict[str, Any],
     seeder_cfg: dict[str, Any],
     timeouts_cfg: dict[str, Any],
+    use_plaintext_loopback_source_hint: bool = True,
 ) -> AgentDownloadResult:
     time.sleep(int(timeouts_cfg["initialPublishDelaySeconds"]))
-    source_hint = None if run.enable_obfuscation else (str(server_cfg["host"]), int(seeder_cfg["tcpPort"]))
+    source_hint = None
+    if use_plaintext_loopback_source_hint and not run.enable_obfuscation:
+        source_hint = (str(server_cfg["host"]), int(seeder_cfg["tcpPort"]))
     agent.post_enrich_download(
         agent_session,
         file_hash=parsed_link.file_hash,
