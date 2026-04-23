@@ -50,9 +50,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     skip_live = pytest.mark.skip(reason="requires --run-live")
 
     for item in items:
-        if "e2e" in item.keywords and not config.getoption("--run-e2e"):
+        if item.get_closest_marker("e2e") is not None and not config.getoption("--run-e2e"):
             item.add_marker(skip_e2e)
-        if "live" in item.keywords and not config.getoption("--run-live"):
+        if item.get_closest_marker("live") is not None and not config.getoption("--run-live"):
             item.add_marker(skip_live)
 
 
