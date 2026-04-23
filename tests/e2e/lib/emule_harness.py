@@ -14,7 +14,10 @@ from tests.e2e.lib.artifacts import latest_file
 from tests.e2e.lib.paths import WorkspacePaths
 from tests.e2e.lib.processes import kill_processes_by_name, run_checked, start_process, stop_process_tree
 
-PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC = 12_207
+# eMule persists MaxDownload/MaxUpload in KiB/s, not Kb/s.
+# Keep local parity runs effectively uncapped without relying on a magic literal.
+PRIVATE_HARNESS_RATE_LIMIT_BITS_PER_SEC = 10_000_000_000
+PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC = PRIVATE_HARNESS_RATE_LIMIT_BITS_PER_SEC // 8 // 1024
 
 
 @dataclass

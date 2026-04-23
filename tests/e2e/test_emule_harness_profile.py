@@ -1,9 +1,21 @@
 from __future__ import annotations
 
-from tests.e2e.lib.emule_harness import PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC, _preferences_content
+from tests.e2e.lib.emule_harness import (
+    PRIVATE_HARNESS_RATE_LIMIT_BITS_PER_SEC,
+    PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC,
+    _preferences_content,
+)
 
 
-def test_private_harness_profile_sets_100mbit_rate_caps() -> None:
+def test_private_harness_rate_cap_matches_high_derived_limit_in_kib_per_second() -> None:
+    assert PRIVATE_HARNESS_RATE_LIMIT_BITS_PER_SEC == 10_000_000_000
+    assert PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC == (
+        PRIVATE_HARNESS_RATE_LIMIT_BITS_PER_SEC // 8 // 1024
+    )
+    assert PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC == 1_220_703
+
+
+def test_private_harness_profile_sets_high_rate_caps() -> None:
     content = _preferences_content(
         bind_addr="127.0.0.1",
         tcp_port=4662,
