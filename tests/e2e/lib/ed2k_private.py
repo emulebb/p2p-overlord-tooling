@@ -71,6 +71,13 @@ class HarnessDownloadResult:
     transport_modes: list[str]
 
 
+@dataclass(frozen=True)
+class AgentSeedResult:
+    source_path: Path
+    ingest_summary: dict[str, Any]
+    parsed_link: ed2k.Ed2kLink
+
+
 def create_private_ed2k_run(
     paths: WorkspacePaths,
     *,
@@ -379,6 +386,31 @@ def run_agent_to_harness_stage(
     )
 
 
+def ingest_local_file_via_agent(
+    agent: AgentRuntime,
+    run: PrivateEd2kRun,
+    agent_session: AgentSession,
+) -> AgentSeedResult:
+    source_path = run.artifact_root / "agent-seed" / run.file_name
+    write_deterministic_binary(source_path, size_bytes=run.file_size, pattern=run.file_pattern)
+    ingest_summary = agent.post_ingest_local_file(
+        agent_session,
+        source_path=source_path,
+        canonical_name=run.file_name,
+    )
+    parsed_link = build_ed2k_link(
+        file_name=str(ingest_summary["canonicalName"]),
+        file_size=int(ingest_summary["fileSize"]),
+        file_hash=str(ingest_summary["fileHash"]),
+        aich_root=str(ingest_summary["aichRoot"]) if ingest_summary.get("aichRoot") else None,
+    )
+    return AgentSeedResult(
+        source_path=source_path,
+        ingest_summary=ingest_summary,
+        parsed_link=parsed_link,
+    )
+
+
 def materialize_private_harness_profile(
     emule: EmuleHarnessRuntime,
     *,
@@ -472,3 +504,18 @@ def seed_export_timeout(file_size: int, base_timeout: int) -> int:
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def build_ed2k_link(*, file_name: str, file_size: int, file_hash: str, aich_root: str | None) -> ed2k.Ed2kLink:
+    normalized_hash = file_hash.lower()
+    parts = [f"ed2k://|file|{file_name}|{file_size}|{normalized_hash}|"]
+    if aich_root:
+        parts.append(f"h={aich_root}|")
+    parts.append("/")
+    return ed2k.Ed2kLink(
+        link="".join(parts),
+        file_name=file_name,
+        file_size=file_size,
+        file_hash=normalized_hash,
+        aich_root=aich_root,
+    )

@@ -337,6 +337,19 @@ max_files = 7
         }
         return http.post_json(f"{session.control_url}/api/internal/enrich", payload)
 
+    def post_ingest_local_file(
+        self,
+        session: AgentSession,
+        *,
+        source_path: Path,
+        canonical_name: str,
+    ) -> Any:
+        payload = {
+            "sourcePath": str(source_path),
+            "canonicalName": canonical_name,
+        }
+        return http.post_json(f"{session.control_url}/api/internal/ingest-local-file", payload)
+
     def latest_ed2k_dump(self, session: AgentSession) -> Path | None:
         return latest_file(session.log_root, "agent-ed2k-tcp-dump-*.jsonl")
 
