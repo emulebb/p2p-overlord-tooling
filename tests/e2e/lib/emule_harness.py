@@ -14,6 +14,8 @@ from tests.e2e.lib.artifacts import latest_file
 from tests.e2e.lib.paths import WorkspacePaths
 from tests.e2e.lib.processes import kill_processes_by_name, run_checked, start_process, stop_process_tree
 
+PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC = 12_207
+
 
 @dataclass
 class EmuleProfile:
@@ -340,6 +342,8 @@ NetworkED2K={1 if enable_ed2k else 0}
 OpenPortsOnStartUp={1 if enable_upnp else 0}
 EnableScheduler=0
 KadUDPKey={kad_udp_key}
+MaxDownload={PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC}
+MaxUpload={PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC}
 CreateCrashDump=0
 Nick=eMule harness
 CryptLayerRequested=0
