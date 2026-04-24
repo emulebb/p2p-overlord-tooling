@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from tests.e2e.lib import http
 from tests.e2e.lib.artifacts import latest_file
@@ -392,6 +393,27 @@ max_files = 7
             "canonicalName": canonical_name,
         }
         return http.post_json(f"{session.control_url}/api/internal/ingest-local-file", payload)
+
+    def post_search_keyword(
+        self,
+        session: AgentSession,
+        *,
+        query: str,
+        callback_url: str,
+        protocol: str = "kad2",
+        job_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload = {
+            "job_id": job_id or str(uuid4()),
+            "protocol": protocol,
+            "kind": "keyword",
+            "query": query,
+            "file_hash": None,
+            "file_size": None,
+            "callback_url": callback_url,
+        }
+        http.post_json(f"{session.control_url}/api/internal/search", payload)
+        return payload
 
     def latest_ed2k_dump(self, session: AgentSession) -> Path | None:
         return latest_file(session.log_root, "agent-ed2k-tcp-dump-*.jsonl")
