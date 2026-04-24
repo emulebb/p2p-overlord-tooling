@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import ipaddress
 import json
 import re
@@ -16,6 +17,15 @@ class Ed2kLink:
     file_size: int
     file_hash: str
     aich_root: str | None
+
+
+def encode_aich_root_for_link(aich_root: str) -> str:
+    normalized = aich_root.strip()
+    if re.fullmatch(r"[0-9A-Fa-f]{40}", normalized):
+        return base64.b32encode(bytes.fromhex(normalized)).decode("ascii").rstrip("=")
+    if re.fullmatch(r"[A-Za-z2-7]{32}", normalized):
+        return normalized.upper()
+    raise ValueError("AICH root must be 40 hex characters or 32 base32 characters")
 
 
 def parse_ed2k_link_file(path: Path) -> Ed2kLink:

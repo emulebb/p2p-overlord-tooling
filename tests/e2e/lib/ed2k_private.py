@@ -512,13 +512,15 @@ def utc_now() -> str:
 def build_ed2k_link(*, file_name: str, file_size: int, file_hash: str, aich_root: str | None) -> ed2k.Ed2kLink:
     normalized_hash = file_hash.lower()
     parts = [f"ed2k://|file|{file_name}|{file_size}|{normalized_hash}|"]
+    normalized_aich_root = None
     if aich_root:
-        parts.append(f"h={aich_root}|")
+        normalized_aich_root = ed2k.encode_aich_root_for_link(aich_root)
+        parts.append(f"h={normalized_aich_root}|")
     parts.append("/")
     return ed2k.Ed2kLink(
         link="".join(parts),
         file_name=file_name,
         file_size=file_size,
         file_hash=normalized_hash,
-        aich_root=aich_root,
+        aich_root=normalized_aich_root,
     )
