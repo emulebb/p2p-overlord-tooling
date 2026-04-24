@@ -93,6 +93,14 @@ class AgentRuntime:
         probe_search_term: str = "ubuntu linux",
         enable_obfuscation: bool = False,
         enable_kad_notes_publish: bool = False,
+        kad_republish_interval_secs: int = 18_000,
+        kad_publish_contact_fanout: int = 4,
+        kad_hello_intro_interval_secs: int = 300,
+        kad_hello_intro_fanout: int = 2,
+        kad_publish_max_outbound_pps: int = 1,
+        kad_synthetic_publish_interval_secs: int = 120,
+        kad_synthetic_publish_batch_items: int = 1,
+        kad_synthetic_publish_contact_fanout: int = 1,
         nodes_dat_seed_path: Path | None = None,
     ) -> dict[str, Path | int | str | None]:
         state_root = scenario_root / "agent-state"
@@ -171,11 +179,11 @@ bootstrap_nodes = {bootstrap_nodes}
 bootstrap_min_routing_contacts = {kad_bootstrap_ready_contacts}
 search_timeout_secs = 45
 store_timeout_secs = 140
-republish_interval_secs = 18000
-publish_contact_fanout = 4
+republish_interval_secs = {kad_republish_interval_secs}
+publish_contact_fanout = {kad_publish_contact_fanout}
 routing_refresh_interval_secs = 900
-hello_intro_interval_secs = 300
-hello_intro_fanout = 2
+hello_intro_interval_secs = {kad_hello_intro_interval_secs}
+hello_intro_fanout = {kad_hello_intro_fanout}
 nodes_dat_refresh_interval_secs = 300
 udp_firewall_check_enabled = false
 udp_firewall_recheck_interval_secs = 1800
@@ -192,14 +200,14 @@ max_outbound_pps = 8
 interactive_max_outbound_pps = 4
 harvest_max_outbound_pps = 1
 maintenance_max_outbound_pps = 1
-publish_max_outbound_pps = 1
+publish_max_outbound_pps = {kad_publish_max_outbound_pps}
 search_phase2_fanout = 50
 keyword_result_cap = 5000
 source_result_cap = 1000
 notes_result_cap = 1000
-synthetic_publish_interval_secs = 120
-synthetic_publish_batch_items = 1
-synthetic_publish_contact_fanout = 1
+synthetic_publish_interval_secs = {kad_synthetic_publish_interval_secs}
+synthetic_publish_batch_items = {kad_synthetic_publish_batch_items}
+synthetic_publish_contact_fanout = {kad_synthetic_publish_contact_fanout}
 seed_notes_publish_enabled = {_bool(enable_kad_notes_publish)}
 obfuscation_enabled = {_bool(enable_obfuscation)}
 enable_mock_results = false
@@ -272,6 +280,14 @@ max_files = 7
         probe_search_term: str = "ubuntu linux",
         nodes_dat_seed_path: Path | None = None,
         enable_obfuscation: bool = False,
+        kad_republish_interval_secs: int = 18_000,
+        kad_publish_contact_fanout: int = 4,
+        kad_hello_intro_interval_secs: int = 300,
+        kad_hello_intro_fanout: int = 2,
+        kad_publish_max_outbound_pps: int = 1,
+        kad_synthetic_publish_interval_secs: int = 120,
+        kad_synthetic_publish_batch_items: int = 1,
+        kad_synthetic_publish_contact_fanout: int = 1,
         skip_build: bool = False,
     ) -> AgentSession:
         kill_processes_by_name(["overlord-agent-emule"])
@@ -291,6 +307,14 @@ max_files = 7
             probe_search_term=probe_search_term,
             server_session_rotation_seconds=0,
             enable_obfuscation=enable_obfuscation,
+            kad_republish_interval_secs=kad_republish_interval_secs,
+            kad_publish_contact_fanout=kad_publish_contact_fanout,
+            kad_hello_intro_interval_secs=kad_hello_intro_interval_secs,
+            kad_hello_intro_fanout=kad_hello_intro_fanout,
+            kad_publish_max_outbound_pps=kad_publish_max_outbound_pps,
+            kad_synthetic_publish_interval_secs=kad_synthetic_publish_interval_secs,
+            kad_synthetic_publish_batch_items=kad_synthetic_publish_batch_items,
+            kad_synthetic_publish_contact_fanout=kad_synthetic_publish_contact_fanout,
             nodes_dat_seed_path=nodes_dat_seed_path,
         )
         if not skip_build or not self.executable_path.is_file():
@@ -421,6 +445,29 @@ max_files = 7
             "callback_url": callback_url,
         }
         http.post_json(f"{session.control_url}/api/internal/search", payload)
+        return payload
+
+    def post_seed_popular(
+        self,
+        session: AgentSession,
+        *,
+        file_hash: str,
+        canonical_name: str,
+        file_size: int,
+        source_count: int,
+    ) -> list[dict[str, Any]]:
+        payload = [
+            {
+                "hash": {
+                    "kind": "ed2k",
+                    "value": file_hash.lower(),
+                },
+                "canonical_name": canonical_name,
+                "size": int(file_size),
+                "source_count": int(source_count),
+            }
+        ]
+        http.post_json(f"{session.control_url}/api/internal/seed-popular", payload)
         return payload
 
     def latest_ed2k_dump(self, session: AgentSession) -> Path | None:
