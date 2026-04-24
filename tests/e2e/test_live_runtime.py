@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tests.e2e.lib.ed2k import write_server_met
 from tests.e2e.lib.live_runtime import resolve_live_scenario_prerequisites
+from tests.e2e.lib.live_servers import LiveEd2kServerEntry
 from tests.e2e.lib.paths import WorkspacePaths
 
 
@@ -14,7 +16,12 @@ def test_resolve_live_scenario_prerequisites_reads_manifest_defaults(
     seed_root = tooling_root / ".local" / "emule-harness-seeds" / "canonical"
     seed_root.mkdir(parents=True, exist_ok=True)
     (seed_root / "nodes.dat").write_bytes(b"nodes")
-    (seed_root / "server.met").write_bytes(b"server")
+    write_server_met(
+        seed_root / "server.met",
+        server_ip="10.20.0.30",
+        server_port=4661,
+        udp_flags=0x51,
+    )
     (seed_root / "seed-bundle.json").write_text(
         '{\n  "schemaVersion": "emule-harness-seed-bundle/v1",\n  "bundleId": "canonical"\n}\n',
         encoding="utf-8",
@@ -42,6 +49,9 @@ def test_resolve_live_scenario_prerequisites_reads_manifest_defaults(
     assert prerequisites.interface_binding.interface_alias == "hide.me"
     assert prerequisites.interface_binding.bind_ip == "10.9.0.5"
     assert prerequisites.seed_bundle.bundle_id == "canonical"
+    assert prerequisites.server_entries == [
+        LiveEd2kServerEntry(host="10.20.0.30", port=4661, udp_flags=0x51)
+    ]
     assert prerequisites.file_size_bytes == 10_485_760
 
 
@@ -53,7 +63,12 @@ def test_resolve_live_scenario_prerequisites_uses_fallback_defaults(
     seed_root = tooling_root / ".local" / "emule-harness-seeds" / "canonical"
     seed_root.mkdir(parents=True, exist_ok=True)
     (seed_root / "nodes.dat").write_bytes(b"nodes")
-    (seed_root / "server.met").write_bytes(b"server")
+    write_server_met(
+        seed_root / "server.met",
+        server_ip="10.20.0.30",
+        server_port=4661,
+        udp_flags=0x51,
+    )
     (seed_root / "seed-bundle.json").write_text(
         '{\n  "schemaVersion": "emule-harness-seed-bundle/v1",\n  "bundleId": "canonical"\n}\n',
         encoding="utf-8",
@@ -76,4 +91,7 @@ def test_resolve_live_scenario_prerequisites_uses_fallback_defaults(
 
     assert prerequisites.interface_binding.interface_alias == "hide.me"
     assert prerequisites.seed_bundle.bundle_id == "canonical"
+    assert prerequisites.server_entries == [
+        LiveEd2kServerEntry(host="10.20.0.30", port=4661, udp_flags=0x51)
+    ]
     assert prerequisites.file_size_bytes is None
