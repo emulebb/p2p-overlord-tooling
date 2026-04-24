@@ -80,6 +80,7 @@ class AgentRuntime:
         disable_kad: bool = False,
         server_host: str | None = None,
         server_port: int = 0,
+        server_entries: list[dict[str, Any]] | None = None,
         server_udp_flags: int = 0,
         server_udp_key: int = 0,
         server_udp_key_ip: int = 0,
@@ -108,17 +109,32 @@ class AgentRuntime:
             bootstrap_nodes = f'["{emule_harness_bootstrap_node}"]'
 
         server_endpoints = "[]"
-        server_entries = "[]"
-        if server_host and server_port > 0:
-            server_endpoints = f'["{server_host}:{server_port}"]'
-            server_entries = (
-                "[{ "
-                f'host = "{server_host}", port = {server_port}, name = "", description = "", '
-                f"udp_flags = {server_udp_flags}, udp_key = {server_udp_key}, "
-                f"udp_key_ip = {server_udp_key_ip}, "
-                f"obfuscation_port_tcp = {server_obfuscation_port_tcp}, "
-                f"obfuscation_port_udp = {server_obfuscation_port_udp} "
-                "}]"
+        server_entries_toml = "[]"
+        configured_server_entries = list(server_entries or [])
+        if configured_server_entries:
+            server_endpoints = _toml_string_list(
+                [
+                    f'{str(entry["host"])}:{int(entry["port"])}'
+                    for entry in configured_server_entries
+                ]
+            )
+            server_entries_toml = _toml_inline_server_entries(configured_server_entries)
+        elif server_host and server_port > 0:
+            server_endpoints = _toml_string_list([f"{server_host}:{server_port}"])
+            server_entries_toml = _toml_inline_server_entries(
+                [
+                    {
+                        "host": server_host,
+                        "port": server_port,
+                        "name": "",
+                        "description": "",
+                        "udp_flags": server_udp_flags,
+                        "udp_key": server_udp_key,
+                        "udp_key_ip": server_udp_key_ip,
+                        "obfuscation_port_tcp": server_obfuscation_port_tcp,
+                        "obfuscation_port_udp": server_obfuscation_port_udp,
+                    }
+                ]
             )
 
         sanitized_probe_search_term = probe_search_term.replace('"', "")
@@ -185,7 +201,7 @@ enable_mock_results = false
 
 [p2p.ed2k]
 listen_port = {ed2k_port}
-server_entries = {server_entries}
+server_entries = {server_entries_toml}
 server_endpoints = {server_endpoints}
 obfuscation_enabled = {_bool(enable_obfuscation)}
 probe_search_term = "{sanitized_probe_search_term}"
@@ -246,6 +262,8 @@ max_files = 7
         kad_bootstrap_ready_contacts: int = 10,
         server_host: str | None = None,
         server_port: int = 0,
+        server_entries: list[dict[str, Any]] | None = None,
+        server_connect_timeout_seconds: int = 8,
         enable_obfuscation: bool = False,
         skip_build: bool = False,
     ) -> AgentSession:
@@ -261,6 +279,8 @@ max_files = 7
             disable_kad=disable_kad,
             server_host=server_host,
             server_port=server_port,
+            server_entries=server_entries,
+            server_connect_timeout_seconds=server_connect_timeout_seconds,
             server_session_rotation_seconds=0,
             enable_obfuscation=enable_obfuscation,
         )
@@ -424,6 +444,33 @@ def _read_json_if_stable(path: Path) -> dict[str, Any] | None:
 
 def _bool(value: bool) -> str:
     return "true" if value else "false"
+
+
+def _toml_inline_server_entries(entries: list[dict[str, Any]]) -> str:
+    serialized: list[str] = []
+    for entry in entries:
+        serialized.append(
+            "{ "
+            f'host = {_toml_string(str(entry["host"]))}, '
+            f'port = {int(entry["port"])}, '
+            f'name = {_toml_string(str(entry.get("name") or ""))}, '
+            f'description = {_toml_string(str(entry.get("description") or ""))}, '
+            f'udp_flags = {int(entry.get("udp_flags") or 0)}, '
+            f'udp_key = {int(entry.get("udp_key") or 0)}, '
+            f'udp_key_ip = {int(entry.get("udp_key_ip") or 0)}, '
+            f'obfuscation_port_tcp = {int(entry.get("obfuscation_port_tcp") or 0)}, '
+            f'obfuscation_port_udp = {int(entry.get("obfuscation_port_udp") or 0)} '
+            "}"
+        )
+    return "[" + ", ".join(serialized) + "]"
+
+
+def _toml_string_list(values: list[str]) -> str:
+    return "[" + ", ".join(_toml_string(value) for value in values) + "]"
+
+
+def _toml_string(value: str) -> str:
+    return json.dumps(value)
 
 
 def _toml_path(path: Path) -> str:

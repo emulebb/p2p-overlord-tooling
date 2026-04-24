@@ -317,6 +317,7 @@ def run_agent_to_harness_stage(
     downloader_cfg: dict[str, Any],
     agent_cfg: dict[str, Any],
     timeouts_cfg: dict[str, Any],
+    download_link_override: str | None = None,
 ) -> HarnessDownloadResult:
     time.sleep(int(timeouts_cfg["agentRepublishDelaySeconds"]))
     profile = materialize_private_harness_profile(
@@ -326,15 +327,18 @@ def run_agent_to_harness_stage(
         harness_cfg=downloader_cfg,
         enable_obfuscation=run.enable_obfuscation,
     )
-    harness_download_link = (
-        parsed_link.link
-        if run.enable_obfuscation
-        else ed2k.add_plain_source(
-            parsed_link.link,
-            source_ip=str(server_cfg["host"]),
-            source_tcp_port=int(agent_cfg["ed2kPort"]),
+    if download_link_override is not None:
+        harness_download_link = download_link_override
+    else:
+        harness_download_link = (
+            parsed_link.link
+            if run.enable_obfuscation
+            else ed2k.add_plain_source(
+                parsed_link.link,
+                source_ip=str(server_cfg["host"]),
+                source_tcp_port=int(agent_cfg["ed2kPort"]),
+            )
         )
-    )
     download_link_path = run.artifact_root / "download.ed2k"
     download_link_path.write_text(harness_download_link + "\n", encoding="utf-8", newline="\n")
     session = emule.start_private_ed2k_session(
