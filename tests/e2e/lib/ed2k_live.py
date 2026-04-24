@@ -34,6 +34,7 @@ def materialize_live_harness_profile(
     prerequisites: LiveScenarioPrerequisites,
     harness_cfg: dict[str, Any],
     enable_obfuscation: bool,
+    enable_kademlia: bool = False,
 ) -> EmuleProfile:
     profile = emule.materialize_private_ed2k_profile(
         profile_root=profile_root,
@@ -43,16 +44,37 @@ def materialize_live_harness_profile(
         server_udp_port=int(harness_cfg["serverUdpPort"]),
         web_port=int(harness_cfg["webPort"]),
         kad_udp_key=int(harness_cfg["kadUdpKey"]),
-        enable_kademlia=False,
+        enable_kademlia=enable_kademlia,
         enable_ed2k=True,
         reset_transient_state=True,
     )
+    materialize_live_seed_bundle_to_harness_profile(profile, prerequisites)
+    emule.set_obfuscation_mode(profile, obfuscated_preferred=enable_obfuscation)
+    return profile
+
+
+def materialize_live_seed_bundle_to_harness_profile(
+    profile: EmuleProfile,
+    prerequisites: LiveScenarioPrerequisites,
+) -> None:
     shutil.copy2(
         prerequisites.seed_bundle.server_met_path,
         profile.profile_root / "config" / "server.met",
     )
-    emule.set_obfuscation_mode(profile, obfuscated_preferred=enable_obfuscation)
-    return profile
+    shutil.copy2(
+        prerequisites.seed_bundle.nodes_dat_path,
+        profile.profile_root / "config" / "nodes.dat",
+    )
+
+
+def materialize_live_seed_bundle_to_agent_state(
+    state_root: Path,
+    prerequisites: LiveScenarioPrerequisites,
+) -> Path:
+    state_root.mkdir(parents=True, exist_ok=True)
+    destination = state_root / "overlord-kad.nodes.dat"
+    shutil.copy2(prerequisites.seed_bundle.nodes_dat_path, destination)
+    return destination
 
 
 def start_live_harness_seeder(
@@ -128,6 +150,7 @@ def start_live_agent_session(
         enable_obfuscation=run.enable_obfuscation,
         skip_build=run.skip_build,
     )
+    materialize_live_seed_bundle_to_agent_state(session.state_root, prerequisites)
     if reset_runtime_root:
         agent.wait_control_ready(session, timeout_seconds=180)
         return session
