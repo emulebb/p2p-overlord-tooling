@@ -47,3 +47,28 @@ def wait_json(url: str, *, timeout_seconds: int, poll_seconds: float = 1.0) -> A
             last_error = exc
             time.sleep(poll_seconds)
     raise TimeoutError(f"{url} did not return JSON within {timeout_seconds}s") from last_error
+
+
+def wait_json_until(
+    url: str,
+    *,
+    predicate,
+    timeout_seconds: int,
+    poll_seconds: float = 1.0,
+    headers: Mapping[str, str] | None = None,
+) -> Any:
+    deadline = time.monotonic() + timeout_seconds
+    last_response: Any = None
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            response = get_json(url, headers=headers, timeout=10)
+            last_response = response
+            if predicate(response):
+                return response
+        except Exception as exc:  # noqa: BLE001 - readiness polling records any failure.
+            last_error = exc
+        time.sleep(poll_seconds)
+    if last_response is not None:
+        raise TimeoutError(f"{url} did not satisfy predicate within {timeout_seconds}s; last_response={last_response}")
+    raise TimeoutError(f"{url} did not satisfy predicate within {timeout_seconds}s") from last_error

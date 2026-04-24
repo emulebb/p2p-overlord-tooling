@@ -25,6 +25,7 @@ CALLBACK_CASE_ID = "callback-limit"
 CALLBACK_LOW_ID_HOST = "1.0.0.0"
 CALLBACK_TCP_PORT = 4662
 CALLBACK_MANIFEST_TIMEOUT_SECONDS = 150
+CALLBACK_STATS_TIMEOUT_SECONDS = 60
 
 
 @pytest.mark.e2e
@@ -120,10 +121,12 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
         )
         assert transfer_manifest.get("completed") is False
 
-        stats_response = http.get_json(
+        stats_response = http.wait_json_until(
             f"{server_session.admin_base_url}/api/stats",
+            predicate=_has_callback_and_source_requests,
+            timeout_seconds=CALLBACK_STATS_TIMEOUT_SECONDS,
+            poll_seconds=2,
             headers={"X-Admin-Token": server_session.admin_token},
-            timeout=10,
         )
         assert stats_response["ok"] is True
         server_stats = stats_response["data"]
@@ -245,3 +248,12 @@ def _write_callback_only_catalog(
         },
     )
     return path
+
+
+def _has_callback_and_source_requests(response: object) -> bool:
+    if not isinstance(response, dict) or response.get("ok") is not True:
+        return False
+    data = response.get("data")
+    if not isinstance(data, dict):
+        return False
+    return int(data.get("callback_requests", 0)) >= 1 and int(data.get("source_requests", 0)) >= 1
