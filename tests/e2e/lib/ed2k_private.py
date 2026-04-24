@@ -197,21 +197,28 @@ def start_private_agent_session(
     agent: AgentRuntime,
     run: PrivateEd2kRun,
     agent_cfg: dict[str, Any],
-    server_cfg: dict[str, Any],
+    server_cfg: dict[str, Any] | None,
     *,
     reset_runtime_root: bool,
+    disable_kad: bool = True,
+    emule_harness_bootstrap_node: str | None = None,
+    kad_bootstrap_ready_contacts: int = 10,
 ) -> AgentSession:
     scenario_root = run.artifact_root / "agt"
     if reset_runtime_root:
         reset_agent_runtime_root(scenario_root)
+    server_host = str(server_cfg["host"]) if server_cfg is not None else None
+    server_port = int(server_cfg["tcpPort"]) if server_cfg is not None else 0
     session = agent.start_private_ed2k_session(
         scenario_root=scenario_root,
         control_port=int(agent_cfg["controlPort"]),
         kad_port=int(agent_cfg["kadPort"]),
         ed2k_port=int(agent_cfg["ed2kPort"]),
-        disable_kad=True,
-        server_host=str(server_cfg["host"]),
-        server_port=int(server_cfg["tcpPort"]),
+        disable_kad=disable_kad,
+        emule_harness_bootstrap_node=emule_harness_bootstrap_node,
+        kad_bootstrap_ready_contacts=kad_bootstrap_ready_contacts,
+        server_host=server_host,
+        server_port=server_port,
         enable_obfuscation=run.enable_obfuscation,
         skip_build=run.skip_build,
     )
