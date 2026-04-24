@@ -23,6 +23,7 @@ markers = [
     "ed2k: ED2K protocol scenario",
     "kad: Kad protocol scenario",
     "cell: manifest-backed parity cell scenario",
+    "campaign: manifest-backed parity campaign scenario",
     "plaintext: plaintext protocol transport variant",
     "obfuscated: obfuscated protocol transport variant",
     "compressed: requires compressed part traffic evidence",
