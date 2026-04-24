@@ -29,20 +29,20 @@ DEFAULT_AGENT_DOWNLOAD_SECONDS = 300
 DEFAULT_HARNESS_READY_SECONDS = 60
 
 
-@pytest.mark.e2e
-@pytest.mark.local
-@pytest.mark.ed2k
-@pytest.mark.harness_to_agent
-def test_private_ed2k_server_download_to_agent(
+def run_private_ed2k_server_download_to_agent_scenario(
     workspace_paths: WorkspacePaths,
     pytestconfig: pytest.Config,
+    *,
+    scenario_id: str,
     transport_mode: str,
+    config_scenario_id: str | None = None,
+    use_plaintext_loopback_source_hint: bool = False,
 ) -> None:
-    manifest = load_manifest(workspace_paths, SCENARIO_ID)
+    manifest = load_manifest(workspace_paths, config_scenario_id or scenario_id)
     harness_cfg = manifest["emuleHarness"]
     run = create_private_ed2k_run(
         workspace_paths,
-        scenario_id=SCENARIO_ID,
+        scenario_id=scenario_id,
         transport_mode=transport_mode,
         file_name=str(harness_cfg["seedFileName"]),
         file_size=int(pytestconfig.getoption("--file-size-bytes")),
@@ -100,7 +100,7 @@ def test_private_ed2k_server_download_to_agent(
             server_cfg=server,
             seeder_cfg=harness_cfg,
             timeouts_cfg=timeouts_cfg,
-            use_plaintext_loopback_source_hint=False,
+            use_plaintext_loopback_source_hint=use_plaintext_loopback_source_hint,
         )
         agent.copy_transfer(
             agent_session,
@@ -172,3 +172,20 @@ def test_private_ed2k_server_download_to_agent(
                     "finishedAtUtc": utc_now(),
                 },
             )
+
+
+@pytest.mark.e2e
+@pytest.mark.local
+@pytest.mark.ed2k
+@pytest.mark.harness_to_agent
+def test_private_ed2k_server_download_to_agent(
+    workspace_paths: WorkspacePaths,
+    pytestconfig: pytest.Config,
+    transport_mode: str,
+) -> None:
+    run_private_ed2k_server_download_to_agent_scenario(
+        workspace_paths,
+        pytestconfig,
+        scenario_id=SCENARIO_ID,
+        transport_mode=transport_mode,
+    )
