@@ -35,6 +35,10 @@ def resolve_live_interface_binding(
         _validate_ipv4(override_ip)
         return LiveInterfaceBinding(interface_alias=interface_alias, bind_ip=override_ip)
 
+    override_alias = os.environ.get("OVERLORD_LIVE_INTERFACE_ALIAS", "").strip()
+    if override_alias:
+        interface_alias = override_alias
+
     runner = command_runner or run_checked
     completed = runner(
         ["powershell", "-NoProfile", "-Command", WINDOWS_IPV4_QUERY],
@@ -79,7 +83,17 @@ def choose_bind_ip_for_interface(candidates: list[dict[str, Any]], *, interface_
         if str(candidate.get("interface_alias", "")).casefold() == interface_alias.casefold()
     ]
     if not matching:
-        raise RuntimeError(f"no IPv4 addresses found for interface alias {interface_alias!r}")
+        available_aliases = sorted(
+            {
+                str(candidate.get("interface_alias", "")).strip()
+                for candidate in candidates
+                if str(candidate.get("interface_alias", "")).strip()
+            }
+        )
+        raise RuntimeError(
+            f"no IPv4 addresses found for interface alias {interface_alias!r}; "
+            f"available aliases: {available_aliases}"
+        )
 
     ranked = sorted(matching, key=_candidate_rank)
     selected_ip = str(ranked[0]["ip_address"])
