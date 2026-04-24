@@ -307,7 +307,26 @@ max_files = 7
         time.sleep(max(flush_wait_seconds, 1))
 
     def wait_control_ready(self, session: AgentSession, *, timeout_seconds: int = 180) -> Any:
-        return http.wait_json(session.stats_url, timeout_seconds=timeout_seconds, poll_seconds=2)
+        deadline = time.monotonic() + timeout_seconds
+        last_response: Any = None
+        expected_log_path = str(session.agent_log_path.resolve()).replace("\\", "/")
+        while time.monotonic() < deadline:
+            response = http.wait_json(session.stats_url, timeout_seconds=10, poll_seconds=1)
+            last_response = response
+            observed_log_path = (
+                response.get("publish_observability", {})
+                .get("log_file", {})
+                .get("path")
+            )
+            if isinstance(observed_log_path, str):
+                normalized_observed = str(Path(observed_log_path).resolve()).replace("\\", "/")
+                if normalized_observed == expected_log_path:
+                    return response
+            time.sleep(1)
+        raise TimeoutError(
+            f"{session.stats_url} did not report the expected agent log path {expected_log_path} "
+            f"within {timeout_seconds}s; last_response={last_response}"
+        )
 
     def post_enrich_download(
         self,

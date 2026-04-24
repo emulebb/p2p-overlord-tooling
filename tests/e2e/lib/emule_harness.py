@@ -294,16 +294,18 @@ class EmuleHarnessRuntime:
 
     def _wait_ready(self, ready_file: Path, *, process_pid: int, timeout_seconds: int = 90) -> dict[str, str]:
         deadline = time.monotonic() + timeout_seconds
+        last_state: dict[str, str] | None = None
         while time.monotonic() < deadline:
             if ready_file.is_file():
                 state = _read_ready_file(ready_file)
-                if state.get("state") != "ready":
-                    raise RuntimeError(f"eMule harness ready file has state={state.get('state')!r}")
-                if int(state.get("pid", "0")) != process_pid:
-                    raise RuntimeError(f"eMule harness ready pid mismatch: {state.get('pid')} != {process_pid}")
-                return state
+                last_state = state
+                if state.get("state") == "ready" and int(state.get("pid", "0")) == process_pid:
+                    return state
             time.sleep(0.25)
-        raise TimeoutError(f"timed out waiting for eMule harness ready file {ready_file}")
+        raise TimeoutError(
+            f"timed out waiting for eMule harness ready file {ready_file}; "
+            f"last_state={last_state}"
+        )
 
 
 def _preferences_content(
