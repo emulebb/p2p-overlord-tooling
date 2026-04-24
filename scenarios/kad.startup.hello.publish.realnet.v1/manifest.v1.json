@@ -17,6 +17,7 @@
     "emule-harness-profile-materialized",
     "emule-harness-started",
     "agent-started",
+    "agent-kad-bootstrapped",
     "manual-publish-triggered",
     "emule-harness-artifacts-captured",
     "agent-artifacts-captured"
@@ -87,6 +88,10 @@
     {
       "id": "agent-started",
       "description": "The agent launched and exposed the internal control endpoints."
+    },
+    {
+      "id": "agent-kad-bootstrapped",
+      "description": "The agent stats endpoint reported enough Kad routing contacts for the configured bootstrap readiness threshold before manual publish."
     },
     {
       "id": "manual-publish-triggered",

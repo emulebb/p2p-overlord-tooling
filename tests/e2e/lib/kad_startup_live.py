@@ -24,8 +24,11 @@ DEFAULT_AGENT_CFG = {
     "controlPort": 13301,
     "kadPort": 41000,
     "ed2kPort": 41001,
+    "kadBootstrapReadyContacts": 1,
 }
 MANUAL_PUBLISH_TIMEOUT_SECONDS = 180
+BOOTSTRAP_READY_TIMEOUT_SECONDS = 180
+LIVE_PUBLISH_POST_TIMEOUT_SECONDS = 420
 POST_PUBLISH_FLUSH_SECONDS = 5
 
 
@@ -90,7 +93,9 @@ def run_live_kad_startup_publish_scenario(
             ed2k_port=int(DEFAULT_AGENT_CFG["ed2kPort"]),
             p2p_bind_ip=prerequisites.interface_binding.bind_ip,
             disable_kad=False,
-            kad_bootstrap_ready_contacts=1,
+            kad_bootstrap_ready_contacts=int(
+                DEFAULT_AGENT_CFG["kadBootstrapReadyContacts"]
+            ),
             probe_search_term=str(seed_request["canonicalName"]),
             nodes_dat_seed_path=prerequisites.seed_bundle.nodes_dat_path,
             kad_republish_interval_secs=3_600,
@@ -100,13 +105,16 @@ def run_live_kad_startup_publish_scenario(
             skip_build=run.skip_build,
         )
         agent.wait_control_ready(agent_session, timeout_seconds=180)
-
-        seed_payload = agent.post_seed_popular(
+        bootstrap_stats = http.wait_json_until(
+            agent_session.stats_url,
+            predicate=_kad_bootstrap_ready,
+            timeout_seconds=BOOTSTRAP_READY_TIMEOUT_SECONDS,
+            poll_seconds=2,
+        )
+        seed_payload = _post_seed_popular_after_bootstrap(
+            agent,
             agent_session,
-            file_hash=str(seed_request["hash"]),
-            canonical_name=str(seed_request["canonicalName"]),
-            file_size=int(seed_request["size"]),
-            source_count=int(seed_request["sourceCount"]),
+            seed_request,
         )
         stats_response = http.wait_json_until(
             agent_session.stats_url,
@@ -178,8 +186,14 @@ def run_live_kad_startup_publish_scenario(
                 "bindIp": prerequisites.interface_binding.bind_ip,
                 "interfaceAlias": prerequisites.interface_binding.interface_alias,
                 "seedPopularRequest": seed_payload[0],
+                "bootstrapStats": {
+                    "peersConnected": int(
+                        bootstrap_stats.get("peers_connected") or 0
+                    ),
+                },
                 "publishObservability": publish_observability,
                 "evidence": {
+                    "bootstrapStatsObserved": True,
                     "manualPublishObserved": True,
                     "bootstrapObserved": True,
                     "helloObserved": True,
@@ -220,6 +234,37 @@ def run_live_kad_startup_publish_scenario(
                     "finishedAtUtc": utc_now(),
                 },
             )
+
+
+def _post_seed_popular_after_bootstrap(
+    agent: AgentRuntime,
+    agent_session: AgentSession,
+    seed_request: dict[str, Any],
+) -> list[dict[str, Any]]:
+    deadline = time.monotonic() + BOOTSTRAP_READY_TIMEOUT_SECONDS
+    last_error: RuntimeError | None = None
+    while time.monotonic() < deadline:
+        try:
+            return agent.post_seed_popular(
+                agent_session,
+                file_hash=str(seed_request["hash"]),
+                canonical_name=str(seed_request["canonicalName"]),
+                file_size=int(seed_request["size"]),
+                source_count=int(seed_request["sourceCount"]),
+                timeout=LIVE_PUBLISH_POST_TIMEOUT_SECONDS,
+            )
+        except RuntimeError as exc:
+            if "kad node is not bootstrapped yet" not in str(exc):
+                raise
+            last_error = exc
+            time.sleep(2)
+    raise TimeoutError(
+        "agent did not accept manual Kad publish after bootstrap wait"
+    ) from last_error
+
+
+def _kad_bootstrap_ready(response: dict[str, Any]) -> bool:
+    return bool(response.get("kad_bootstrapped"))
 
 
 def _manual_publish_observed(response: dict[str, Any]) -> bool:

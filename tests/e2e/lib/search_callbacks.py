@@ -130,7 +130,7 @@ def select_ed2k_keyword_candidate(
     query: str,
 ) -> dict[str, Any]:
     tokens = [token.lower() for token in query.split() if len(token) >= 3]
-    candidates: list[tuple[tuple[int, int, int, str], dict[str, Any]]] = []
+    candidates: list[tuple[tuple[int, int, int, int, str], dict[str, Any]]] = []
     for batch in batches:
         for file_record in batch.get("files", []):
             if not isinstance(file_record, dict):
@@ -142,9 +142,11 @@ def select_ed2k_keyword_candidate(
                 continue
             lower_name = file_name.lower()
             matched_tokens = sum(1 for token in tokens if token in lower_name)
+            source_count = _source_count(file_record)
             preferred_extension = int(lower_name.endswith((".iso", ".bin", ".mp4", ".mkv", ".avi")))
             score = (
                 -matched_tokens,
+                -source_count,
                 -preferred_extension,
                 file_size,
                 lower_name,
@@ -205,3 +207,17 @@ def _file_size(file_record: dict[str, Any]) -> int | None:
     if value is None:
         return None
     return int(value)
+
+
+def _source_count(file_record: dict[str, Any]) -> int:
+    source_counts: list[int] = []
+    for source in file_record.get("sources", []):
+        if not isinstance(source, dict):
+            continue
+        extra = source.get("extra")
+        if not isinstance(extra, dict):
+            continue
+        value = extra.get("source_count")
+        if value is not None:
+            source_counts.append(int(value))
+    return max(source_counts, default=0)

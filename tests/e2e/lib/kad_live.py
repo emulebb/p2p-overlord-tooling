@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from tests.e2e.lib import ed2k
+from tests.e2e.lib import ed2k, http
 from tests.e2e.lib.agent import AgentRuntime, AgentSession
 from tests.e2e.lib.artifacts import latest_file
 from tests.e2e.lib.ed2k_live import start_live_agent_session
@@ -27,6 +27,7 @@ DEFAULT_AGENT_CFG = {
 }
 SEARCH_TIMEOUT_SECONDS = 180
 DOWNLOAD_TIMEOUT_SECONDS = 900
+BOOTSTRAP_READY_TIMEOUT_SECONDS = 180
 
 
 def run_live_kad_search_download_to_agent_scenario(
@@ -74,6 +75,12 @@ def run_live_kad_search_download_to_agent_scenario(
             disable_kad=False,
             probe_search_term=query,
         )
+        bootstrap_stats = http.wait_json_until(
+            agent_session.stats_url,
+            predicate=_kad_bootstrap_ready,
+            timeout_seconds=BOOTSTRAP_READY_TIMEOUT_SECONDS,
+            poll_seconds=2,
+        )
 
         search_job = agent.post_search_keyword(
             agent_session,
@@ -109,7 +116,13 @@ def run_live_kad_search_download_to_agent_scenario(
             file_hash=str(candidate["file_hash"]),
             timeout_seconds=DOWNLOAD_TIMEOUT_SECONDS,
         )
-        assert transfer_manifest.get("completed") is True
+        if transfer_manifest.get("completed") is not True:
+            raise AssertionError(
+                "transfer did not complete "
+                f"file_hash={candidate['file_hash']} "
+                f"sources={len(transfer_manifest.get('sources') or [])} "
+                f"aich_root={transfer_manifest.get('aich_root')!r}"
+            )
         assert transfer_manifest.get("aich_root")
         assert transfer_manifest.get("sources")
 
@@ -151,8 +164,15 @@ def run_live_kad_search_download_to_agent_scenario(
                     "fileName": candidate["file_name"],
                     "fileSize": candidate["file_size"],
                 },
+                "transferManifest": transfer_manifest,
                 "selectedServerCount": len(prerequisites.server_entries),
+                "bootstrapStats": {
+                    "peersConnected": int(
+                        bootstrap_stats.get("peers_connected") or 0
+                    ),
+                },
                 "evidence": {
+                    "bootstrapStatsObserved": True,
                     "searchStarted": True,
                     "searchCompleted": True,
                     "searchResultBatchCount": len(result_batches),
@@ -184,6 +204,7 @@ def run_live_kad_search_download_to_agent_scenario(
                     "query": query,
                     "searchJobId": search_job["job_id"] if search_job else None,
                     "candidate": candidate,
+                    "transferManifest": transfer_manifest,
                     "failedReason": failed_reason,
                     "finishedAtUtc": utc_now(),
                 },
@@ -195,3 +216,7 @@ def _dump_has_state_id(path: Path, *, direction: str, state_id: str) -> bool:
         record.get("direction") == direction and record.get("state_id") == state_id
         for record in ed2k.dump_records(path)
     )
+
+
+def _kad_bootstrap_ready(response: dict[str, Any]) -> bool:
+    return bool(response.get("kad_bootstrapped"))

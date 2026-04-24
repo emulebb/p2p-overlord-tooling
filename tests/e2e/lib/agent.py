@@ -455,6 +455,7 @@ max_files = 7
         canonical_name: str,
         file_size: int,
         source_count: int,
+        timeout: int = 30,
     ) -> list[dict[str, Any]]:
         payload = [
             {
@@ -467,7 +468,11 @@ max_files = 7
                 "source_count": int(source_count),
             }
         ]
-        http.post_json(f"{session.control_url}/api/internal/seed-popular", payload)
+        http.post_json(
+            f"{session.control_url}/api/internal/seed-popular",
+            payload,
+            timeout=timeout,
+        )
         return payload
 
     def latest_ed2k_dump(self, session: AgentSession) -> Path | None:
