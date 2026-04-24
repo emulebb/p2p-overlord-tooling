@@ -35,6 +35,19 @@ def test_private_ed2k_server_triplet_callback_limit(
     workspace_paths: WorkspacePaths,
     pytestconfig: pytest.Config,
 ) -> None:
+    run_private_ed2k_server_triplet_callback_limit_scenario(
+        workspace_paths,
+        pytestconfig,
+        scenario_id=SCENARIO_ID,
+    )
+
+
+def run_private_ed2k_server_triplet_callback_limit_scenario(
+    workspace_paths: WorkspacePaths,
+    pytestconfig: pytest.Config,
+    *,
+    scenario_id: str,
+) -> None:
     manifest = load_manifest(workspace_paths, SCENARIO_ID)
     runtime_manifest = load_manifest(workspace_paths, RUNTIME_CONFIG_SCENARIO_ID)
     file_hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -43,7 +56,7 @@ def test_private_ed2k_server_triplet_callback_limit(
 
     run = create_private_ed2k_run(
         workspace_paths,
-        scenario_id=SCENARIO_ID,
+        scenario_id=scenario_id,
         transport_mode="plaintext",
         file_name=file_name,
         file_size=file_size,
