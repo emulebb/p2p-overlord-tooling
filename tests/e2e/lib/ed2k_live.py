@@ -119,6 +119,8 @@ def start_live_agent_session(
     manifest: dict[str, Any],
     *,
     reset_runtime_root: bool,
+    disable_kad: bool = True,
+    probe_search_term: str = "ubuntu linux",
 ) -> AgentSession:
     server_selection = manifest.get("serverSelection")
     connect_timeout_milliseconds = 8_000
@@ -131,7 +133,7 @@ def start_live_agent_session(
         kad_port=int(agent_cfg["kadPort"]),
         ed2k_port=int(agent_cfg["ed2kPort"]),
         p2p_bind_ip=prerequisites.interface_binding.bind_ip,
-        disable_kad=True,
+        disable_kad=disable_kad,
         server_entries=[
             {
                 "host": entry.host,
@@ -147,10 +149,11 @@ def start_live_agent_session(
             for entry in prerequisites.server_entries
         ],
         server_connect_timeout_seconds=connect_timeout_seconds,
+        probe_search_term=probe_search_term,
+        nodes_dat_seed_path=prerequisites.seed_bundle.nodes_dat_path,
         enable_obfuscation=run.enable_obfuscation,
         skip_build=run.skip_build,
     )
-    materialize_live_seed_bundle_to_agent_state(session.state_root, prerequisites)
     if reset_runtime_root:
         agent.wait_control_ready(session, timeout_seconds=180)
         return session

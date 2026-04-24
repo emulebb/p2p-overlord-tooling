@@ -93,6 +93,7 @@ class AgentRuntime:
         probe_search_term: str = "ubuntu linux",
         enable_obfuscation: bool = False,
         enable_kad_notes_publish: bool = False,
+        nodes_dat_seed_path: Path | None = None,
     ) -> dict[str, Path | int | str | None]:
         state_root = scenario_root / "agent-state"
         log_root = scenario_root / "agent-logs"
@@ -104,6 +105,9 @@ class AgentRuntime:
         if self.config_path.exists():
             backup_path = scenario_root / "agent-real-miniupnpc.backup.toml"
             shutil.copy2(self.config_path, backup_path)
+
+        if nodes_dat_seed_path is not None:
+            shutil.copy2(nodes_dat_seed_path, state_root / "overlord-kad.nodes.dat")
 
         bootstrap_nodes = "[]"
         if not disable_kad and emule_harness_bootstrap_node:
@@ -265,6 +269,8 @@ max_files = 7
         server_port: int = 0,
         server_entries: list[dict[str, Any]] | None = None,
         server_connect_timeout_seconds: int = 8,
+        probe_search_term: str = "ubuntu linux",
+        nodes_dat_seed_path: Path | None = None,
         enable_obfuscation: bool = False,
         skip_build: bool = False,
     ) -> AgentSession:
@@ -282,8 +288,10 @@ max_files = 7
             server_port=server_port,
             server_entries=server_entries,
             server_connect_timeout_seconds=server_connect_timeout_seconds,
+            probe_search_term=probe_search_term,
             server_session_rotation_seconds=0,
             enable_obfuscation=enable_obfuscation,
+            nodes_dat_seed_path=nodes_dat_seed_path,
         )
         if not skip_build or not self.executable_path.is_file():
             self.build()

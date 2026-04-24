@@ -124,6 +124,48 @@ def wait_for_result_batch(
     raise TimeoutError(f"did not observe result batch for job_id={job_id} within {timeout_seconds}s")
 
 
+def select_ed2k_keyword_candidate(
+    batches: list[dict[str, Any]],
+    *,
+    query: str,
+) -> dict[str, Any]:
+    tokens = [token.lower() for token in query.split() if len(token) >= 3]
+    candidates: list[tuple[tuple[int, int, int, str], dict[str, Any]]] = []
+    for batch in batches:
+        for file_record in batch.get("files", []):
+            if not isinstance(file_record, dict):
+                continue
+            file_hash = _ed2k_hash(file_record)
+            file_name = _first_name(file_record)
+            file_size = _file_size(file_record)
+            if file_hash is None or file_name is None or file_size is None or file_size <= 0:
+                continue
+            lower_name = file_name.lower()
+            matched_tokens = sum(1 for token in tokens if token in lower_name)
+            preferred_extension = int(lower_name.endswith((".iso", ".bin", ".mp4", ".mkv", ".avi")))
+            score = (
+                -matched_tokens,
+                -preferred_extension,
+                file_size,
+                lower_name,
+            )
+            candidates.append(
+                (
+                    score,
+                    {
+                        "file_hash": file_hash,
+                        "file_name": file_name,
+                        "file_size": file_size,
+                        "file_record": file_record,
+                    },
+                )
+            )
+    if not candidates:
+        raise ValueError(f"did not find a usable ED2K candidate for query {query!r}")
+    candidates.sort(key=lambda item: item[0])
+    return candidates[0][1]
+
+
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
@@ -137,3 +179,29 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
             if isinstance(value, dict):
                 records.append(value)
     return records
+
+
+def _ed2k_hash(file_record: dict[str, Any]) -> str | None:
+    for hash_entry in file_record.get("hashes", []):
+        if not isinstance(hash_entry, dict):
+            continue
+        if hash_entry.get("kind") != "ed2k":
+            continue
+        value = hash_entry.get("value")
+        return str(value).lower() if value else None
+    return None
+
+
+def _first_name(file_record: dict[str, Any]) -> str | None:
+    names = file_record.get("names")
+    if not isinstance(names, list) or not names:
+        return None
+    value = names[0]
+    return str(value) if value else None
+
+
+def _file_size(file_record: dict[str, Any]) -> int | None:
+    value = file_record.get("size")
+    if value is None:
+        return None
+    return int(value)
