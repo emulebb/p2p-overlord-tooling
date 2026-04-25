@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from tests.e2e.lib.search_callbacks import select_ed2k_keyword_candidate
+from tests.e2e.lib.search_callbacks import (
+    ed2k_candidate_source_count,
+    select_ed2k_keyword_candidate,
+)
 
 
 def test_select_ed2k_keyword_candidate_prefers_query_match_then_smaller_file() -> None:
@@ -72,3 +75,4 @@ def test_select_ed2k_keyword_candidate_prefers_higher_source_count() -> None:
     )
 
     assert candidate["file_hash"] == "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    assert ed2k_candidate_source_count(candidate) == 6

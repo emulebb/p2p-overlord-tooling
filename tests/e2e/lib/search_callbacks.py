@@ -168,6 +168,13 @@ def select_ed2k_keyword_candidate(
     return candidates[0][1]
 
 
+def ed2k_candidate_source_count(candidate: dict[str, Any]) -> int:
+    file_record = candidate.get("file_record")
+    if not isinstance(file_record, dict):
+        return 0
+    return _source_count(file_record)
+
+
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
