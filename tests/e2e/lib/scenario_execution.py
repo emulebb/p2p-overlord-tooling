@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tests.e2e.lib.paths import WorkspacePaths
-from tests.e2e.lib.scenario_catalog import (
+from overlord_tooling.scenarios import (
     ScenarioCase,
     ScenarioCatalog,
     ScenarioRecord,
@@ -22,7 +22,7 @@ def execute_scenario_case(
     workspace_paths: WorkspacePaths,
     pytestconfig: pytest.Config,
 ) -> None:
-    catalog = ScenarioCatalog.load(workspace_paths)
+    catalog = ScenarioCatalog.load(workspace_paths.tooling_root)
     selected_transport = str(pytestconfig.getoption("--transport"))
     if (
         case.transport_mode is not None
@@ -65,7 +65,7 @@ def execute_scenario_case(
 
 
 def collect_scenario_cases(paths: WorkspacePaths) -> list[ScenarioCase]:
-    catalog = ScenarioCatalog.load(paths)
+    catalog = ScenarioCatalog.load(paths.tooling_root)
     return catalog.runnable_cases(registered_command_names())
 
 

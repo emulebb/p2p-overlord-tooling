@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tests.e2e.lib.ed2k_live import run_live_ed2k_server_roundtrip_scenario
-from tests.e2e.lib.manifests import load_manifest
+from overlord_tooling.scenarios import load_manifest
 from tests.e2e.lib.paths import WorkspacePaths
 
 
@@ -22,7 +22,7 @@ def test_live_ed2k_server_roundtrip(
     workspace_paths: WorkspacePaths,
     pytestconfig: pytest.Config,
 ) -> None:
-    manifest = load_manifest(workspace_paths, SCENARIO_ID)
+    manifest = load_manifest(workspace_paths.tooling_root, SCENARIO_ID)
     run_live_ed2k_server_roundtrip_scenario(
         workspace_paths,
         pytestconfig,

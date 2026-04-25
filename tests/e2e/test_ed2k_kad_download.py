@@ -18,7 +18,7 @@ from tests.e2e.lib.ed2k_private import (
     utc_now,
 )
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleProfile, EmuleSession
-from tests.e2e.lib.manifests import load_manifest, write_json
+from overlord_tooling.scenarios import load_manifest, write_json
 from tests.e2e.lib.paths import WorkspacePaths
 from tests.e2e.lib.payloads import write_deterministic_binary
 from tests.e2e.lib.waits import wait_path
@@ -40,7 +40,7 @@ def run_private_kad_ed2k_download_to_agent_scenario(
     run_slug: str | None = None,
     metadata: dict[str, object] | None = None,
 ) -> None:
-    manifest = load_manifest(workspace_paths, config_scenario_id or scenario_id)
+    manifest = load_manifest(workspace_paths.tooling_root, config_scenario_id or scenario_id)
     harness_cfg = manifest["emuleHarness"]
     agent_cfg = manifest["agent"]
 

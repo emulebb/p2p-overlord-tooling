@@ -16,7 +16,7 @@ from tests.e2e.lib.ed2k_private import (
     utc_now,
 )
 from tests.e2e.lib.goed2k import Goed2kRuntime, Goed2kSession
-from tests.e2e.lib.manifests import load_manifest, write_json
+from overlord_tooling.scenarios import load_manifest, write_json
 from tests.e2e.lib.paths import WorkspacePaths
 
 
@@ -53,8 +53,8 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
     run_slug: str | None = None,
     metadata: dict[str, object] | None = None,
 ) -> None:
-    manifest = load_manifest(workspace_paths, SCENARIO_ID)
-    runtime_manifest = load_manifest(workspace_paths, RUNTIME_CONFIG_SCENARIO_ID)
+    manifest = load_manifest(workspace_paths.tooling_root, SCENARIO_ID)
+    runtime_manifest = load_manifest(workspace_paths.tooling_root, RUNTIME_CONFIG_SCENARIO_ID)
     file_hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     file_name = "callback-only-private-source.bin"
     file_size = int(pytestconfig.getoption("--file-size-bytes"))

@@ -19,7 +19,7 @@ from tests.e2e.lib.ed2k_private import (
 )
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleSession
 from tests.e2e.lib.goed2k import Goed2kRuntime, Goed2kSession
-from tests.e2e.lib.manifests import load_manifest, write_json
+from overlord_tooling.scenarios import load_manifest, write_json
 from tests.e2e.lib.paths import WorkspacePaths
 
 
@@ -42,7 +42,7 @@ def run_private_ed2k_server_download_to_agent_scenario(
     run_slug: str | None = None,
     metadata: dict[str, object] | None = None,
 ) -> None:
-    manifest = load_manifest(workspace_paths, config_scenario_id or scenario_id)
+    manifest = load_manifest(workspace_paths.tooling_root, config_scenario_id or scenario_id)
     harness_cfg = manifest["emuleHarness"]
     run = create_private_ed2k_run(
         workspace_paths,

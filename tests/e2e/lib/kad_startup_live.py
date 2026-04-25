@@ -17,7 +17,7 @@ from tests.e2e.lib.ed2k_private import (
 )
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleProfile, EmuleSession
 from tests.e2e.lib.live_runtime import resolve_live_scenario_prerequisites
-from tests.e2e.lib.manifests import write_json
+from overlord_tooling.scenarios import write_json
 from tests.e2e.lib.paths import WorkspacePaths
 
 

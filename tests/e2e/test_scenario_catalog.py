@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tests.e2e.lib.scenario_catalog import ScenarioCatalog, campaign_step_slug
+from overlord_tooling.scenarios import ScenarioCatalog, campaign_step_slug
 from tests.e2e.lib.scenario_execution import collect_scenario_cases
 from tests.e2e.lib.scenario_registry import registered_command_names
 from tests.e2e.lib.paths import WorkspacePaths
@@ -9,7 +9,7 @@ from tests.e2e.lib.paths import WorkspacePaths
 def test_scenario_catalog_validates_manifest_relationships(
     workspace_paths: WorkspacePaths,
 ) -> None:
-    catalog = ScenarioCatalog.load(workspace_paths)
+    catalog = ScenarioCatalog.load(workspace_paths.tooling_root)
 
     assert catalog.validate() == []
 
@@ -29,7 +29,7 @@ def test_manifest_driven_cases_include_native_runner_backed_cells_and_campaigns(
 def test_native_command_gaps_are_explicit_legacy_kad2_triplet_cells(
     workspace_paths: WorkspacePaths,
 ) -> None:
-    catalog = ScenarioCatalog.load(workspace_paths)
+    catalog = ScenarioCatalog.load(workspace_paths.tooling_root)
 
     assert catalog.native_command_gaps(registered_command_names()) == [
         "kad2.cell.bootstrap.lookup.triplet.private.v1",

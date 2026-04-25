@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tests.e2e.lib.kad_live import run_live_kad_search_download_to_agent_scenario
-from tests.e2e.lib.manifests import load_manifest, write_json
+from overlord_tooling.scenarios import load_manifest, write_json
 from tests.e2e.lib.paths import WorkspacePaths
 
 
@@ -21,7 +21,7 @@ def test_live_kad_search_download_to_agent(
     pytestconfig: pytest.Config,
     transport_mode: str,
 ) -> None:
-    manifest = load_manifest(workspace_paths, SCENARIO_ID)
+    manifest = load_manifest(workspace_paths.tooling_root, SCENARIO_ID)
     run_live_kad_search_download_to_agent_scenario(
         workspace_paths,
         pytestconfig,

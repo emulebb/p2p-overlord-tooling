@@ -20,7 +20,7 @@ from tests.e2e.lib.ed2k_private import (
 )
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleSession
 from tests.e2e.lib.goed2k import Goed2kRuntime, Goed2kSession
-from tests.e2e.lib.manifests import load_manifest, write_json
+from overlord_tooling.scenarios import load_manifest, write_json
 from tests.e2e.lib.paths import WorkspacePaths
 
 
@@ -38,7 +38,7 @@ def test_private_ed2k_agent_seed_to_harness_download(
     pytestconfig: pytest.Config,
     transport_mode: str,
 ) -> None:
-    manifest = load_manifest(workspace_paths, SCENARIO_ID)
+    manifest = load_manifest(workspace_paths.tooling_root, SCENARIO_ID)
     file_size = int(pytestconfig.getoption("--file-size-bytes") or manifest["file"]["sizeBytes"])
     if file_size <= ED2K_PART_SIZE_BYTES:
         pytest.fail(

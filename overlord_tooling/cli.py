@@ -13,6 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from overlord_tooling.scenarios import (
+    ScenarioCatalog,
+    default_run_root,
+    load_manifest,
+    parity_status_rows,
+)
+
 
 COMMANDS = [
     ("help", "Show CLI help"),
@@ -115,7 +122,7 @@ def command_show_scenario(paths: Paths, argv: list[str]) -> Any:
     parser = argparse.ArgumentParser(prog="python -m overlord_tooling show-scenario")
     parser.add_argument("scenario_id")
     parsed = parser.parse_args(argv)
-    return read_scenario_manifest(paths.tooling_root, parsed.scenario_id)
+    return load_manifest(paths.tooling_root, parsed.scenario_id)
 
 
 def command_show_parity_matrix(paths: Paths, argv: list[str]) -> Any:
@@ -126,45 +133,13 @@ def command_show_parity_matrix(paths: Paths, argv: list[str]) -> Any:
     parser.add_argument("--tier", choices=["All", "deterministic-private", "broad-private", "realnet-confidence"], default="All")
     parsed = parser.parse_args(argv)
 
-    rows = []
-    for record in iter_scenario_manifests(paths.tooling_root):
-        manifest = record["manifest"]
-        scenario_kind = str(manifest.get("scenarioKind", ""))
-        if scenario_kind not in {"cell", "campaign"}:
-            continue
-        if parsed.scenario_kind != "All" and scenario_kind != parsed.scenario_kind:
-            continue
-        if parsed.protocol != "All" and manifest.get("protocol") != parsed.protocol:
-            continue
-        if parsed.tier != "All" and manifest.get("tier") != parsed.tier:
-            continue
-
-        parity = manifest.get("parity") if isinstance(manifest.get("parity"), dict) else {}
-        campaign = manifest.get("campaign") if isinstance(manifest.get("campaign"), dict) else {}
-        execution = manifest.get("execution") if isinstance(manifest.get("execution"), dict) else {}
-        availability = campaign.get("availability") if scenario_kind == "campaign" else parity.get("availability")
-        if parsed.availability != "All" and availability != parsed.availability:
-            continue
-
-        command = execution.get("command")
-        rows.append(
-            {
-                "scenarioId": record["scenarioId"],
-                "scenarioKind": scenario_kind,
-                "protocol": manifest.get("protocol"),
-                "tier": manifest.get("tier"),
-                "matrixId": parity.get("matrixId"),
-                "cellId": parity.get("cellId"),
-                "availability": availability,
-                "command": command,
-                "summarySourceScenarioId": execution.get("summarySourceScenarioId"),
-                "memberCount": len(campaign.get("members", [])) if isinstance(campaign.get("members"), list) else 0,
-                "expectedBranch": parity.get("expectedBranch"),
-                "comparisonMode": parity.get("comparisonMode"),
-                "description": manifest.get("description"),
-            }
-        )
-    return rows
+    catalog = ScenarioCatalog.load(paths.tooling_root)
+    return catalog.parity_matrix_rows(
+        scenario_kind=None if parsed.scenario_kind == "All" else parsed.scenario_kind,
+        protocol=None if parsed.protocol == "All" else parsed.protocol,
+        availability=None if parsed.availability == "All" else parsed.availability,
+        tier=None if parsed.tier == "All" else parsed.tier,
+    )
 
 
 def command_parity_status(paths: Paths, argv: list[str]) -> Any:
@@ -188,27 +163,7 @@ def command_parity_status(paths: Paths, argv: list[str]) -> Any:
             parsed.tier,
         ],
     )
-    run_root = Path(os.environ.get("OVERLORD_TMP_DIR", Path(os.environ.get("TEMP", "/tmp")) / "p2p-overlord"))
-    run_root = run_root / "overlord-tooling" / "runs"
-    rows = []
-    for row in matrix_rows:
-        latest = latest_run_summary(run_root, str(row["scenarioId"]))
-        status = {
-            "latestRunId": None,
-            "latestCompleted": None,
-            "latestFailedReason": None,
-            "latestRunSummaryPath": None,
-        }
-        if latest is not None:
-            summary = json.loads(latest.read_text(encoding="utf-8"))
-            status = {
-                "latestRunId": summary.get("runId"),
-                "latestCompleted": summary.get("completed"),
-                "latestFailedReason": summary.get("failedReason"),
-                "latestRunSummaryPath": str(latest),
-            }
-        rows.append({**row, **status})
-    return rows
+    return parity_status_rows(matrix_rows, default_run_root())
 
 
 def command_import_emule_harness_seeds(paths: Paths, argv: list[str]) -> Any:
@@ -313,40 +268,6 @@ def find_tooling_root(start: Path) -> Path:
 
 def canonical_repo_roots(workspace_root: Path) -> list[Path]:
     return [(workspace_root / name).resolve() for name in CANONICAL_REPOS if (workspace_root / name).is_dir()]
-
-
-def read_scenario_manifest(tooling_root: Path, scenario_id: str) -> dict[str, Any]:
-    manifest_path = tooling_root / "scenarios" / scenario_id / "manifest.v1.json"
-    if not manifest_path.is_file():
-        raise SystemExit(f"Scenario manifest not found at {manifest_path}")
-    return json.loads(manifest_path.read_text(encoding="utf-8"))
-
-
-def iter_scenario_manifests(tooling_root: Path) -> list[dict[str, Any]]:
-    records = []
-    for scenario_dir in sorted((tooling_root / "scenarios").iterdir()):
-        manifest_path = scenario_dir / "manifest.v1.json"
-        if not manifest_path.is_file():
-            continue
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        records.append(
-            {
-                "scenarioId": str(manifest.get("scenarioId", scenario_dir.name)),
-                "manifest": manifest,
-                "manifestPath": str(manifest_path),
-            }
-        )
-    return sorted(records, key=lambda record: record["scenarioId"])
-
-
-def latest_run_summary(run_root: Path, scenario_id: str) -> Path | None:
-    scenario_root = run_root / scenario_id
-    if not scenario_root.is_dir():
-        return None
-    candidates = [path for path in scenario_root.rglob("run-summary.json") if path.is_file()]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
 def run_privacy_guard(repo_root: Path, policy_path: Path, local_policy_path: Path) -> dict[str, Any]:

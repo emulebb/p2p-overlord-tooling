@@ -12,7 +12,7 @@ from tests.e2e.lib.agent import AgentRuntime, AgentSession
 from tests.e2e.lib.artifacts import copy_if_exists, copy_if_small
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleProfile, EmuleSession
 from tests.e2e.lib.goed2k import Goed2kRuntime, Goed2kSession
-from tests.e2e.lib.manifests import write_json
+from overlord_tooling.scenarios import write_json
 from tests.e2e.lib.paths import WorkspacePaths
 from tests.e2e.lib.payloads import write_deterministic_binary
 from tests.e2e.lib.waits import wait_file_size, wait_path

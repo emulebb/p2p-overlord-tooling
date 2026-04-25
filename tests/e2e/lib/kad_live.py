@@ -12,7 +12,7 @@ from tests.e2e.lib.artifacts import latest_file
 from tests.e2e.lib.ed2k_live import start_live_agent_session
 from tests.e2e.lib.ed2k_private import copy_agent_artifacts, create_private_ed2k_run, run_identity, utc_now
 from tests.e2e.lib.live_runtime import resolve_live_scenario_prerequisites
-from tests.e2e.lib.manifests import write_json
+from overlord_tooling.scenarios import write_json
 from tests.e2e.lib.paths import WorkspacePaths
 from tests.e2e.lib.search_callbacks import (
     ed2k_candidate_source_count,
