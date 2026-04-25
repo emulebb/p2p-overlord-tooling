@@ -9,6 +9,19 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+UNSAFE_LIVE_NAME_TOKENS = (
+    "preteen",
+    "underage",
+    "child porn",
+    "lolita",
+    "school girls",
+    "rape",
+    "13 yrs",
+    "12 yrs",
+    "11 yrs",
+    "10 yrs",
+)
+
 
 @dataclass
 class SearchCallbackSession:
@@ -128,8 +141,31 @@ def select_ed2k_keyword_candidate(
     batches: list[dict[str, Any]],
     *,
     query: str,
+    min_source_count: int = 0,
+    max_file_size: int | None = None,
+    deny_hashes: set[str] | None = None,
 ) -> dict[str, Any]:
+    return select_ed2k_keyword_candidates(
+        batches,
+        query=query,
+        min_source_count=min_source_count,
+        max_file_size=max_file_size,
+        deny_hashes=deny_hashes,
+        limit=1,
+    )[0]
+
+
+def select_ed2k_keyword_candidates(
+    batches: list[dict[str, Any]],
+    *,
+    query: str,
+    min_source_count: int = 0,
+    max_file_size: int | None = None,
+    deny_hashes: set[str] | None = None,
+    limit: int = 1,
+) -> list[dict[str, Any]]:
     tokens = [token.lower() for token in query.split() if len(token) >= 3]
+    deny_hashes = {value.lower() for value in deny_hashes or set()}
     candidates: list[tuple[tuple[int, int, int, int, str], dict[str, Any]]] = []
     for batch in batches:
         for file_record in batch.get("files", []):
@@ -140,9 +176,17 @@ def select_ed2k_keyword_candidate(
             file_size = _file_size(file_record)
             if file_hash is None or file_name is None or file_size is None or file_size <= 0:
                 continue
+            if file_hash in deny_hashes:
+                continue
+            if is_unsafe_live_candidate_name(file_name):
+                continue
+            if max_file_size is not None and file_size > max_file_size:
+                continue
             lower_name = file_name.lower()
             matched_tokens = sum(1 for token in tokens if token in lower_name)
             source_count = _source_count(file_record)
+            if source_count < min_source_count:
+                continue
             preferred_extension = int(lower_name.endswith((".iso", ".bin", ".mp4", ".mkv", ".avi")))
             score = (
                 -matched_tokens,
@@ -165,7 +209,7 @@ def select_ed2k_keyword_candidate(
     if not candidates:
         raise ValueError(f"did not find a usable ED2K candidate for query {query!r}")
     candidates.sort(key=lambda item: item[0])
-    return candidates[0][1]
+    return [candidate for _, candidate in candidates[: max(1, limit)]]
 
 
 def ed2k_candidate_source_count(candidate: dict[str, Any]) -> int:
@@ -173,6 +217,11 @@ def ed2k_candidate_source_count(candidate: dict[str, Any]) -> int:
     if not isinstance(file_record, dict):
         return 0
     return _source_count(file_record)
+
+
+def is_unsafe_live_candidate_name(name: object) -> bool:
+    lower_name = str(name or "").lower()
+    return any(token in lower_name for token in UNSAFE_LIVE_NAME_TOKENS)
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

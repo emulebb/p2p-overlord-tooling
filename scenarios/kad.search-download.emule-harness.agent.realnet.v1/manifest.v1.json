@@ -13,7 +13,15 @@
     "comparisonMode": "wire-layer+state-machine-layer+acceptance-layer"
   },
   "search": {
-    "query": "ubuntu linux"
+    "query": "ubuntu linux",
+    "candidatePolicy": {
+      "minSourceCount": 1,
+      "maxFileSize": 100000000,
+      "maxCandidates": 5,
+      "denyHashes": [
+        "e44b536c4f7b5be847084d96103ddadb"
+      ]
+    }
   },
   "transportModes": [
     "PlaintextOnly",

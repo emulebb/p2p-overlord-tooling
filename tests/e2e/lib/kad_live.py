@@ -16,8 +16,9 @@ from overlord_tooling.scenarios import write_json
 from tests.e2e.lib.paths import WorkspacePaths
 from tests.e2e.lib.search_callbacks import (
     ed2k_candidate_source_count,
+    is_unsafe_live_candidate_name,
     read_result_batches,
-    select_ed2k_keyword_candidate,
+    select_ed2k_keyword_candidates,
     start_search_callback_collector,
     stop_search_callback_collector,
     wait_for_search_event,
@@ -110,6 +111,7 @@ def run_live_kad_search_download_to_agent_scenario(
     search_job: dict[str, object] | None = None
     result_batches: list[dict[str, Any]] = []
     bootstrap_stats: dict[str, Any] | None = None
+    attempted_candidates: list[dict[str, Any]] = []
 
     try:
         if not run.skip_build:
@@ -153,28 +155,61 @@ def run_live_kad_search_download_to_agent_scenario(
         result_batches = [
             batch for batch in read_result_batches(callback_session) if str(batch.get("job_id")) == job_id
         ]
-        candidate = select_ed2k_keyword_candidate(result_batches, query=query)
+        candidate_policy = manifest["search"].get("candidatePolicy") or {}
+        max_file_size = candidate_policy.get("maxFileSize")
+        deny_hashes = {
+            str(value).lower()
+            for value in candidate_policy.get("denyHashes", [])
+        }
+        candidates = select_ed2k_keyword_candidates(
+            result_batches,
+            query=query,
+            min_source_count=int(candidate_policy.get("minSourceCount") or 0),
+            max_file_size=int(max_file_size) if max_file_size is not None else None,
+            deny_hashes=deny_hashes,
+            limit=int(candidate_policy.get("maxCandidates") or 1),
+        )
 
-        agent.post_enrich_download(
-            agent_session,
-            file_hash=str(candidate["file_hash"]),
-            file_name=str(candidate["file_name"]),
-            file_size=int(candidate["file_size"]),
-        )
-        transfer_manifest = agent.wait_transfer_manifest(
-            agent_session,
-            file_hash=str(candidate["file_hash"]),
-            timeout_seconds=DOWNLOAD_TIMEOUT_SECONDS,
-        )
-        if transfer_manifest.get("completed") is not True:
-            raise AssertionError(
-                "transfer did not complete "
-                f"file_hash={candidate['file_hash']} "
-                f"sources={len(transfer_manifest.get('sources') or [])} "
-                f"aich_root={transfer_manifest.get('aich_root')!r}"
+        for candidate in candidates:
+            agent.post_enrich_download(
+                agent_session,
+                file_hash=str(candidate["file_hash"]),
+                file_name=str(candidate["file_name"]),
+                file_size=int(candidate["file_size"]),
             )
+            transfer_manifest = agent.wait_transfer_manifest(
+                agent_session,
+                file_hash=str(candidate["file_hash"]),
+                timeout_seconds=DOWNLOAD_TIMEOUT_SECONDS,
+            )
+            unsafe_canonical_name = is_unsafe_live_candidate_name(
+                transfer_manifest.get("canonical_name")
+            )
+            attempted_candidates.append(
+                {
+                    **_candidate_summary(candidate),
+                    "completed": transfer_manifest.get("completed") is True,
+                    "sourceCount": len(transfer_manifest.get("sources") or []),
+                    "aichRootPresent": bool(transfer_manifest.get("aich_root")),
+                    "unsafeCanonicalName": unsafe_canonical_name,
+                }
+            )
+            if unsafe_canonical_name:
+                continue
+            if transfer_manifest.get("completed") is True:
+                break
+        else:
+            raise AssertionError(
+                "no live candidate completed "
+                f"attempts={len(attempted_candidates)} "
+                f"last_file_hash={candidate['file_hash'] if candidate else None} "
+                f"last_sources={len(transfer_manifest.get('sources') or []) if transfer_manifest else 0} "
+                f"last_aich_root={transfer_manifest.get('aich_root') if transfer_manifest else None!r}"
+            )
+
         assert transfer_manifest.get("aich_root")
         assert transfer_manifest.get("sources")
+        assert not is_unsafe_live_candidate_name(transfer_manifest.get("canonical_name"))
 
         agent_dump_path = agent.latest_ed2k_dump(agent_session)
         agent_server_dump_path = latest_file(agent_session.log_root, "agent-ed2k-server-dump-*.jsonl")
@@ -215,6 +250,7 @@ def run_live_kad_search_download_to_agent_scenario(
                     "fileSize": candidate["file_size"],
                     "advertisedSourceCount": ed2k_candidate_source_count(candidate),
                 },
+                "attemptedCandidates": attempted_candidates,
                 "transferManifest": transfer_manifest,
                 "selectedServerCount": len(prerequisites.server_entries),
                 "bootstrapStats": {
@@ -272,6 +308,7 @@ def run_live_kad_search_download_to_agent_scenario(
                     "query": query,
                     "searchJobId": search_job["job_id"] if search_job else None,
                     "candidate": _candidate_summary(candidate),
+                    "attemptedCandidates": attempted_candidates,
                     "transferManifest": transfer_manifest,
                     "failedReason": failed_reason,
                     "selectedServerCount": len(prerequisites.server_entries),
