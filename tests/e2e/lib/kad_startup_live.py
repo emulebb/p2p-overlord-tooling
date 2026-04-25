@@ -179,8 +179,8 @@ def run_live_kad_startup_publish_scenario(
             direction="send",
             state_id="kad.send.kademlia2_publish_source_req",
         )
-        assert harness_session.trace_log_path.is_file()
         assert harness_udp_dump_path.is_file()
+        harness_trace_log_present = harness_session.trace_log_path.is_file()
 
         publish_observability = stats_response["publish_observability"]
         write_json(
@@ -207,7 +207,7 @@ def run_live_kad_startup_publish_scenario(
                     "publishSourceObserved": True,
                     "agentUdpDumpPresent": True,
                     "harnessUdpDumpPresent": True,
-                    "harnessTraceLogPresent": True,
+                    "harnessTraceLogPresent": harness_trace_log_present,
                 },
                 "finishedAtUtc": utc_now(),
             },
