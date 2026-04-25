@@ -24,7 +24,7 @@
     ]
   },
   "execution": {
-    "command": "run-private-emule-harness-ed2k-server-download",
+    "command": "ed2k.private.server-download",
     "summarySourceScenarioId": "ed2k.server.emule-harness.agent.private.v1"
   }
 }

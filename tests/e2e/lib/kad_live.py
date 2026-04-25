@@ -10,7 +10,7 @@ from tests.e2e.lib.artifacts import copy_if_exists
 from tests.e2e.lib.agent import AgentRuntime, AgentSession
 from tests.e2e.lib.artifacts import latest_file
 from tests.e2e.lib.ed2k_live import start_live_agent_session
-from tests.e2e.lib.ed2k_private import copy_agent_artifacts, create_private_ed2k_run, utc_now
+from tests.e2e.lib.ed2k_private import copy_agent_artifacts, create_private_ed2k_run, run_identity, utc_now
 from tests.e2e.lib.live_runtime import resolve_live_scenario_prerequisites
 from tests.e2e.lib.manifests import write_json
 from tests.e2e.lib.paths import WorkspacePaths
@@ -78,6 +78,9 @@ def run_live_kad_search_download_to_agent_scenario(
     scenario_id: str,
     manifest: dict[str, Any],
     transport_mode: str,
+    artifact_scenario_id: str | None = None,
+    run_slug: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     prerequisites = resolve_live_scenario_prerequisites(workspace_paths, manifest)
     query = str(manifest["search"]["query"])
@@ -90,6 +93,9 @@ def run_live_kad_search_download_to_agent_scenario(
         file_pattern="live-kad-search-download",
         keep_sessions_running=bool(pytestconfig.getoption("--keep-sessions-running")),
         skip_build=bool(pytestconfig.getoption("--skip-runtime-build")),
+        artifact_scenario_id=artifact_scenario_id,
+        run_slug=run_slug,
+        metadata=metadata,
     )
 
     agent = AgentRuntime(workspace_paths)
@@ -198,8 +204,7 @@ def run_live_kad_search_download_to_agent_scenario(
             run.run_summary_path,
             {
                 "schemaVersion": "run-summary/v1",
-                "scenarioId": run.scenario_id,
-                "runId": run.run_id,
+                **run_identity(run),
                 "completed": True,
                 "query": query,
                 "searchJobId": job_id,
@@ -261,8 +266,7 @@ def run_live_kad_search_download_to_agent_scenario(
                 run.run_summary_path,
                 {
                     "schemaVersion": "run-summary/v1",
-                    "scenarioId": run.scenario_id,
-                    "runId": run.run_id,
+                    **run_identity(run),
                     "completed": False,
                     "transportMode": run.transport_mode,
                     "query": query,

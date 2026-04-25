@@ -13,10 +13,12 @@ The parity program uses three manifest kinds:
 
 Use `python -m overlord_tooling show-parity-matrix` to list the current KAD2 and
 ED2K matrix inventory, including planned cells that still need deterministic
-harness shaping.
+harness shaping. Use `python -m overlord_tooling parity-status` to add latest
+`run-summary.json` status from the local artifact root.
 
-Legacy `execution.command` values in manifests refer to removed runners. Native
-parity E2E execution now belongs under `..\tests\e2e\`.
+Runnable `execution.command` values must be native registry command ids used by
+`tests/e2e/test_parity_scenarios.py`; do not add one-off pytest wrappers for
+new cells or campaigns.
 
 Current live-transfer coverage includes:
 

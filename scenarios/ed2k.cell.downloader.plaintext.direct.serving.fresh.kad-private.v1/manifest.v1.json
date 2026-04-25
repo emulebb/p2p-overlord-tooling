@@ -24,7 +24,7 @@
     ]
   },
   "execution": {
-    "command": "run-private-emule-harness-ed2k-download",
+    "command": "ed2k.private.kad-assisted-download",
     "summarySourceScenarioId": "kad.emule-harness.ed2k.download.private.v1"
   }
 }

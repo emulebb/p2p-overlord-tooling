@@ -25,7 +25,7 @@
     }
   },
   "execution": {
-    "command": "run-private-harness-kad-triplet",
+    "command": "kad2.private.harness-triplet",
     "summarySourceScenarioId": "kad.harness.triplet.local.v1"
   }
 }

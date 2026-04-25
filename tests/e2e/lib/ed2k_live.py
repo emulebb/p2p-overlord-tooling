@@ -13,6 +13,7 @@ from tests.e2e.lib.ed2k_private import (
     copy_harness_artifacts,
     copy_small_download,
     create_private_ed2k_run,
+    run_identity,
     seed_export_timeout,
     run_agent_to_harness_stage,
     run_harness_to_agent_stage,
@@ -195,6 +196,9 @@ def run_live_ed2k_server_roundtrip_scenario(
     *,
     scenario_id: str,
     manifest: dict[str, Any],
+    artifact_scenario_id: str | None = None,
+    run_slug: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     prerequisites = resolve_live_scenario_prerequisites(workspace_paths, manifest)
     file_size = int(pytestconfig.getoption("--file-size-bytes") or manifest["file"]["sizeBytes"])
@@ -207,6 +211,9 @@ def run_live_ed2k_server_roundtrip_scenario(
         file_pattern=str(manifest["file"]["pattern"]),
         keep_sessions_running=bool(pytestconfig.getoption("--keep-sessions-running")),
         skip_build=bool(pytestconfig.getoption("--skip-runtime-build")),
+        artifact_scenario_id=artifact_scenario_id,
+        run_slug=run_slug,
+        metadata=metadata,
     )
 
     emule = EmuleHarnessRuntime(workspace_paths)
@@ -309,8 +316,7 @@ def run_live_ed2k_server_roundtrip_scenario(
             run.run_summary_path,
             {
                 "schemaVersion": "run-summary/v1",
-                "scenarioId": run.scenario_id,
-                "runId": run.run_id,
+                **run_identity(run),
                 "completed": True,
                 "bindIp": prerequisites.interface_binding.bind_ip,
                 "interfaceAlias": prerequisites.interface_binding.interface_alias,
@@ -375,8 +381,7 @@ def run_live_ed2k_server_roundtrip_scenario(
                 run.run_summary_path,
                 {
                     "schemaVersion": "run-summary/v1",
-                    "scenarioId": run.scenario_id,
-                    "runId": run.run_id,
+                    **run_identity(run),
                     "completed": False,
                     "transportMode": run.transport_mode,
                     "bindIp": prerequisites.interface_binding.bind_ip,

@@ -11,6 +11,7 @@ from tests.e2e.lib.ed2k_private import (
     copy_server_artifacts,
     create_private_ed2k_run,
     file_contains_text,
+    run_identity,
     start_private_agent_session,
     utc_now,
 )
@@ -48,6 +49,9 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
     pytestconfig: pytest.Config,
     *,
     scenario_id: str,
+    artifact_scenario_id: str | None = None,
+    run_slug: str | None = None,
+    metadata: dict[str, object] | None = None,
 ) -> None:
     manifest = load_manifest(workspace_paths, SCENARIO_ID)
     runtime_manifest = load_manifest(workspace_paths, RUNTIME_CONFIG_SCENARIO_ID)
@@ -64,6 +68,9 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
         file_pattern="ed2k-triplet-callback-only",
         keep_sessions_running=bool(pytestconfig.getoption("--keep-sessions-running")),
         skip_build=bool(pytestconfig.getoption("--skip-runtime-build")),
+        artifact_scenario_id=artifact_scenario_id,
+        run_slug=run_slug,
+        metadata=metadata,
     )
 
     agent = AgentRuntime(workspace_paths)
@@ -160,8 +167,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
             run.run_summary_path,
             {
                 "schemaVersion": "run-summary/v1",
-                "scenarioId": run.scenario_id,
-                "runId": run.run_id,
+                **run_identity(run),
                 "completed": True,
                 "transportMode": run.transport_mode,
                 "casesValidated": [CALLBACK_CASE_ID],
@@ -204,8 +210,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
                 run.run_summary_path,
                 {
                     "schemaVersion": "run-summary/v1",
-                    "scenarioId": run.scenario_id,
-                    "runId": run.run_id,
+                    **run_identity(run),
                     "completed": False,
                     "transportMode": run.transport_mode,
                     "casesValidated": [CALLBACK_CASE_ID],

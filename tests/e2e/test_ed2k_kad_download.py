@@ -13,6 +13,7 @@ from tests.e2e.lib.ed2k_private import (
     create_private_ed2k_run,
     file_contains_text,
     require_dump,
+    run_identity,
     start_private_agent_session,
     utc_now,
 )
@@ -35,6 +36,9 @@ def run_private_kad_ed2k_download_to_agent_scenario(
     *,
     scenario_id: str,
     config_scenario_id: str | None = None,
+    artifact_scenario_id: str | None = None,
+    run_slug: str | None = None,
+    metadata: dict[str, object] | None = None,
 ) -> None:
     manifest = load_manifest(workspace_paths, config_scenario_id or scenario_id)
     harness_cfg = manifest["emuleHarness"]
@@ -49,6 +53,9 @@ def run_private_kad_ed2k_download_to_agent_scenario(
         file_pattern=DEFAULT_FILE_PATTERN,
         keep_sessions_running=bool(pytestconfig.getoption("--keep-sessions-running")),
         skip_build=bool(pytestconfig.getoption("--skip-runtime-build")),
+        artifact_scenario_id=artifact_scenario_id,
+        run_slug=run_slug,
+        metadata=metadata,
     )
 
     emule = EmuleHarnessRuntime(workspace_paths)
@@ -174,8 +181,7 @@ def run_private_kad_ed2k_download_to_agent_scenario(
             run.run_summary_path,
             {
                 "schemaVersion": "run-summary/v1",
-                "scenarioId": run.scenario_id,
-                "runId": run.run_id,
+                **run_identity(run),
                 "completed": True,
                 "transportMode": run.transport_mode,
                 "fileHash": parsed_link.file_hash,
@@ -207,8 +213,7 @@ def run_private_kad_ed2k_download_to_agent_scenario(
                 run.run_summary_path,
                 {
                     "schemaVersion": "run-summary/v1",
-                    "scenarioId": run.scenario_id,
-                    "runId": run.run_id,
+                    **run_identity(run),
                     "completed": False,
                     "transportMode": run.transport_mode,
                     "fileHash": parsed_link.file_hash if parsed_link else None,

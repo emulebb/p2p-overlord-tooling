@@ -12,6 +12,7 @@ from tests.e2e.lib.ed2k_private import (
     copy_agent_artifacts,
     copy_harness_artifacts,
     create_private_ed2k_run,
+    run_identity,
     utc_now,
 )
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleProfile, EmuleSession
@@ -38,6 +39,9 @@ def run_live_kad_startup_publish_scenario(
     *,
     scenario_id: str,
     manifest: dict[str, Any],
+    artifact_scenario_id: str | None = None,
+    run_slug: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     prerequisites = resolve_live_scenario_prerequisites(workspace_paths, manifest)
     seed_request = dict(manifest["agent"]["seedRequest"])
@@ -50,6 +54,9 @@ def run_live_kad_startup_publish_scenario(
         file_pattern="live-kad-startup-publish",
         keep_sessions_running=bool(pytestconfig.getoption("--keep-sessions-running")),
         skip_build=bool(pytestconfig.getoption("--skip-runtime-build")),
+        artifact_scenario_id=artifact_scenario_id,
+        run_slug=run_slug,
+        metadata=metadata,
     )
 
     emule = EmuleHarnessRuntime(workspace_paths)
@@ -180,8 +187,7 @@ def run_live_kad_startup_publish_scenario(
             run.run_summary_path,
             {
                 "schemaVersion": "run-summary/v1",
-                "scenarioId": run.scenario_id,
-                "runId": run.run_id,
+                **run_identity(run),
                 "completed": True,
                 "bindIp": prerequisites.interface_binding.bind_ip,
                 "interfaceAlias": prerequisites.interface_binding.interface_alias,
@@ -226,8 +232,7 @@ def run_live_kad_startup_publish_scenario(
                 run.run_summary_path,
                 {
                     "schemaVersion": "run-summary/v1",
-                    "scenarioId": run.scenario_id,
-                    "runId": run.run_id,
+                    **run_identity(run),
                     "completed": False,
                     "bindIp": prerequisites.interface_binding.bind_ip,
                     "failedReason": failed_reason,

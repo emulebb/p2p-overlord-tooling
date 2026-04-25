@@ -20,7 +20,7 @@
     ]
   },
   "execution": {
-    "command": "run-realnet-kad-search-download-parity",
+    "command": "ed2k.live.kad-search-download",
     "arguments": [
       "-Query",
       "ubuntu linux",

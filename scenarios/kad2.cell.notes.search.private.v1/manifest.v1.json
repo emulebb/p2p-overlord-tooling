@@ -24,7 +24,7 @@
     }
   },
   "execution": {
-    "command": "run-private-harness-kad-triplet",
+    "command": "kad2.private.harness-triplet",
     "arguments": [
       "-ScenarioManifestPath",
       "p2p-overlord-tooling\\scenarios\\kad.harness.triplet.local.notes-search.v1\\manifest.v1.json"

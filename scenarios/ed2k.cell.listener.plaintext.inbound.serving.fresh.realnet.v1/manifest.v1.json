@@ -19,7 +19,7 @@
     ]
   },
   "execution": {
-    "command": "run-realnet-emule-harness-ed2k-server-roundtrip",
+    "command": "ed2k.live.server-roundtrip",
     "summarySourceScenarioId": "ed2k.server.emule-harness.agent.roundtrip.realnet.v1"
   }
 }

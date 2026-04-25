@@ -10,6 +10,7 @@ from tests.e2e.lib.ed2k_private import (
     copy_harness_artifacts,
     copy_server_artifacts,
     create_private_ed2k_run,
+    run_identity,
     run_harness_to_agent_stage,
     start_private_agent_session,
     start_private_harness_seeder,
@@ -37,6 +38,9 @@ def run_private_ed2k_server_download_to_agent_scenario(
     transport_mode: str,
     config_scenario_id: str | None = None,
     use_plaintext_loopback_source_hint: bool = False,
+    artifact_scenario_id: str | None = None,
+    run_slug: str | None = None,
+    metadata: dict[str, object] | None = None,
 ) -> None:
     manifest = load_manifest(workspace_paths, config_scenario_id or scenario_id)
     harness_cfg = manifest["emuleHarness"]
@@ -49,6 +53,9 @@ def run_private_ed2k_server_download_to_agent_scenario(
         file_pattern=DEFAULT_FILE_PATTERN,
         keep_sessions_running=bool(pytestconfig.getoption("--keep-sessions-running")),
         skip_build=bool(pytestconfig.getoption("--skip-runtime-build")),
+        artifact_scenario_id=artifact_scenario_id,
+        run_slug=run_slug,
+        metadata=metadata,
     )
 
     timeouts_cfg = {
@@ -120,8 +127,7 @@ def run_private_ed2k_server_download_to_agent_scenario(
             run.run_summary_path,
             {
                 "schemaVersion": "run-summary/v1",
-                "scenarioId": run.scenario_id,
-                "runId": run.run_id,
+                **run_identity(run),
                 "completed": True,
                 "bindAddr": str(server["host"]),
                 "fileHash": seeder_result.parsed_link.file_hash,
@@ -161,8 +167,7 @@ def run_private_ed2k_server_download_to_agent_scenario(
                 run.run_summary_path,
                 {
                     "schemaVersion": "run-summary/v1",
-                    "scenarioId": run.scenario_id,
-                    "runId": run.run_id,
+                    **run_identity(run),
                     "completed": False,
                     "transportMode": run.transport_mode,
                     "fileHash": seeder_result.parsed_link.file_hash if seeder_result else None,

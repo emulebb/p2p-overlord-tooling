@@ -22,7 +22,7 @@
     ]
   },
   "execution": {
-    "command": "validate-ed2k-server-triplet",
+    "command": "ed2k.private.callback-source-acquisition",
     "summarySourceScenarioId": "ed2k.server.triplet.validation.v1"
   }
 }

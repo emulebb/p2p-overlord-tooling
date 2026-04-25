@@ -22,7 +22,7 @@
     ]
   },
   "execution": {
-    "command": "run-kad-startup-hello-publish",
+    "command": "kad2.live.startup-publish",
     "summarySourceScenarioId": "kad.startup.hello.publish.realnet.v1"
   }
 }

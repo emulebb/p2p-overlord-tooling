@@ -24,6 +24,7 @@ ED2K_PART_SIZE_BYTES = 9_728_000
 @dataclass(frozen=True)
 class PrivateEd2kRun:
     scenario_id: str
+    artifact_scenario_id: str
     run_id: str
     transport_mode: str
     enable_obfuscation: bool
@@ -40,6 +41,7 @@ class PrivateEd2kRun:
     server_artifacts: Path
     run_manifest_path: Path
     run_summary_path: Path
+    metadata: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -88,9 +90,14 @@ def create_private_ed2k_run(
     file_pattern: str,
     keep_sessions_running: bool,
     skip_build: bool,
+    artifact_scenario_id: str | None = None,
+    run_slug: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> PrivateEd2kRun:
-    run_id = f"{scenario_id}.{transport_mode}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    artifact_root = paths.run_root(scenario_id, run_id)
+    artifact_namespace = artifact_scenario_id or scenario_id
+    run_stem = run_slug or scenario_id
+    run_id = f"{run_stem}.{transport_mode}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    artifact_root = paths.run_root(artifact_namespace, run_id)
     seeder_artifacts = artifact_root / "seed-art"
     downloader_artifacts = artifact_root / "down-art"
     agent_stage1_artifacts = artifact_root / "agt1-art"
@@ -112,8 +119,12 @@ def create_private_ed2k_run(
         run_manifest_path,
         {
             "schemaVersion": "run-manifest/v1",
-            "scenarioId": scenario_id,
-            "runId": run_id,
+            **run_identity_fields(
+                scenario_id=scenario_id,
+                artifact_scenario_id=artifact_namespace,
+                run_id=run_id,
+                metadata=metadata or {},
+            ),
             "artifactRoot": str(artifact_root),
             "transportMode": transport_mode,
             "file": {"name": file_name, "sizeBytes": file_size, "pattern": file_pattern},
@@ -123,6 +134,7 @@ def create_private_ed2k_run(
 
     return PrivateEd2kRun(
         scenario_id=scenario_id,
+        artifact_scenario_id=artifact_namespace,
         run_id=run_id,
         transport_mode=transport_mode,
         enable_obfuscation=transport_mode == "obfuscated",
@@ -139,6 +151,32 @@ def create_private_ed2k_run(
         server_artifacts=server_artifacts,
         run_manifest_path=run_manifest_path,
         run_summary_path=run_summary_path,
+        metadata=metadata or {},
+    )
+
+
+def run_identity_fields(
+    *,
+    scenario_id: str,
+    artifact_scenario_id: str,
+    run_id: str,
+    metadata: dict[str, Any],
+) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "scenarioId": scenario_id,
+        "artifactScenarioId": artifact_scenario_id,
+        "runId": run_id,
+    }
+    fields.update(metadata)
+    return fields
+
+
+def run_identity(run: PrivateEd2kRun) -> dict[str, Any]:
+    return run_identity_fields(
+        scenario_id=run.scenario_id,
+        artifact_scenario_id=run.artifact_scenario_id,
+        run_id=run.run_id,
+        metadata=run.metadata,
     )
 
 
