@@ -34,10 +34,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Run tracked-file privacy guard
         shell: pwsh
-        run: .\overlord-tooling.ps1 guard-tracked-files
+        run: python -m overlord_tooling guard-tracked-files
 
       - name: Run workspace conventions guard
         shell: pwsh
-        run: .\overlord-tooling.ps1 guard-workspace-conventions
+        run: python -m overlord_tooling guard-workspace-conventions --repo-root .
