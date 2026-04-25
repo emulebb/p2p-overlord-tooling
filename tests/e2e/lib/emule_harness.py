@@ -200,9 +200,12 @@ class EmuleHarnessRuntime:
         export_aich_path: Path | None = None,
         export_source_ip: str | None = None,
         download_link_path: Path | None = None,
+        bootstrap_peers: str | None = None,
         skip_build: bool = False,
+        kill_existing: bool = True,
     ) -> EmuleSession:
-        kill_processes_by_name(["eMule_v072a_parity"])
+        if kill_existing:
+            kill_processes_by_name(["eMule_v072a_parity"])
         runtime_exe = self.runtime_exe_path()
         if not skip_build or not runtime_exe.is_file():
             runtime_exe = self.build()
@@ -242,6 +245,8 @@ class EmuleHarnessRuntime:
             args.append(f"-exportsourceip={export_source_ip}")
         if download_link_path:
             args.append(f"-downloadlinkfile={download_link_path}")
+        if bootstrap_peers:
+            args.append(f"-bootstrap={bootstrap_peers}")
         parity_hook_config = profile.profile_root / "parity-hooks.v1.json"
         if parity_hook_config.is_file():
             args.append(f"-hookconfigfile={parity_hook_config}")

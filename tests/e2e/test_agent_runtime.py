@@ -97,3 +97,21 @@ def test_private_agent_config_writes_kad_timing_overrides(tmp_path: Path) -> Non
     assert "synthetic_publish_interval_secs = 900" in config
     assert "synthetic_publish_batch_items = 2" in config
     assert "synthetic_publish_contact_fanout = 5" in config
+
+
+def test_private_agent_config_writes_notes_publish_enabled(tmp_path: Path) -> None:
+    paths = WorkspacePaths.discover()
+    runtime = AgentRuntime(paths)
+
+    runtime.write_private_local_config(
+        scenario_root=tmp_path / "scenario",
+        control_port=13301,
+        kad_port=41120,
+        ed2k_port=41121,
+        p2p_bind_ip="10.8.0.4",
+        disable_kad=False,
+        enable_kad_notes_publish=True,
+    )
+
+    config = runtime.config_path.read_text(encoding="utf-8")
+    assert "seed_notes_publish_enabled = true" in config

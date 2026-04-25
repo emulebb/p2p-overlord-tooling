@@ -288,6 +288,7 @@ max_files = 7
         kad_synthetic_publish_interval_secs: int = 120,
         kad_synthetic_publish_batch_items: int = 1,
         kad_synthetic_publish_contact_fanout: int = 1,
+        enable_kad_notes_publish: bool = False,
         skip_build: bool = False,
     ) -> AgentSession:
         kill_processes_by_name(["overlord-agent-emule"])
@@ -315,6 +316,7 @@ max_files = 7
             kad_synthetic_publish_interval_secs=kad_synthetic_publish_interval_secs,
             kad_synthetic_publish_batch_items=kad_synthetic_publish_batch_items,
             kad_synthetic_publish_contact_fanout=kad_synthetic_publish_contact_fanout,
+            enable_kad_notes_publish=enable_kad_notes_publish,
             nodes_dat_seed_path=nodes_dat_seed_path,
         )
         if not skip_build or not self.executable_path.is_file():
@@ -435,13 +437,39 @@ max_files = 7
         protocol: str = "kad2",
         job_id: str | None = None,
     ) -> dict[str, Any]:
+        return self.post_search(
+            session,
+            kind="keyword",
+            query=query,
+            callback_url=callback_url,
+            protocol=protocol,
+            job_id=job_id,
+        )
+
+    def post_search(
+        self,
+        session: AgentSession,
+        *,
+        kind: str,
+        callback_url: str,
+        protocol: str = "kad2",
+        query: str | None = None,
+        file_hash: str | None = None,
+        file_size: int | None = None,
+        job_id: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_hash = file_hash.lower() if file_hash else None
         payload = {
             "job_id": job_id or str(uuid4()),
             "protocol": protocol,
-            "kind": "keyword",
+            "kind": kind,
             "query": query,
-            "file_hash": None,
-            "file_size": None,
+            "file_hash": (
+                {"kind": "ed2k", "value": normalized_hash}
+                if normalized_hash is not None
+                else None
+            ),
+            "file_size": int(file_size) if file_size is not None else None,
             "callback_url": callback_url,
         }
         http.post_json(f"{session.control_url}/api/internal/search", payload)
