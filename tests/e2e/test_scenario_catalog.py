@@ -27,6 +27,7 @@ def test_manifest_driven_cases_include_native_runner_backed_cells_and_campaigns(
     assert "kad2.campaign.search-families.private.v1" in case_ids
     assert "kad2.cell.notes.publish.private.v1" in case_ids
     assert "kad2.campaign.publish-families.v1" in case_ids
+    assert "kad2.campaign.private-confidence.v1" in case_ids
 
 
 def test_native_command_gaps_are_empty(

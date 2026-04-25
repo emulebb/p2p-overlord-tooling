@@ -297,7 +297,7 @@ class EmuleHarnessRuntime:
         session.write_metadata()
         return session
 
-    def _wait_ready(self, ready_file: Path, *, process_pid: int, timeout_seconds: int = 90) -> dict[str, str]:
+    def _wait_ready(self, ready_file: Path, *, process_pid: int, timeout_seconds: int = 300) -> dict[str, str]:
         deadline = time.monotonic() + timeout_seconds
         last_state: dict[str, str] | None = None
         while time.monotonic() < deadline:

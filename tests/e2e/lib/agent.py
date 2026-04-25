@@ -366,7 +366,11 @@ max_files = 7
         last_response: Any = None
         expected_log_path = str(session.agent_log_path.resolve()).replace("\\", "/")
         while time.monotonic() < deadline:
-            response = http.wait_json(session.stats_url, timeout_seconds=10, poll_seconds=1)
+            try:
+                response = http.wait_json(session.stats_url, timeout_seconds=10, poll_seconds=1)
+            except TimeoutError as exc:
+                last_response = {"error": str(exc)}
+                continue
             last_response = response
             observed_log_path = (
                 response.get("publish_observability", {})
