@@ -30,11 +30,6 @@ def resolve_live_interface_binding(
     interface_alias: str = "hide.me",
     command_runner: Callable[..., Any] | None = None,
 ) -> LiveInterfaceBinding:
-    override_ip = os.environ.get("OVERLORD_LIVE_BIND_IP", "").strip()
-    if override_ip:
-        _validate_ipv4(override_ip)
-        return LiveInterfaceBinding(interface_alias=interface_alias, bind_ip=override_ip)
-
     override_alias = os.environ.get("OVERLORD_LIVE_INTERFACE_ALIAS", "").strip()
     if override_alias:
         interface_alias = override_alias
@@ -47,6 +42,22 @@ def resolve_live_interface_binding(
     )
     payload = json.loads(completed.stdout or "[]")
     candidates = normalize_interface_candidates(payload)
+    override_ip = os.environ.get("OVERLORD_LIVE_BIND_IP", "").strip()
+    if override_ip:
+        _validate_ipv4(override_ip)
+        matching_ips = {
+            str(candidate["ip_address"])
+            for candidate in candidates
+            if str(candidate.get("interface_alias", "")).casefold() == interface_alias.casefold()
+        }
+        if override_ip not in matching_ips:
+            current = sorted(matching_ips)
+            raise RuntimeError(
+                f"OVERLORD_LIVE_BIND_IP={override_ip!r} is not assigned to interface "
+                f"{interface_alias!r}; current IPv4 addresses for that interface: {current}"
+            )
+        return LiveInterfaceBinding(interface_alias=interface_alias, bind_ip=override_ip)
+
     bind_ip = choose_bind_ip_for_interface(candidates, interface_alias=interface_alias)
     return LiveInterfaceBinding(interface_alias=interface_alias, bind_ip=bind_ip)
 

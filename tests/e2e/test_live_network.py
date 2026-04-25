@@ -75,8 +75,42 @@ def test_choose_bind_ip_for_interface_prefers_preferred_non_skip_source() -> Non
 def test_resolve_live_interface_binding_honors_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OVERLORD_LIVE_BIND_IP", "10.8.0.44")
 
+    class _Completed:
+        def __init__(self, stdout: str) -> None:
+            self.stdout = stdout
+
     binding = resolve_live_interface_binding(
-        WorkspacePaths(
+        _workspace_paths(tmp_path),
+        command_runner=lambda *args, **kwargs: _Completed(
+            '[{"InterfaceAlias":"hide.me","IPAddress":"10.8.0.44","SkipAsSource":false,"AddressState":"Preferred"}]'
+        ),
+    )
+
+    assert binding.interface_alias == "hide.me"
+    assert binding.bind_ip == "10.8.0.44"
+
+
+def test_resolve_live_interface_binding_rejects_stale_env_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OVERLORD_LIVE_BIND_IP", "10.8.0.44")
+
+    class _Completed:
+        def __init__(self, stdout: str) -> None:
+            self.stdout = stdout
+
+    with pytest.raises(RuntimeError, match="not assigned"):
+        resolve_live_interface_binding(
+            _workspace_paths(tmp_path),
+            command_runner=lambda *args, **kwargs: _Completed(
+                '[{"InterfaceAlias":"hide.me","IPAddress":"10.8.0.45","SkipAsSource":false,"AddressState":"Preferred"}]'
+            ),
+        )
+
+
+def _workspace_paths(tmp_path: Path) -> WorkspacePaths:
+    return WorkspacePaths(
             project_root=tmp_path,
             tooling_root=tmp_path / "tooling",
             agents_root=tmp_path / "agents",
@@ -85,10 +119,6 @@ def test_resolve_live_interface_binding_honors_env_override(tmp_path: Path, monk
             log_dir=tmp_path / "logs",
             emule_workspace_root=None,
         )
-    )
-
-    assert binding.interface_alias == "hide.me"
-    assert binding.bind_ip == "10.8.0.44"
 
 
 def test_resolve_live_interface_binding_honors_interface_alias_override(
