@@ -140,12 +140,30 @@ def _run_live_kad_startup_publish(context: ScenarioContext) -> None:
     )
 
 
+def _run_kad2_private_harness_triplet(context: ScenarioContext) -> None:
+    from tests.e2e.lib.kad_private import run_private_kad_harness_triplet_scenario
+
+    if context.source_manifest is None:
+        raise ValueError(f"{context.scenario_id} requires a summarySourceScenarioId manifest")
+    run_private_kad_harness_triplet_scenario(
+        context.workspace_paths,
+        context.pytestconfig,
+        scenario_id=context.run_scenario_id,
+        manifest=context.manifest,
+        source_manifest=context.source_manifest,
+        artifact_scenario_id=context.artifact_scenario_id,
+        run_slug=context.run_slug,
+        metadata=context.metadata,
+    )
+
+
 _REGISTRY: dict[str, Runner] = {
     "ed2k.private.callback-source-acquisition": _run_ed2k_private_callback_source_acquisition,
     "ed2k.private.kad-assisted-download": _run_ed2k_private_kad_assisted_download,
     "ed2k.private.server-download": _run_ed2k_private_server_download,
     "ed2k.live.kad-search-download": _run_live_kad_search_download,
     "ed2k.live.server-roundtrip": _run_live_ed2k_server_roundtrip,
+    "kad2.private.harness-triplet": _run_kad2_private_harness_triplet,
     "kad2.live.keyword-search-download": _run_live_kad_search_download,
     "kad2.live.startup-publish": _run_live_kad_startup_publish,
 }

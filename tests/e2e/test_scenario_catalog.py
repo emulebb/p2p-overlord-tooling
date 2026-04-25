@@ -23,23 +23,16 @@ def test_manifest_driven_cases_include_native_runner_backed_cells_and_campaigns(
     assert "ed2k.campaign.realnet-confidence.v1" in case_ids
     assert "kad2.cell.keyword.search.obfuscated.realnet.v1" in case_ids
     assert "kad2.campaign.realnet-confidence.v1" in case_ids
-    assert "kad2.cell.keyword.search.triplet.private.v1" not in case_ids
+    assert "kad2.cell.keyword.search.triplet.private.v1" in case_ids
+    assert "kad2.campaign.search-families.private.v1" in case_ids
 
 
-def test_native_command_gaps_are_explicit_legacy_kad2_triplet_cells(
+def test_native_command_gaps_are_empty(
     workspace_paths: WorkspacePaths,
 ) -> None:
     catalog = ScenarioCatalog.load(workspace_paths.tooling_root)
 
-    assert catalog.native_command_gaps(registered_command_names()) == [
-        "kad2.cell.bootstrap.lookup.triplet.private.v1",
-        "kad2.cell.hello.senderkey.ack.triplet.private.v1",
-        "kad2.cell.keyword.publish.triplet.private.v1",
-        "kad2.cell.keyword.search.triplet.private.v1",
-        "kad2.cell.notes.search.private.v1",
-        "kad2.cell.source.publish.triplet.private.v1",
-        "kad2.cell.source.search.private.v1",
-    ]
+    assert catalog.native_command_gaps(registered_command_names()) == []
 
 
 def test_campaign_step_slug_is_stable_and_readable() -> None:

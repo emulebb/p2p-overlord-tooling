@@ -33,6 +33,6 @@ Current parity status:
 - KAD2 obfuscated live keyword search/download remains a required red cell:
   bootstrap/search work and `OP_GETSOURCES_OBFU` is sent, but no usable source
   response is acquired yet.
-- KAD2 private triplet manifests are still visible in the matrix, but their
-  native `kad2.private.harness-triplet` runner is not registered yet, so they
-  are reported as command gaps rather than collected as runnable tests.
+- KAD2 private triplet cells are collected through the native
+  `kad2.private.harness-triplet` runner, which uses the v0.72a tracing harness
+  triplet for deterministic bootstrap, publish, and search parity evidence.
