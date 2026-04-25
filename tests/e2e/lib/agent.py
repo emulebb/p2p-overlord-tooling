@@ -516,8 +516,10 @@ max_files = 7
         *,
         file_hash: str,
         timeout_seconds: int,
+        stop_on_terminal_error: bool = False,
     ) -> dict[str, Any]:
-        manifest_path = session.transfer_root / file_hash.lower() / "resume-manifest.json"
+        normalized_hash = file_hash.lower()
+        manifest_path = session.transfer_root / normalized_hash / "resume-manifest.json"
         deadline = time.monotonic() + timeout_seconds
         latest: dict[str, Any] | None = None
         while time.monotonic() < deadline:
@@ -525,6 +527,11 @@ max_files = 7
             if snapshot is not None and "completed" in snapshot:
                 latest = snapshot
                 if snapshot.get("completed") is True:
+                    return snapshot
+                if stop_on_terminal_error and _agent_reported_terminal_download_error(
+                    session,
+                    file_hash=normalized_hash,
+                ):
                     return snapshot
             time.sleep(2)
         if latest is not None:
@@ -554,6 +561,23 @@ def _read_json_if_stable(path: Path) -> dict[str, Any] | None:
         return value if isinstance(value, dict) else None
     except (OSError, json.JSONDecodeError):
         return None
+
+
+def _agent_reported_terminal_download_error(session: AgentSession, *, file_hash: str) -> bool:
+    try:
+        stats = http.get_json(session.stats_url, timeout=2)
+    except Exception:  # noqa: BLE001 - terminal detection must not mask manifest polling.
+        return False
+    if not isinstance(stats, dict):
+        return False
+    activity = stats.get("agent_activity")
+    if not isinstance(activity, dict):
+        return False
+    if activity.get("state") != "degraded":
+        return False
+    target = str(activity.get("query_or_target") or "").lower()
+    last_error = str(activity.get("last_error") or "")
+    return file_hash.lower() in target and bool(last_error)
 
 
 def _bool(value: bool) -> str:

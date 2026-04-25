@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests.e2e.lib.agent import AgentRuntime
+from tests.e2e.lib import agent as agent_lib
+from tests.e2e.lib.agent import AgentRuntime, AgentSession
 from tests.e2e.lib.paths import WorkspacePaths
 
 
@@ -115,3 +116,53 @@ def test_private_agent_config_writes_notes_publish_enabled(tmp_path: Path) -> No
 
     config = runtime.config_path.read_text(encoding="utf-8")
     assert "seed_notes_publish_enabled = true" in config
+
+
+def test_wait_transfer_manifest_returns_on_terminal_agent_error(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    paths = WorkspacePaths.discover()
+    runtime = AgentRuntime(paths)
+    file_hash = "a" * 32
+    transfer_dir = tmp_path / "transfers" / file_hash
+    transfer_dir.mkdir(parents=True)
+    (transfer_dir / "resume-manifest.json").write_text(
+        '{"completed": false, "sources": []}\n',
+        encoding="utf-8",
+    )
+    session = AgentSession(
+        session_dir=tmp_path,
+        session_name="agent",
+        state_root=tmp_path / "state",
+        log_root=tmp_path / "logs",
+        config_path=tmp_path / "agent.toml",
+        config_backup_path=None,
+        stdout_path=tmp_path / "stdout.log",
+        stderr_path=tmp_path / "stderr.log",
+        agent_log_path=tmp_path / "agent.log",
+        control_url="http://127.0.0.1:9",
+        stats_url="http://127.0.0.1:9/api/internal/stats",
+        transfer_root=tmp_path / "transfers",
+        control_port=9,
+        kad_port=10,
+        ed2k_port=11,
+        bind_ip="127.0.0.1",
+        pid=1234,
+        started_at_utc="2026-04-25T00:00:00Z",
+    )
+
+    monkeypatch.setattr(
+        agent_lib,
+        "_agent_reported_terminal_download_error",
+        lambda _session, *, file_hash: file_hash == "a" * 32,
+    )
+
+    manifest = runtime.wait_transfer_manifest(
+        session,
+        file_hash=file_hash,
+        timeout_seconds=30,
+        stop_on_terminal_error=True,
+    )
+
+    assert manifest["completed"] is False

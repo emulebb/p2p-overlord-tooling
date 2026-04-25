@@ -181,6 +181,7 @@ def run_live_kad_search_download_to_agent_scenario(
                 agent_session,
                 file_hash=str(candidate["file_hash"]),
                 timeout_seconds=DOWNLOAD_TIMEOUT_SECONDS,
+                stop_on_terminal_error=True,
             )
             unsafe_canonical_name = is_unsafe_live_candidate_name(
                 transfer_manifest.get("canonical_name")
