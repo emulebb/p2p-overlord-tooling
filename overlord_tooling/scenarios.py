@@ -398,7 +398,23 @@ def default_run_root() -> Path:
 
 def campaign_step_slug(member_id: str) -> str:
     member = member_id.lower()
-    if "startup.hello.publish" in member:
+    if "hello.senderkey.ack" in member:
+        suffix = "hello-senderkey-ack"
+    elif "bootstrap.lookup" in member:
+        suffix = "bootstrap-lookup"
+    elif "keyword.publish" in member:
+        suffix = "keyword-publish"
+    elif "source.publish" in member:
+        suffix = "source-publish"
+    elif "notes.publish" in member:
+        suffix = "notes-publish"
+    elif "keyword.search.triplet" in member:
+        suffix = "keyword-search-private"
+    elif "source.search" in member:
+        suffix = "source-search"
+    elif "notes.search" in member:
+        suffix = "notes-search"
+    elif "startup.hello.publish" in member:
         suffix = "startup-publish"
     elif "keyword.search.obfuscated" in member:
         suffix = "keyword-search-obfuscated"
