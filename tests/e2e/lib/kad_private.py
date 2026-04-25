@@ -171,9 +171,13 @@ def run_private_kad_harness_triplet_scenario(
 
         if _needs_manual_publish(expected_branch, search_kind):
             _post_seed_popular_after_bootstrap(agent, agent_session, manual_publish)
+            notes_publish_enabled = bool(agent_cfg.get("seedNotesPublishEnabled") or False)
             publish_stats = http.wait_json_until(
                 agent_session.stats_url,
-                predicate=_manual_publish_observed,
+                predicate=lambda response: _manual_publish_observed(
+                    response,
+                    notes_publish_enabled=notes_publish_enabled,
+                ),
                 timeout_seconds=MANUAL_PUBLISH_TIMEOUT_SECONDS,
                 poll_seconds=2,
             )
@@ -668,16 +672,32 @@ def _kad_bootstrap_ready(response: dict[str, Any]) -> bool:
     return bool(response.get("kad_bootstrapped"))
 
 
-def _manual_publish_observed(response: dict[str, Any]) -> bool:
+def _manual_publish_observed(
+    response: dict[str, Any],
+    *,
+    notes_publish_enabled: bool,
+) -> bool:
     publish = response.get("publish_observability") or {}
     latest_keyword = publish.get("latest_keyword_batch") or {}
     latest_source = publish.get("latest_source_batch") or {}
-    return (
+    keyword_and_source_observed = (
         publish.get("last_seed_source") == "manual_api"
         and latest_keyword.get("seed_source") == "manual_api"
         and int(latest_keyword.get("published_items") or 0) >= 1
         and latest_source.get("seed_source") == "manual_api"
         and int(latest_source.get("published_items") or 0) >= 1
+    )
+    if not keyword_and_source_observed:
+        return False
+    if not notes_publish_enabled:
+        return True
+
+    latest_notes = publish.get("latest_notes_batch") or {}
+    notes_counters = publish.get("notes_counters") or {}
+    return (
+        latest_notes.get("seed_source") == "manual_api"
+        and int(latest_notes.get("published_items") or 0) >= 1
+        and int(notes_counters.get("published_items") or 0) >= 1
     )
 
 
