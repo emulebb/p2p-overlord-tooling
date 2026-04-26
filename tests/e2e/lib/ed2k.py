@@ -10,6 +10,14 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
+PART_PAYLOAD_OPCODE_NAMES = (
+    "OP_COMPRESSEDPART",
+    "OP_COMPRESSEDPART_I64",
+    "OP_SENDINGPART",
+    "OP_SENDINGPART_I64",
+)
+
+
 @dataclass(frozen=True)
 class Ed2kLink:
     link: str

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tests.e2e.lib.kad_live import source_acquisition_evidence
+from tests.e2e.lib.kad_live import classify_candidate_terminal_reason, source_acquisition_evidence
 
 
 def test_source_acquisition_evidence_summarizes_zero_source_live_failure(tmp_path: Path) -> None:
@@ -104,3 +104,72 @@ def test_source_acquisition_evidence_reads_server_getsources_dump(tmp_path: Path
     assert evidence["sourceSearchFailures"] == [
         "background: timed out waiting for OP_FOUNDSOURCES"
     ]
+
+
+def test_source_acquisition_evidence_tracks_direct_attempt_refresh_terminal_reason(tmp_path: Path) -> None:
+    file_hash = "372c0a482e8cfa5148f7a98943dc1468"
+    log_path = tmp_path / "overlord-agent-emule.log"
+    log_path.write_text(
+        "\n".join(
+            [
+                "native ED2K download attempt "
+                f"file_hash={file_hash} peer=93.41.146.101:44662 client_id=1 "
+                "obfuscated=true has_user_hash=true",
+                "native ED2K download peer failed "
+                f"file_hash={file_hash} peer=93.41.146.101:44662: "
+                "failed to read eD2k packet from 93.41.146.101:44662",
+                "native ED2K download source refresh completed "
+                f"file_hash={file_hash} requery_round=1 refreshed_source_count=2 "
+                "added_source_count=0 aggregated_source_count=2 new_direct_source_count=0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    evidence = source_acquisition_evidence(log_path, file_hash=file_hash)
+
+    assert evidence["directDownloadAttemptCount"] == 1
+    assert evidence["directDownloadAttemptedEndpointCount"] == 1
+    assert evidence["directDownloadFailureCount"] == 1
+    assert evidence["sourceRefreshCount"] == 1
+    assert evidence["sourceRefreshNewDirectEndpointCount"] == 0
+    assert classify_candidate_terminal_reason({"completed": False}, evidence) == (
+        "no_progress_repeated_endpoints"
+    )
+
+
+def test_candidate_terminal_reason_classifies_peer_and_source_failures() -> None:
+    assert classify_candidate_terminal_reason(
+        {"completed": False},
+        {
+            "directDownloadAttemptedEndpointCount": 1,
+            "sourceRefreshCount": 0,
+            "sourceRefreshSkipped": False,
+            "sourceRefreshNewDirectEndpointCount": 0,
+            "directDownloadFailureReasons": ["peer does not serve requested file abc"],
+            "sourceSearchFailureCount": 0,
+        },
+    ) == "peer_not_serving"
+    assert classify_candidate_terminal_reason(
+        {"completed": False},
+        {
+            "directDownloadAttemptedEndpointCount": 1,
+            "sourceRefreshCount": 0,
+            "sourceRefreshSkipped": False,
+            "sourceRefreshNewDirectEndpointCount": 0,
+            "directDownloadFailureReasons": ["failed to read eD2k packet from peer"],
+            "sourceSearchFailureCount": 0,
+        },
+    ) == "peer_closed_after_hello"
+    assert classify_candidate_terminal_reason(
+        {"completed": False},
+        {
+            "directDownloadAttemptedEndpointCount": 0,
+            "sourceRefreshCount": 0,
+            "sourceRefreshSkipped": False,
+            "sourceRefreshNewDirectEndpointCount": 0,
+            "directDownloadFailureReasons": [],
+            "sourceSearchFailureCount": 1,
+        },
+    ) == "source_search_timeout"

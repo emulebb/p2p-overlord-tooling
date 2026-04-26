@@ -148,7 +148,7 @@ def run_private_kad_ed2k_download_to_agent_scenario(
         assert ed2k.dump_has_opcode(
             agent_dump_path,
             direction="recv",
-            opcode_names=("OP_COMPRESSEDPART", "OP_COMPRESSEDPART_I64"),
+            opcode_names=ed2k.PART_PAYLOAD_OPCODE_NAMES,
         )
         assert "plaintext" in ed2k.dump_transport_modes(agent_dump_path)
 

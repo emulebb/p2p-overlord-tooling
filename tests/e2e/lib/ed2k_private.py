@@ -329,7 +329,7 @@ def run_harness_to_agent_stage(
     assert ed2k.dump_has_opcode(
         evidence_dump_path,
         direction=compressed_direction,
-        opcode_names=("OP_COMPRESSEDPART", "OP_COMPRESSEDPART_I64"),
+        opcode_names=ed2k.PART_PAYLOAD_OPCODE_NAMES,
     )
     transport_modes = ed2k.dump_transport_modes(evidence_dump_path)
     assert run.transport_mode in transport_modes
@@ -420,7 +420,7 @@ def run_agent_to_harness_stage(
     assert ed2k.dump_has_opcode(
         evidence_dump_path,
         direction=compressed_direction,
-        opcode_names=("OP_COMPRESSEDPART", "OP_COMPRESSEDPART_I64"),
+        opcode_names=ed2k.PART_PAYLOAD_OPCODE_NAMES,
     )
     transport_modes = ed2k.dump_transport_modes(evidence_dump_path)
     assert run.transport_mode in transport_modes

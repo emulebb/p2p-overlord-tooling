@@ -73,6 +73,26 @@ DOWNLOAD_SOURCE_FAILURE_RE = re.compile(
     r"native ED2K download (?P<phase>background|active server) source search "
     r"failed for file_hash=(?P<file_hash>[0-9a-fA-F]{32}): (?P<error>.+)"
 )
+DIRECT_DOWNLOAD_ATTEMPT_RE = re.compile(
+    r"native ED2K download attempt file_hash=(?P<file_hash>[0-9a-fA-F]{32}) "
+    r"peer=(?P<endpoint>\S+) .* obfuscated=(?P<obfuscated>true|false)"
+)
+DIRECT_DOWNLOAD_FAILURE_RE = re.compile(
+    r"native ED2K download peer failed file_hash=(?P<file_hash>[0-9a-fA-F]{32}) "
+    r"peer=(?P<endpoint>\S+): (?P<error>.+)"
+)
+SOURCE_REFRESH_RE = re.compile(
+    r"native ED2K download source refresh completed file_hash=(?P<file_hash>[0-9a-fA-F]{32}) "
+    r"requery_round=(?P<requery_round>\d+) "
+    r"refreshed_source_count=(?P<refreshed_source_count>\d+) "
+    r"added_source_count=(?P<added_source_count>\d+) "
+    r"aggregated_source_count=(?P<aggregated_source_count>\d+) "
+    r"new_direct_source_count=(?P<new_direct_source_count>\d+)"
+)
+SOURCE_REFRESH_SKIPPED_RE = re.compile(
+    r"native ED2K download skipping source refresh file_hash=(?P<file_hash>[0-9a-fA-F]{32}) "
+    r"reason=(?P<reason>\S+) .* known_new_direct_source_count=(?P<known_new_direct_source_count>\d+)"
+)
 
 
 def run_live_kad_search_download_to_agent_scenario(
@@ -201,6 +221,11 @@ def run_live_kad_search_download_to_agent_scenario(
                     "sourceCount": len(transfer_manifest.get("sources") or []),
                     "aichRootPresent": bool(transfer_manifest.get("aich_root")),
                     "unsafeCanonicalName": unsafe_canonical_name,
+                    **candidate_terminal_evidence(
+                        transfer_manifest,
+                        agent_session.agent_log_path if agent_session is not None else None,
+                        file_hash=str(candidate["file_hash"]),
+                    ),
                 }
             )
             if unsafe_canonical_name:
@@ -237,7 +262,7 @@ def run_live_kad_search_download_to_agent_scenario(
         assert ed2k.dump_has_opcode(
             agent_dump_path,
             direction="recv",
-            opcode_names=("OP_COMPRESSEDPART", "OP_COMPRESSEDPART_I64"),
+            opcode_names=ed2k.PART_PAYLOAD_OPCODE_NAMES,
         )
         assert transport_mode in ed2k.dump_transport_modes(agent_dump_path)
 
@@ -407,6 +432,15 @@ def source_acquisition_evidence(
         "serverFoundSourcesResponseCount": 0,
         "serverSourceSearchRoles": [],
         "serverSourceSearchTransports": [],
+        "directDownloadAttemptCount": 0,
+        "directDownloadAttemptedEndpointCount": 0,
+        "directDownloadEndpoints": [],
+        "directDownloadFailureCount": 0,
+        "directDownloadFailureReasons": [],
+        "sourceRefreshCount": 0,
+        "sourceRefreshNewDirectEndpointCount": 0,
+        "sourceRefreshSkipped": False,
+        "sourceRefreshSkippedReason": None,
     }
     if path is not None and path.is_file():
         _merge_agent_log_source_evidence(evidence, path, target_hash)
@@ -421,7 +455,9 @@ def _merge_agent_log_source_evidence(
     target_hash: str | None,
 ) -> None:
     endpoints: list[str] = []
+    direct_endpoints: list[str] = []
     failures: list[str] = []
+    direct_failures: list[str] = []
     for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
         if "WARNING : You have a lowid" in line or "lowid" in line.lower():
             evidence["lowIdWarningObserved"] = True
@@ -473,8 +509,103 @@ def _merge_agent_log_source_evidence(
                     f"{download_failure.group('phase')}: {download_failure.group('error')}"
                 )
 
+        direct_attempt = DIRECT_DOWNLOAD_ATTEMPT_RE.search(line)
+        if direct_attempt and _matches_file_hash(direct_attempt, target_hash):
+            endpoint = direct_attempt.group("endpoint")
+            evidence["directDownloadAttemptCount"] = int(evidence["directDownloadAttemptCount"]) + 1
+            if endpoint not in direct_endpoints:
+                direct_endpoints.append(endpoint)
+
+        direct_failure = DIRECT_DOWNLOAD_FAILURE_RE.search(line)
+        if direct_failure and _matches_file_hash(direct_failure, target_hash):
+            evidence["directDownloadFailureCount"] = int(evidence["directDownloadFailureCount"]) + 1
+            if len(direct_failures) < 5:
+                direct_failures.append(direct_failure.group("error"))
+
+        source_refresh = SOURCE_REFRESH_RE.search(line)
+        if source_refresh and _matches_file_hash(source_refresh, target_hash):
+            evidence["sourceRefreshCount"] = int(evidence["sourceRefreshCount"]) + 1
+            evidence["sourceRefreshNewDirectEndpointCount"] = (
+                int(evidence["sourceRefreshNewDirectEndpointCount"])
+                + int(source_refresh.group("new_direct_source_count"))
+            )
+
+        source_refresh_skipped = SOURCE_REFRESH_SKIPPED_RE.search(line)
+        if source_refresh_skipped and _matches_file_hash(source_refresh_skipped, target_hash):
+            evidence["sourceRefreshSkipped"] = True
+            evidence["sourceRefreshSkippedReason"] = source_refresh_skipped.group("reason")
+            evidence["sourceRefreshNewDirectEndpointCount"] = (
+                int(evidence["sourceRefreshNewDirectEndpointCount"])
+                + int(source_refresh_skipped.group("known_new_direct_source_count"))
+            )
+
     evidence["sourceSearchEndpoints"] = endpoints
     evidence["sourceSearchFailures"] = failures
+    evidence["directDownloadEndpoints"] = direct_endpoints
+    evidence["directDownloadAttemptedEndpointCount"] = len(direct_endpoints)
+    evidence["directDownloadFailureReasons"] = direct_failures
+
+
+def candidate_terminal_evidence(
+    transfer_manifest: dict[str, Any] | None,
+    agent_log_path: Path | None,
+    *,
+    file_hash: str,
+) -> dict[str, Any]:
+    evidence = source_acquisition_evidence(agent_log_path, file_hash=file_hash)
+    return {
+        "terminalReason": classify_candidate_terminal_reason(transfer_manifest, evidence),
+        "attemptedDirectEndpointCount": evidence["directDownloadAttemptedEndpointCount"],
+        "refreshedNewDirectEndpointCount": evidence["sourceRefreshNewDirectEndpointCount"],
+    }
+
+
+def classify_candidate_terminal_reason(
+    transfer_manifest: dict[str, Any] | None,
+    source_evidence: dict[str, Any],
+) -> str:
+    if transfer_manifest and transfer_manifest.get("completed") is True:
+        return "completed"
+    if _transfer_manifest_has_progress(transfer_manifest):
+        return "in_progress"
+    if (
+        int(source_evidence.get("directDownloadAttemptedEndpointCount") or 0) != 0
+        and (
+            int(source_evidence.get("sourceRefreshCount") or 0) != 0
+            or source_evidence.get("sourceRefreshSkipped") is True
+        )
+        and int(source_evidence.get("sourceRefreshNewDirectEndpointCount") or 0) == 0
+    ):
+        return "no_progress_repeated_endpoints"
+    direct_failures = [str(value).lower() for value in source_evidence.get("directDownloadFailureReasons") or []]
+    if any("does not serve requested file" in value for value in direct_failures):
+        return "peer_not_serving"
+    if any(
+        "failed to read ed2k packet" in value
+        or "closed ed2k download session" in value
+        or "forcibly closed" in value
+        for value in direct_failures
+    ):
+        return "peer_closed_after_hello"
+    if int(source_evidence.get("sourceSearchFailureCount") or 0) != 0:
+        return "source_search_timeout"
+    return "unknown"
+
+
+def _transfer_manifest_has_progress(transfer_manifest: dict[str, Any] | None) -> bool:
+    if not transfer_manifest:
+        return False
+    return (
+        transfer_manifest.get("md4_hashset_acquired") is True
+        or transfer_manifest.get("aich_hashset_acquired") is True
+        or bool(transfer_manifest.get("aich_root"))
+        or bool(transfer_manifest.get("verified_ranges"))
+        or any(
+            int(piece.get("bytes_written") or 0) != 0
+            for piece in transfer_manifest.get("pieces") or []
+            if isinstance(piece, dict)
+        )
+    )
 
 
 def _merge_server_dump_source_evidence(
