@@ -28,11 +28,10 @@ Current parity status:
 - ED2K private parity covers direct download, callback/source acquisition,
   Kad-assisted source fallback, AICH/hashset, compressed parts, and local
   roundtrip behavior.
-- KAD2 live startup/publish and plaintext keyword search/download have passing
-  real-network evidence.
-- KAD2 obfuscated live keyword search/download remains a required red cell:
-  bootstrap/search work and `OP_GETSOURCES_OBFU` is sent, but no usable source
-  response is acquired yet.
+- KAD2 live startup/publish plus plaintext and obfuscated keyword
+  search/download have passing real-network evidence. The obfuscated transfer
+  gate passed on April 26, 2026 with run
+  `kad2.cell.keyword.search.obfuscated.realnet.v1.obfuscated-20260426-204828`.
 - KAD2 private triplet cells are collected through the native
   `kad2.private.harness-triplet` runner, which uses the v0.72a tracing harness
   triplet for deterministic bootstrap, publish, and search parity evidence.

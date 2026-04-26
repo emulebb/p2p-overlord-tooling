@@ -28,6 +28,8 @@ Current live-transfer coverage includes:
   ED2K roundtrip gate on the modern `FileIdentifier` path
 - `kad.search-download.emule-harness.agent.realnet.v1` for paired live Kad
   search and downstream ED2K download evidence
+- `kad2.cell.keyword.search.obfuscated.realnet.v1` for native live KAD2
+  keyword search and obfuscated downstream ED2K payload evidence
 
 Current deterministic local transfer coverage includes:
 
