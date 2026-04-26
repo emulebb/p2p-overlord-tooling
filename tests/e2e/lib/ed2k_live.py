@@ -133,7 +133,8 @@ def start_live_agent_session(
         control_port=int(agent_cfg["controlPort"]),
         kad_port=int(agent_cfg["kadPort"]),
         ed2k_port=int(agent_cfg["ed2kPort"]),
-        p2p_bind_ip=prerequisites.interface_binding.bind_ip,
+        p2p_bind_ip=None,
+        p2p_bind_iface=prerequisites.interface_binding.interface_alias,
         disable_kad=disable_kad,
         server_entries=[
             {

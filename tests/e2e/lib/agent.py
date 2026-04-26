@@ -75,7 +75,8 @@ class AgentRuntime:
         control_port: int,
         kad_port: int,
         ed2k_port: int,
-        p2p_bind_ip: str,
+        p2p_bind_ip: str | None,
+        p2p_bind_iface: str | None = None,
         emule_harness_bootstrap_node: str | None = None,
         kad_bootstrap_ready_contacts: int = 10,
         disable_kad: bool = False,
@@ -168,8 +169,8 @@ selection_confirmed = true
 listen_port = {control_port}
 
 [p2p]
-bind_iface = ""
-bind_ip = "{p2p_bind_ip}"
+bind_iface = "{_toml_bare_value(p2p_bind_iface)}"
+bind_ip = "{_toml_bare_value(p2p_bind_ip)}"
 selection_confirmed = true
 
 [p2p.kad]
@@ -270,6 +271,7 @@ max_files = 7
         kad_port: int,
         ed2k_port: int,
         p2p_bind_ip: str = "127.0.0.1",
+        p2p_bind_iface: str | None = None,
         disable_kad: bool = True,
         emule_harness_bootstrap_node: str | None = None,
         kad_bootstrap_ready_contacts: int = 10,
@@ -298,6 +300,7 @@ max_files = 7
             kad_port=kad_port,
             ed2k_port=ed2k_port,
             p2p_bind_ip=p2p_bind_ip,
+            p2p_bind_iface=p2p_bind_iface,
             emule_harness_bootstrap_node=emule_harness_bootstrap_node,
             kad_bootstrap_ready_contacts=kad_bootstrap_ready_contacts,
             disable_kad=disable_kad,
@@ -327,8 +330,11 @@ max_files = 7
         session_dir.mkdir(parents=True, exist_ok=True)
         stdout_path = session_dir / "agent-stdout.log"
         stderr_path = session_dir / "agent-stderr.log"
+        launch_config_path = Path(config["config_path"])
+        active_config_path = session_dir / "agent-real-miniupnpc.active.toml"
+        shutil.copy2(launch_config_path, active_config_path)
         process = start_process(
-            [self.executable_path, "--config", self.config_path],
+            [self.executable_path, "--config", launch_config_path],
             cwd=self.paths.agents_root,
             stdout_path=stdout_path,
             stderr_path=stderr_path,
@@ -339,7 +345,7 @@ max_files = 7
             session_name=session_name,
             state_root=Path(config["state_root"]),
             log_root=Path(config["log_root"]),
-            config_path=Path(config["config_path"]),
+            config_path=active_config_path,
             config_backup_path=Path(config["backup_path"]) if config["backup_path"] else None,
             stdout_path=stdout_path,
             stderr_path=stderr_path,
@@ -350,7 +356,7 @@ max_files = 7
             control_port=control_port,
             kad_port=kad_port,
             ed2k_port=ed2k_port,
-            bind_ip=p2p_bind_ip,
+            bind_ip=p2p_bind_ip or "",
             pid=process.pid,
             started_at_utc=datetime.now(timezone.utc).isoformat(),
         )
@@ -609,6 +615,10 @@ def _toml_string_list(values: list[str]) -> str:
 
 def _toml_string(value: str) -> str:
     return json.dumps(value)
+
+
+def _toml_bare_value(value: str | None) -> str:
+    return "" if value is None else value.replace('"', "")
 
 
 def _toml_path(path: Path) -> str:

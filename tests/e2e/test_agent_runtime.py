@@ -118,6 +118,25 @@ def test_private_agent_config_writes_notes_publish_enabled(tmp_path: Path) -> No
     assert "seed_notes_publish_enabled = true" in config
 
 
+def test_private_agent_config_can_bind_p2p_by_interface(tmp_path: Path) -> None:
+    paths = WorkspacePaths.discover()
+    runtime = AgentRuntime(paths)
+
+    runtime.write_private_local_config(
+        scenario_root=tmp_path / "scenario",
+        control_port=13301,
+        kad_port=41120,
+        ed2k_port=41121,
+        p2p_bind_ip=None,
+        p2p_bind_iface="hide.me",
+        disable_kad=False,
+    )
+
+    config = runtime.config_path.read_text(encoding="utf-8")
+    assert 'bind_iface = "hide.me"' in config
+    assert 'bind_ip = ""' in config
+
+
 def test_wait_transfer_manifest_returns_on_terminal_agent_error(
     tmp_path: Path,
     monkeypatch,

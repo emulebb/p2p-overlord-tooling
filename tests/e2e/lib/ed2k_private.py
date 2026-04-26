@@ -493,6 +493,9 @@ def materialize_private_harness_profile(
 
 
 def copy_agent_artifacts(session: AgentSession, dump_path: Path | None, destination: Path) -> None:
+    copy_if_exists(session.config_path, destination)
+    copy_if_exists(session.config_backup_path, destination)
+    copy_if_exists(session.session_dir / "agent-session.json", destination)
     copy_if_exists(session.agent_log_path, destination)
     copy_if_exists(session.stdout_path, destination)
     copy_if_exists(session.stderr_path, destination)
