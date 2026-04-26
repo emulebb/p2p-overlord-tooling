@@ -101,7 +101,6 @@ The latest focused obfuscated run was interrupted before a `run-summary.json` wa
 
    ```powershell
    $env:OVERLORD_LIVE_INTERFACE_ALIAS='hide.me'
-   Remove-Item Env:OVERLORD_LIVE_BIND_IP -ErrorAction SilentlyContinue
    python -m pytest tests\e2e\test_parity_scenarios.py --run-e2e --run-live --skip-runtime-build -k "kad2.cell.keyword.search.obfuscated.realnet.v1" -q
    ```
 
@@ -121,7 +120,6 @@ The latest focused obfuscated run was interrupted before a `run-summary.json` wa
 
    ```powershell
    $env:OVERLORD_LIVE_INTERFACE_ALIAS='hide.me'
-   Remove-Item Env:OVERLORD_LIVE_BIND_IP -ErrorAction SilentlyContinue
    python -m pytest tests\e2e\test_parity_scenarios.py --run-e2e --run-live --skip-runtime-build -k "kad2.campaign.realnet-confidence.v1" -q
    ```
 

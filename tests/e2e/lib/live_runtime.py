@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from tests.e2e.lib.live_network import LiveInterfaceBinding, resolve_live_interface_binding
 from tests.e2e.lib.live_seeds import EmuleHarnessSeedBundle, resolve_emule_harness_seed_bundle
@@ -20,10 +20,16 @@ class LiveScenarioPrerequisites:
 def resolve_live_scenario_prerequisites(
     paths: WorkspacePaths,
     manifest: dict[str, Any],
+    *,
+    command_runner: Callable[..., Any] | None = None,
 ) -> LiveScenarioPrerequisites:
     interface_alias = str(manifest.get("interfaceAlias") or "hide.me")
     seed_bundle_id = str(manifest.get("seedBundleId") or "canonical")
-    interface_binding = resolve_live_interface_binding(paths, interface_alias=interface_alias)
+    interface_binding = resolve_live_interface_binding(
+        paths,
+        interface_alias=interface_alias,
+        command_runner=command_runner,
+    )
     seed_bundle = resolve_emule_harness_seed_bundle(paths, bundle_id=seed_bundle_id)
     server_entries = resolve_live_server_entries(seed_bundle, manifest)
     file_block = manifest.get("file")
