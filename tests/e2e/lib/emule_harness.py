@@ -12,7 +12,13 @@ from pathlib import Path
 
 from tests.e2e.lib.artifacts import latest_file
 from tests.e2e.lib.paths import WorkspacePaths
-from tests.e2e.lib.processes import kill_processes_by_name, run_checked, start_process, stop_process_tree
+from tests.e2e.lib.processes import (
+    kill_processes_by_name,
+    run_checked,
+    start_process,
+    stop_process_tree,
+    stop_processes_by_command_line_fragment,
+)
 
 # eMule persists MaxDownload/MaxUpload in KiB/s, not Kb/s.
 # Keep local parity runs effectively uncapped without relying on a magic literal.
@@ -283,6 +289,7 @@ class EmuleHarnessRuntime:
 
     def stop(self, session: EmuleSession, *, flush_wait_seconds: int = 5) -> EmuleSession:
         stop_process_tree(session.pid)
+        stop_processes_by_command_line_fragment(str(session.profile_root))
         time.sleep(max(flush_wait_seconds, 1))
         session.udp_dump_path = latest_file(
             session.profile_root / "logs",

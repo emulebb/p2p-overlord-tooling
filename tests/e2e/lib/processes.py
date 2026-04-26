@@ -90,6 +90,32 @@ def stop_process_tree(pid: int, *, timeout_seconds: int = 15) -> None:
             subprocess.run(["kill", "-KILL", str(pid)], check=False)
 
 
+def stop_processes_by_command_line_fragment(fragment: str) -> None:
+    fragment = fragment.strip()
+    if not fragment:
+        return
+    if os.name == "nt":
+        script = (
+            "$needle = $args[0]; "
+            "Get-CimInstance Win32_Process | "
+            "Where-Object { $_.CommandLine -and $_.CommandLine.Contains($needle) } | "
+            "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+        )
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script, fragment],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        return
+    subprocess.run(
+        ["pkill", "-f", fragment],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+
+
 def kill_processes_by_name(names: Sequence[str]) -> None:
     if not names:
         return
