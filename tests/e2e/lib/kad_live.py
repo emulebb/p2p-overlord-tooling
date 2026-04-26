@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,8 @@ DEFAULT_AGENT_CFG = {
 SEARCH_TIMEOUT_SECONDS = 180
 DOWNLOAD_TIMEOUT_SECONDS = 900
 BOOTSTRAP_READY_TIMEOUT_SECONDS = 180
+LIVE_SEARCH_DOWNLOAD_BUDGET_SECONDS = 2400
+MIN_BOUNDED_TRANSFER_TIMEOUT_SECONDS = 10
 SOURCE_ATTEMPT_RE = re.compile(
     r"ED2K source search attempt=(?P<attempt>\d+)/(?P<budget>\d+) "
     r"endpoint=(?P<endpoint>\S+) .* file_hash=(?P<file_hash>[0-9a-fA-F]{32})"
@@ -112,6 +115,7 @@ def run_live_kad_search_download_to_agent_scenario(
     result_batches: list[dict[str, Any]] = []
     bootstrap_stats: dict[str, Any] | None = None
     attempted_candidates: list[dict[str, Any]] = []
+    scenario_deadline = time.monotonic() + LIVE_SEARCH_DOWNLOAD_BUDGET_SECONDS
 
     try:
         if not run.skip_build:
@@ -171,6 +175,10 @@ def run_live_kad_search_download_to_agent_scenario(
         )
 
         for candidate in candidates:
+            transfer_timeout_seconds = bounded_transfer_timeout_seconds(
+                scenario_deadline,
+                max_seconds=DOWNLOAD_TIMEOUT_SECONDS,
+            )
             agent.post_enrich_download(
                 agent_session,
                 file_hash=str(candidate["file_hash"]),
@@ -180,7 +188,7 @@ def run_live_kad_search_download_to_agent_scenario(
             transfer_manifest = agent.wait_transfer_manifest(
                 agent_session,
                 file_hash=str(candidate["file_hash"]),
-                timeout_seconds=DOWNLOAD_TIMEOUT_SECONDS,
+                timeout_seconds=transfer_timeout_seconds,
                 stop_on_terminal_error=True,
             )
             unsafe_canonical_name = is_unsafe_live_candidate_name(
@@ -199,6 +207,10 @@ def run_live_kad_search_download_to_agent_scenario(
                 continue
             if transfer_manifest.get("completed") is True:
                 break
+            bounded_transfer_timeout_seconds(
+                scenario_deadline,
+                max_seconds=DOWNLOAD_TIMEOUT_SECONDS,
+            )
         else:
             raise AssertionError(
                 "no live candidate completed "
@@ -344,6 +356,22 @@ def _dump_has_state_id(path: Path, *, direction: str, state_id: str) -> bool:
 
 def _kad_bootstrap_ready(response: dict[str, Any]) -> bool:
     return bool(response.get("kad_bootstrapped"))
+
+
+def bounded_transfer_timeout_seconds(
+    deadline_monotonic: float,
+    *,
+    max_seconds: int,
+    now_monotonic: float | None = None,
+) -> int:
+    now = time.monotonic() if now_monotonic is None else now_monotonic
+    remaining = int(deadline_monotonic - now)
+    if remaining < MIN_BOUNDED_TRANSFER_TIMEOUT_SECONDS:
+        raise TimeoutError(
+            "live Kad search/download scenario budget expired "
+            f"remaining_seconds={remaining} minimum_seconds={MIN_BOUNDED_TRANSFER_TIMEOUT_SECONDS}"
+        )
+    return min(max_seconds, remaining)
 
 
 def source_acquisition_evidence(
