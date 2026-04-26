@@ -98,7 +98,8 @@ def run_live_kad_startup_publish_scenario(
             control_port=int(DEFAULT_AGENT_CFG["controlPort"]),
             kad_port=int(DEFAULT_AGENT_CFG["kadPort"]),
             ed2k_port=int(DEFAULT_AGENT_CFG["ed2kPort"]),
-            p2p_bind_ip=prerequisites.interface_binding.bind_ip,
+            p2p_bind_ip=None,
+            p2p_bind_iface=prerequisites.interface_binding.interface_alias,
             disable_kad=False,
             kad_bootstrap_ready_contacts=int(
                 DEFAULT_AGENT_CFG["kadBootstrapReadyContacts"]
