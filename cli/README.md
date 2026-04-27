@@ -11,6 +11,8 @@ Current built-in commands include:
 - `help`
 - `layout`
 - `paths`
+- `quality-baseline`
+- `hygiene-report`
 - `guard-tracked-files`
 - `guard-workspace-conventions`
 - `show-scenario`

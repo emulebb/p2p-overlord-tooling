@@ -42,6 +42,13 @@ under the owning package or pytest library.
 
 ## Repo Guards
 
+- `python -m overlord_tooling quality-baseline` runs the non-live workspace
+  quality baseline by orchestrating the canonical `cargo`, `npm`, `pytest`, and
+  guard commands directly. It may write normal build, package, and test caches,
+  but it must not edit tracked source.
+- `python -m overlord_tooling hygiene-report` prints a JSON report covering repo
+  cleanliness, largest tracked source files, Rust `allow` inventory, parity
+  status, required environment variables, and advisory internal API drift.
 - `python -m overlord_tooling guard-tracked-files` validates that tracked files do
   not contain committed local user-profile paths and do not use configured
   personal-name filenames.

@@ -25,6 +25,8 @@ COMMANDS = [
     ("help", "Show CLI help"),
     ("layout", "Show the platform directory layout"),
     ("paths", "Show canonical workspace and repo paths"),
+    ("quality-baseline", "Run the non-live workspace quality baseline"),
+    ("hygiene-report", "Print workspace hygiene, source hotspot, and parity status summary"),
     ("show-scenario", "Print a scenario manifest"),
     ("show-parity-matrix", "Print parity cell and campaign inventory from scenario manifests"),
     ("parity-status", "Print parity inventory with latest run-summary status"),
@@ -66,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
         "help": command_help,
         "layout": command_layout,
         "paths": command_paths,
+        "quality-baseline": command_quality_baseline,
+        "hygiene-report": command_hygiene_report,
         "show-scenario": command_show_scenario,
         "show-parity-matrix": command_show_parity_matrix,
         "parity-status": command_parity_status,
@@ -115,6 +119,68 @@ def command_paths(paths: Paths, argv: list[str]) -> Any:
         "docsRoot": str(paths.docs_root),
         "schemasRoot": str(paths.schemas_root),
         "scenariosRoot": str(paths.scenarios_root),
+    }
+
+
+def command_quality_baseline(paths: Paths, argv: list[str]) -> Any:
+    parser = argparse.ArgumentParser(prog="python -m overlord_tooling quality-baseline")
+    parser.parse_args(argv)
+
+    agents_root = paths.workspace_root / "p2p-overlord-agents"
+    backend_root = paths.workspace_root / "p2p-overlord-be" / "overlord-be-coordinator"
+    commands = [
+        quality_command("agents:fmt", agents_root, ["cargo", "fmt", "--all", "--check"]),
+        quality_command(
+            "agents:clippy",
+            agents_root,
+            [
+                "cargo",
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--all-features",
+                "--",
+                "-D",
+                "warnings",
+                "-W",
+                "clippy::all",
+            ],
+        ),
+        quality_command("backend:check", backend_root, ["npm", "run", "check"]),
+        quality_command("backend:prisma-validate", backend_root, ["npm", "run", "prisma:validate"]),
+        quality_command("tooling:pytest", paths.tooling_root, [sys.executable, "-m", "pytest", "tests/e2e", "-q"]),
+    ]
+    commands.extend(quality_guard_commands(paths))
+
+    results = [run_quality_command(command) for command in commands]
+    summary = {
+        "schemaVersion": "quality-baseline-summary/v1",
+        "workspaceRoot": str(paths.workspace_root),
+        "commands": results,
+        "passed": all(result["passed"] for result in results),
+    }
+    if not summary["passed"]:
+        write_json(summary)
+        raise SystemExit("Quality baseline failed")
+    return summary
+
+
+def command_hygiene_report(paths: Paths, argv: list[str]) -> Any:
+    parser = argparse.ArgumentParser(prog="python -m overlord_tooling hygiene-report")
+    parser.add_argument("--top-files", type=int, default=10)
+    parsed = parser.parse_args(argv)
+
+    repo_roots = canonical_repo_roots(paths.workspace_root)
+    matrix_rows = ScenarioCatalog.load(paths.tooling_root).parity_matrix_rows()
+    available_rows = [row for row in matrix_rows if row["availability"] == "available"]
+    available_status = parity_status_rows(available_rows, default_run_root())
+    return {
+        "schemaVersion": "workspace-hygiene-report/v1",
+        "workspaceRoot": str(paths.workspace_root),
+        "repos": [repo_hygiene_summary(repo, parsed.top_files) for repo in repo_roots],
+        "environment": environment_summary(),
+        "parity": parity_hygiene_summary(matrix_rows, available_status),
+        "apiDrift": internal_api_drift_summary(paths.workspace_root),
     }
 
 
@@ -251,6 +317,203 @@ def command_guard_workspace_conventions(paths: Paths, argv: list[str]) -> Any:
         write_json(summary)
         raise SystemExit("Workspace conventions guard failed")
     return summary
+
+
+def quality_command(name: str, cwd: Path, command: list[str]) -> dict[str, Any]:
+    return {"name": name, "cwd": cwd, "command": command}
+
+
+def quality_guard_commands(paths: Paths) -> list[dict[str, Any]]:
+    commands = [
+        quality_command(
+            "guard:workspace-conventions",
+            paths.tooling_root,
+            [sys.executable, "-m", "overlord_tooling", "guard-workspace-conventions"],
+        )
+    ]
+    for repo_name in CANONICAL_REPOS:
+        commands.append(
+            quality_command(
+                f"guard:tracked-files:{repo_name}",
+                paths.tooling_root,
+                [
+                    sys.executable,
+                    "-m",
+                    "overlord_tooling",
+                    "guard-tracked-files",
+                    "--repo-root",
+                    str(paths.workspace_root / repo_name),
+                ],
+            )
+        )
+    return commands
+
+
+def run_quality_command(command: dict[str, Any]) -> dict[str, Any]:
+    executable = resolve_command_executable(command["command"][0])
+    argv = [executable, *command["command"][1:]]
+    result = subprocess.run(
+        argv,
+        cwd=command["cwd"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return {
+        "name": command["name"],
+        "cwd": str(command["cwd"]),
+        "command": command["command"],
+        "exitCode": result.returncode,
+        "passed": result.returncode == 0,
+        "stdoutTail": tail_lines(result.stdout),
+        "stderrTail": tail_lines(result.stderr),
+    }
+
+
+def resolve_command_executable(command: str) -> str:
+    if command == sys.executable:
+        return command
+    resolved = shutil.which(command)
+    return resolved or command
+
+
+def tail_lines(text: str, limit: int = 40) -> list[str]:
+    lines = text.splitlines()
+    return lines[-limit:]
+
+
+def repo_hygiene_summary(repo_root: Path, top_files: int) -> dict[str, Any]:
+    tracked_files = git_lines(repo_root, ["ls-files"])
+    return {
+        "name": repo_root.name,
+        "repoRoot": str(repo_root),
+        "branch": git_scalar(repo_root, ["branch", "--show-current"]),
+        "head": git_scalar(repo_root, ["log", "-1", "--oneline"]),
+        "status": git_lines(repo_root, ["status", "--short"]),
+        "largestSourceFiles": largest_source_files(repo_root, tracked_files, top_files),
+        "rustAllowInventory": rust_allow_inventory(repo_root, tracked_files),
+    }
+
+
+def git_scalar(repo_root: Path, args: list[str]) -> str | None:
+    lines = git_lines(repo_root, args)
+    return lines[0] if lines else None
+
+
+def largest_source_files(repo_root: Path, tracked_files: list[str], limit: int) -> list[dict[str, Any]]:
+    source_suffixes = {".rs", ".ts", ".svelte", ".py", ".mjs", ".js"}
+    files = []
+    for relative_path in tracked_files:
+        path = repo_root / relative_path
+        if path.suffix.lower() not in source_suffixes or not path.is_file():
+            continue
+        files.append(
+            {
+                "path": relative_path,
+                "bytes": path.stat().st_size,
+                "kib": round(path.stat().st_size / 1024, 1),
+            }
+        )
+    return sorted(files, key=lambda item: item["bytes"], reverse=True)[:limit]
+
+
+def rust_allow_inventory(repo_root: Path, tracked_files: list[str]) -> list[dict[str, Any]]:
+    inventory = []
+    for relative_path in tracked_files:
+        if not relative_path.endswith(".rs"):
+            continue
+        path = repo_root / relative_path
+        if not path.is_file():
+            continue
+        for line_number, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1):
+            if "#[allow(" in line or "#![allow(" in line:
+                inventory.append({"path": relative_path, "line": line_number, "allow": line.strip()})
+    return inventory
+
+
+def environment_summary() -> dict[str, dict[str, Any]]:
+    names = [
+        "OVERLORD_PROJECT_DIR",
+        "OVERLORD_TMP_DIR",
+        "OVERLORD_LOG_DIR",
+        "EMULE_WORKSPACE_ROOT",
+    ]
+    return {name: {"present": bool(os.environ.get(name)), "value": os.environ.get(name)} for name in names}
+
+
+def parity_hygiene_summary(
+    matrix_rows: list[dict[str, Any]], available_status: list[dict[str, Any]]
+) -> dict[str, Any]:
+    return {
+        "totalRows": len(matrix_rows),
+        "availableRows": sum(1 for row in matrix_rows if row["availability"] == "available"),
+        "plannedRows": sum(1 for row in matrix_rows if row["availability"] == "planned"),
+        "availableWithCompletedLatest": sum(1 for row in available_status if row.get("latestCompleted") is True),
+        "availableWithNonCompletedSummary": sum(
+            1
+            for row in available_status
+            if row.get("latestRunSummaryPath") and row.get("latestCompleted") is not True
+        ),
+        "availableWithoutSummary": sum(1 for row in available_status if not row.get("latestRunSummaryPath")),
+    }
+
+
+def internal_api_drift_summary(workspace_root: Path) -> dict[str, Any]:
+    coordinator_root = workspace_root / "p2p-overlord-be" / "overlord-be-coordinator"
+    types_path = coordinator_root / "src" / "lib" / "shared" / "internal-api.ts"
+    openapi_path = coordinator_root / "openapi" / "internal-api.yaml"
+    if not types_path.is_file() or not openapi_path.is_file():
+        return {
+            "checked": False,
+            "reason": "internal API TypeScript or OpenAPI source not found",
+            "passed": True,
+        }
+
+    types_text = types_path.read_text(encoding="utf-8")
+    openapi_text = openapi_path.read_text(encoding="utf-8")
+    comparisons = []
+    for name in ["Protocol", "ContentType", "SearchKind", "SearchEventStatus"]:
+        ts_values = extract_ts_union_values(types_text, name)
+        yaml_values = extract_yaml_enum_values(openapi_text, name)
+        comparisons.append(
+            {
+                "name": name,
+                "typescript": ts_values,
+                "openapi": yaml_values,
+                "missingInOpenapi": sorted(set(ts_values) - set(yaml_values)),
+                "missingInTypescript": sorted(set(yaml_values) - set(ts_values)),
+                "matched": set(ts_values) == set(yaml_values),
+            }
+        )
+    return {
+        "checked": True,
+        "passed": all(item["matched"] for item in comparisons if item["openapi"]),
+        "comparisons": comparisons,
+    }
+
+
+def extract_ts_union_values(text: str, type_name: str) -> list[str]:
+    match = re.search(rf"export type {re.escape(type_name)} =(?P<body>.*?);", text, re.DOTALL)
+    if not match:
+        return []
+    return sorted(set(re.findall(r"'([^']+)'", match.group("body"))))
+
+
+def extract_yaml_enum_values(text: str, schema_name: str) -> list[str]:
+    schema_match = re.search(
+        rf"^\s{{4}}{re.escape(schema_name)}:\n(?P<body>(?:^\s{{6,}}.*\n?)+)",
+        text,
+        re.MULTILINE,
+    )
+    if not schema_match:
+        inline_matches = re.findall(rf"{re.escape(schema_name)}[^\n]*enum:\s*\[([^\]]*)\]", text)
+        return sorted(set(value.strip().strip("'\"") for match in inline_matches for value in match.split(",") if value.strip()))
+    body = schema_match.group("body")
+    inline = re.search(r"enum:\s*\[([^\]]*)\]", body)
+    if inline:
+        return sorted(set(value.strip().strip("'\"") for value in inline.group(1).split(",") if value.strip()))
+    values = re.findall(r"^\s*-\s*['\"]?([^'\"\n]+)['\"]?\s*$", body, re.MULTILINE)
+    return sorted(set(value.strip() for value in values))
 
 
 def discover_paths() -> Paths:

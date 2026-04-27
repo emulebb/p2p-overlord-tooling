@@ -57,6 +57,11 @@ under the owning package or pytest library.
 
 ## Guards
 
+- `python -m overlord_tooling quality-baseline` runs the non-live workspace
+  quality baseline across agents, backend, tooling, and guards.
+- `python -m overlord_tooling hygiene-report` prints JSON hygiene metadata for
+  repo status, source hotspots, Rust allows, parity status, environment
+  readiness, and advisory internal API drift.
 - `python -m overlord_tooling guard-tracked-files` scans tracked files for user-profile
   path leaks and configured personal-name filename leaks.
 - `python -m overlord_tooling guard-workspace-conventions` scans the canonical
