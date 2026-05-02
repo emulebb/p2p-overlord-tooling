@@ -68,6 +68,37 @@ def test_private_agent_config_writes_multiple_server_entries(tmp_path: Path) -> 
     assert 'host = "5.6.7.8", port = 4665, name = "beta", description = "backup"' in config
 
 
+def test_private_agent_config_can_withhold_server_obfuscation_flags(
+    tmp_path: Path,
+) -> None:
+    paths = WorkspacePaths.discover()
+    runtime = AgentRuntime(paths)
+
+    runtime.write_private_local_config(
+        scenario_root=tmp_path / "scenario",
+        control_port=13301,
+        kad_port=41120,
+        ed2k_port=41121,
+        p2p_bind_ip="10.8.0.4",
+        disable_kad=True,
+        enable_obfuscation=True,
+        server_entries=[
+            {
+                "host": "127.0.0.1",
+                "port": 42161,
+                "udp_flags": 0,
+                "obfuscation_port_tcp": 42161,
+            }
+        ],
+    )
+
+    config = runtime.config_path.read_text(encoding="utf-8")
+    assert "obfuscation_enabled = true" in config
+    assert 'server_endpoints = ["127.0.0.1:42161"]' in config
+    assert "udp_flags = 0, udp_key = 0, udp_key_ip = 0" in config
+    assert "obfuscation_port_tcp = 42161, obfuscation_port_udp = 0" in config
+
+
 def test_private_agent_config_writes_kad_timing_overrides(tmp_path: Path) -> None:
     paths = WorkspacePaths.discover()
     runtime = AgentRuntime(paths)
