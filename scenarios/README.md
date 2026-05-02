@@ -26,6 +26,8 @@ Current live-transfer coverage includes:
   same-server ED2K roundtrip between the eMule harness and the agent
 - `ed2k.server.roundtrip.realnet.large.v1` for the large-file real-network
   ED2K roundtrip gate on the modern `FileIdentifier` path
+- `ed2k.campaign.modern-aich.v1` for the runnable large-file real-network
+  AICH closure gate for `ITEM_031`
 - `kad.search-download.emule-harness.agent.realnet.v1` for paired live Kad
   search and downstream ED2K download evidence
 - `kad2.cell.keyword.search.obfuscated.realnet.v1` for native live KAD2

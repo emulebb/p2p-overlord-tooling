@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.modern-aich.plaintext.server-roundtrip.large.realnet.v1",
+  "description": "ED2K modern AICH large-file real-network closure cell using the existing live server roundtrip runner and the large HASHSETREQUEST2/HASHSETANSWER2 source manifest.",
+  "scenarioKind": "cell",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "modern_aich.plaintext.server_roundtrip.large_file.realnet",
+    "availability": "available",
+    "expectedBranch": "server-session->download->large-file-hashset-aich->reoffer->listener-download-aich",
+    "comparisonMode": "acceptance-layer",
+    "backlogItem": "ITEM_031",
+    "requiredArtifacts": [
+      "run-summary evidence"
+    ],
+    "requiredAgentEvidence": [
+      "agent manifest aich acquired",
+      "stage1 HASHSETREQUEST2 AICH",
+      "stage1 HASHSETANSWER2 AICH",
+      "stage2 HASHSETREQUEST2 AICH",
+      "stage2 HASHSETANSWER2 AICH",
+      "harness verifier AICH OK"
+    ]
+  },
+  "execution": {
+    "command": "ed2k.live.server-roundtrip",
+    "summarySourceScenarioId": "ed2k.server.roundtrip.realnet.large.v1"
+  }
+}

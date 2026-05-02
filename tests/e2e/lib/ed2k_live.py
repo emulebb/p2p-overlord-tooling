@@ -44,7 +44,7 @@ def materialize_live_harness_profile(
         udp_port=int(harness_cfg["udpPort"]),
         server_udp_port=int(harness_cfg["serverUdpPort"]),
         web_port=int(harness_cfg["webPort"]),
-        kad_udp_key=int(harness_cfg["kadUdpKey"]),
+        kad_udp_key=int(harness_cfg.get("kadUdpKey", 0)),
         enable_kademlia=enable_kademlia,
         enable_ed2k=True,
         reset_transient_state=True,

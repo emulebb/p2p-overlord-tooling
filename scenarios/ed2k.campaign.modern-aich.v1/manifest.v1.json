@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.campaign.modern-aich.v1",
+  "description": "ED2K modern AICH campaign over the large-file real-network closure cell for ITEM_031.",
+  "scenarioKind": "campaign",
+  "protocol": "ed2k",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k",
+    "backlogItem": "ITEM_031"
+  },
+  "campaign": {
+    "availability": "available",
+    "members": [
+      {
+        "scenarioId": "ed2k.cell.modern-aich.plaintext.server-roundtrip.large.realnet.v1",
+        "required": true
+      }
+    ]
+  }
+}

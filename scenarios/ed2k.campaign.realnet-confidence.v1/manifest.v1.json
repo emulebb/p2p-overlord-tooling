@@ -22,6 +22,10 @@
       {
         "scenarioId": "ed2k.cell.listener.plaintext.inbound.serving.fresh.realnet.v1",
         "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.modern-aich.plaintext.server-roundtrip.large.realnet.v1",
+        "required": true
       }
     ]
   }
