@@ -105,7 +105,8 @@ def run_live_kad_search_download_to_agent_scenario(
     artifact_scenario_id: str | None = None,
     run_slug: str | None = None,
     metadata: dict[str, Any] | None = None,
-) -> None:
+    download_budget_seconds: int = LIVE_SEARCH_DOWNLOAD_BUDGET_SECONDS,
+) -> Path:
     prerequisites = resolve_live_scenario_prerequisites(workspace_paths, manifest)
     query = str(manifest["search"]["query"])
     run = create_private_ed2k_run(
@@ -135,7 +136,7 @@ def run_live_kad_search_download_to_agent_scenario(
     result_batches: list[dict[str, Any]] = []
     bootstrap_stats: dict[str, Any] | None = None
     attempted_candidates: list[dict[str, Any]] = []
-    scenario_deadline = time.monotonic() + LIVE_SEARCH_DOWNLOAD_BUDGET_SECONDS
+    scenario_deadline = time.monotonic() + download_budget_seconds
 
     try:
         if not run.skip_build:
@@ -316,6 +317,7 @@ def run_live_kad_search_download_to_agent_scenario(
                 "finishedAtUtc": utc_now(),
             },
         )
+        return run.run_summary_path
     except Exception as exc:
         failed_reason = str(exc)
         raise
@@ -370,6 +372,7 @@ def run_live_kad_search_download_to_agent_scenario(
                     "finishedAtUtc": utc_now(),
                 },
             )
+    return run.run_summary_path
 
 
 def _dump_has_state_id(path: Path, *, direction: str, state_id: str) -> bool:

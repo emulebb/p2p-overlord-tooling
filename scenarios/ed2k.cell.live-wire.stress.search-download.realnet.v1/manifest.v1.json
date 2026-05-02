@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.live-wire.stress.search-download.realnet.v1",
+  "description": "Bounded live-wire ED2K/Kad search and download stress cell over canonical workspace search terms.",
+  "scenarioKind": "cell",
+  "protocol": "mixed",
+  "tier": "realnet-confidence",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "live-wire.stress.search-download.realnet",
+    "availability": "available",
+    "expectedBranch": "kad-search->candidate-selection->ed2k-download",
+    "comparisonMode": "acceptance-layer",
+    "requiredArtifacts": [
+      "delegatedRunSummaryPath",
+      "stressSummaryPath"
+    ],
+    "requiredAgentEvidence": [
+      "search callback batches",
+      "source-acquisition trace",
+      "transfer manifest",
+      "ED2K TCP dump",
+      "Kad UDP dump"
+    ]
+  },
+  "execution": {
+    "command": "ed2k.live.search-download-stress",
+    "summarySourceScenarioId": "kad.search-download.emule-harness.agent.realnet.v1"
+  },
+  "stress": {
+    "searchTerms": [
+      "linux",
+      "ubuntu",
+      "fedora",
+      "freebsd",
+      "debian",
+      "emule"
+    ],
+    "transportModes": [
+      "plaintext",
+      "obfuscated"
+    ],
+    "perTermBudgetSeconds": 300,
+    "totalBudgetSeconds": 2700,
+    "requiredCompletedDownloadCount": 2
+  }
+}

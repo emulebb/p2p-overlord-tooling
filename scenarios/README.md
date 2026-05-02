@@ -28,6 +28,9 @@ Current live-transfer coverage includes:
   ED2K roundtrip gate on the modern `FileIdentifier` path
 - `ed2k.campaign.modern-aich.v1` for the runnable large-file real-network
   AICH closure gate for `ITEM_031`
+- `ed2k.cell.live-wire.stress.search-download.realnet.v1` for bounded live
+  search/download stress over the canonical workspace terms in plaintext and
+  obfuscated modes
 - `kad.search-download.emule-harness.agent.realnet.v1` for paired live Kad
   search and downstream ED2K download evidence
 - `kad2.cell.keyword.search.obfuscated.realnet.v1` for native live KAD2

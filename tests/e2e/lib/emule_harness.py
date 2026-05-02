@@ -24,6 +24,14 @@ from tests.e2e.lib.processes import (
 # Keep local parity runs effectively uncapped without relying on a magic literal.
 PRIVATE_HARNESS_RATE_LIMIT_BITS_PER_SEC = 10_000_000_000
 PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC = PRIVATE_HARNESS_RATE_LIMIT_BITS_PER_SEC // 8 // 1024
+_HARNESS_APP_DIR_CANDIDATES = (
+    "eMule-v0.72a-tracing-harness-community",
+    "eMule-v0.72a-tracing-harness",
+)
+_RUNTIME_EXE_CANDIDATES = (
+    "eMule_v072a_parity.exe",
+    "emule.exe",
+)
 
 
 @dataclass
@@ -72,26 +80,57 @@ class EmuleHarnessRuntime:
 
     def resolve_debug_dir(self) -> Path:
         workspace = self.paths.require_emule_workspace()
-        preferred = (
-            workspace
-            / "workspaces"
-            / "v0.72a"
-            / "app"
-            / "eMule-v0.72a-tracing-harness"
-            / "srchybrid"
-            / "x64"
-            / "Debug"
-        )
-        if preferred.exists():
-            return preferred
+        preferred_dirs = [
+            (
+                workspace
+                / "workspaces"
+                / "v0.72a"
+                / "app"
+                / harness_dir
+                / "srchybrid"
+                / "x64"
+                / "Debug"
+            )
+            for harness_dir in _HARNESS_APP_DIR_CANDIDATES
+        ]
+        for preferred in preferred_dirs:
+            if preferred.exists():
+                return preferred
 
-        matches = list(workspace.glob("workspaces/*/app/eMule-v0.72a-tracing-harness/srchybrid/x64/Debug"))
-        if len(matches) == 1:
-            return matches[0]
+        matches: list[Path] = []
+        for harness_dir in _HARNESS_APP_DIR_CANDIDATES:
+            matches.extend(
+                workspace.glob(
+                    f"workspaces/*/app/{harness_dir}/srchybrid/x64/Debug",
+                )
+            )
+        unique_matches = sorted({match.resolve() for match in matches})
+        if len(unique_matches) == 1:
+            return unique_matches[0]
+        if unique_matches:
+            raise RuntimeError(
+                "multiple eMule tracing-harness debug dirs found under "
+                f"{workspace}: {', '.join(str(match) for match in unique_matches)}"
+            )
         raise RuntimeError(f"could not resolve eMule tracing-harness debug dir under {workspace}")
 
     def runtime_exe_path(self) -> Path:
-        return self.resolve_debug_dir() / "eMule_v072a_parity.exe"
+        debug_dir = self.resolve_debug_dir()
+        for exe_name in _RUNTIME_EXE_CANDIDATES:
+            exe_path = debug_dir / exe_name
+            if exe_path.is_file():
+                return exe_path
+        return debug_dir / _RUNTIME_EXE_CANDIDATES[0]
+
+    def _built_exe_path(self, debug_dir: Path) -> Path:
+        for exe_name in _RUNTIME_EXE_CANDIDATES:
+            exe_path = debug_dir / exe_name
+            if exe_path.is_file():
+                return exe_path
+        raise FileNotFoundError(
+            "built eMule executable not found; checked "
+            f"{', '.join(str(debug_dir / name) for name in _RUNTIME_EXE_CANDIDATES)}"
+        )
 
     def build(self) -> Path:
         workspace = self.paths.require_emule_workspace()
@@ -103,15 +142,7 @@ class EmuleHarnessRuntime:
             )
         run_checked(shlex.split(build_command), cwd=workspace, timeout=3600)
         debug_dir = self.resolve_debug_dir()
-        built_exe = debug_dir / "emule.exe"
-        runtime_exe = debug_dir / "eMule_v072a_parity.exe"
-        if not built_exe.is_file():
-            raise FileNotFoundError(f"built eMule executable not found at {built_exe}")
-        shutil.copy2(built_exe, runtime_exe)
-        built_pdb = debug_dir / "emule.pdb"
-        if built_pdb.exists():
-            shutil.copy2(built_pdb, debug_dir / "eMule_v072a_parity.pdb")
-        return runtime_exe
+        return self._built_exe_path(debug_dir)
 
     def materialize_private_ed2k_profile(
         self,
@@ -212,6 +243,7 @@ class EmuleHarnessRuntime:
     ) -> EmuleSession:
         if kill_existing:
             kill_processes_by_name(["eMule_v072a_parity"])
+            stop_processes_by_command_line_fragment(str(profile.profile_root))
         runtime_exe = self.runtime_exe_path()
         if not skip_build or not runtime_exe.is_file():
             runtime_exe = self.build()

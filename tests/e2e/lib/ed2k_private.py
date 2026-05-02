@@ -294,7 +294,15 @@ def run_harness_to_agent_stage(
         file_hash=parsed_link.file_hash,
         timeout_seconds=int(timeouts_cfg["agentDownloadSeconds"]),
     )
-    assert transfer_manifest.get("completed") is True
+    assert transfer_manifest.get("completed") is True, (
+        "agent download did not complete "
+        f"file_hash={parsed_link.file_hash} "
+        f"sources={len(transfer_manifest.get('sources') or [])} "
+        f"md4_hashset_acquired={transfer_manifest.get('md4_hashset_acquired')} "
+        f"aich_hashset_acquired={transfer_manifest.get('aich_hashset_acquired')} "
+        f"verified_ranges={len(transfer_manifest.get('verified_ranges') or [])} "
+        f"pieces={_piece_progress_summary(transfer_manifest)}"
+    )
     assert transfer_manifest.get("aich_hashset_acquired") is True
     assert transfer_manifest.get("aich_root")
     assert transfer_manifest.get("aich_hashset")
@@ -549,6 +557,18 @@ def file_contains_text(path: Path, needle: str) -> bool:
         except UnicodeError:
             continue
     return False
+
+
+def _piece_progress_summary(transfer_manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "pieceIndex": piece.get("piece_index"),
+            "state": piece.get("state"),
+            "bytesWritten": piece.get("bytes_written"),
+        }
+        for piece in transfer_manifest.get("pieces") or []
+        if isinstance(piece, dict)
+    ]
 
 
 def seed_export_timeout(file_size: int, base_timeout: int) -> int:
