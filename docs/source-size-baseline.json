@@ -58,17 +58,6 @@
           ]
         },
         {
-          "path": "crates/overlord-kad-dht/src/node.rs",
-          "severity": "warn",
-          "bytes": 33991,
-          "kib": 33.2,
-          "lines": 983,
-          "reasons": [
-            "bytes>warn",
-            "lines>warn"
-          ]
-        },
-        {
           "path": "crates/overlord-agent-nat/src/provider/rupnp.rs",
           "severity": "warn",
           "bytes": 29726,
