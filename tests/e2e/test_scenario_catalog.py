@@ -34,6 +34,7 @@ def test_manifest_driven_cases_include_native_runner_backed_cells_and_campaigns(
     assert "ed2k.campaign.resume.v1" in case_ids
     assert "ed2k.cell.live-wire.stress.search-download.realnet.v1" in case_ids
     assert "ed2k.cell.notes.search.private.v1" in case_ids
+    assert "ed2k.campaign.surface.v1" in case_ids
     assert "ed2k.campaign.realnet-confidence.v1" in case_ids
     assert "kad2.cell.keyword.search.obfuscated.realnet.v1" in case_ids
     assert "kad2.campaign.realnet-confidence.v1" in case_ids

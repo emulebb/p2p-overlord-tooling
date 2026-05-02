@@ -71,6 +71,8 @@ Current deterministic local transfer coverage includes:
   across plaintext and obfuscated transport
 - `ed2k.cell.notes.search.private.v1` for ED2K-labeled notes search over the
   stock-aligned Kad notes transport with deterministic harness reply shaping
+- `ed2k.campaign.surface.v1` for the composed `ITEM_035` surface gate, starting
+  with notes search and ready for preview/shared-browsing cells as they land
 - `kad.emule-harness.agent.download.private.large.v1` for harness->agent
   Kad-discovered large-file transfer on loopback
 - `kad.agent.emule-harness.download.private.large.v1` for agent->harness

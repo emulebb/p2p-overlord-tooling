@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.campaign.surface.v1",
+  "description": "ED2K peer-facing surface campaign for notes, preview, and browsing parity cells.",
+  "scenarioKind": "campaign",
+  "protocol": "ed2k",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "ed2k"
+  },
+  "campaign": {
+    "availability": "available",
+    "members": [
+      {
+        "scenarioId": "ed2k.cell.notes.search.private.v1",
+        "required": true
+      }
+    ]
+  }
+}
