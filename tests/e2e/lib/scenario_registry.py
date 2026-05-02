@@ -103,6 +103,20 @@ def _run_ed2k_private_listener_queue(context: ScenarioContext) -> None:
     )
 
 
+def _run_ed2k_private_downloader_queue(context: ScenarioContext) -> None:
+    from tests.e2e.lib.ed2k_rust_scenarios import run_private_ed2k_downloader_queue_scenario
+
+    run_private_ed2k_downloader_queue_scenario(
+        context.workspace_paths,
+        context.pytestconfig,
+        scenario_id=context.run_scenario_id,
+        artifact_scenario_id=context.artifact_scenario_id,
+        run_slug=context.run_slug,
+        metadata=context.metadata,
+        transport_mode=context.transport_mode,
+    )
+
+
 def _run_live_kad_search_download(context: ScenarioContext) -> None:
     from tests.e2e.lib.kad_live import run_live_kad_search_download_to_agent_scenario
 
@@ -188,6 +202,7 @@ def _run_kad2_private_harness_triplet(context: ScenarioContext) -> None:
 
 _REGISTRY: dict[str, Runner] = {
     "ed2k.private.callback-source-acquisition": _run_ed2k_private_callback_source_acquisition,
+    "ed2k.private.downloader-queue": _run_ed2k_private_downloader_queue,
     "ed2k.private.listener-queue": _run_ed2k_private_listener_queue,
     "ed2k.private.kad-assisted-download": _run_ed2k_private_kad_assisted_download,
     "ed2k.private.server-download": _run_ed2k_private_server_download,
