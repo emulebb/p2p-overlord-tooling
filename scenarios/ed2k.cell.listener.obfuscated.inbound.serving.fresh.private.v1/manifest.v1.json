@@ -1,26 +1,29 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.cell.listener.obfuscated.inbound.serving.fresh.private.v1",
-  "description": "Planned ED2K listener obfuscated inbound serving private cell.",
+  "description": "ED2K listener obfuscated inbound serving private cell covering verified upload bytes and compressed part serving through the real ED2K TCP obfuscation transport.",
   "scenarioKind": "cell",
   "protocol": "ed2k",
   "tier": "deterministic-private",
   "parity": {
     "matrixId": "ed2k",
     "cellId": "listener.obfuscated.inbound.serving.fresh.private",
-    "availability": "planned",
+    "availability": "available",
     "expectedBranch": "listener-hello->accept-upload->serve.obfuscated",
     "comparisonMode": "state-machine-layer",
-    "requiredHarnessHooks": [
-      "obfuscated_handshake",
-      "listener_part_variants"
+    "backlogItem": "ITEM_033",
+    "requiredArtifacts": [
+      "run-summary evidence"
     ],
-    "harnessHookConfig": {
-      "hookSetId": "ed2k.listener.obfuscated.inbound.serving.fresh.private",
-      "hooks": [
-        "obfuscated_handshake",
-        "listener_part_variants"
-      ]
-    }
+    "requiredAgentEvidence": [
+      "obfuscated ED2K TCP transport",
+      "OP_ACCEPTUPLOADREQ",
+      "OP_COMPRESSEDPART",
+      "verified reconstructed upload bytes"
+    ],
+    "requiredHarnessHooks": []
+  },
+  "execution": {
+    "command": "ed2k.private.listener-serving"
   }
 }
