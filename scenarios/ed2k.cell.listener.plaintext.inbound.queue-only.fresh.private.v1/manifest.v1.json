@@ -1,26 +1,29 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.cell.listener.plaintext.inbound.queue-only.fresh.private.v1",
-  "description": "Planned ED2K listener plaintext inbound queue-only private cell.",
+  "description": "ED2K listener plaintext inbound queue-only private cell covering queue rank refresh, duplicate reconnect, file switch rank preservation, and accept-upload promotion.",
   "scenarioKind": "cell",
   "protocol": "ed2k",
   "tier": "deterministic-private",
   "parity": {
     "matrixId": "ed2k",
     "cellId": "listener.plaintext.inbound.queue-only.fresh.private",
-    "availability": "planned",
+    "availability": "available",
     "expectedBranch": "listener-queue-waiting",
     "comparisonMode": "state-machine-layer",
-    "requiredHarnessHooks": [
-      "listener_queue_only",
-      "queue_rank_refresh"
+    "backlogItem": "ITEM_033",
+    "requiredArtifacts": [
+      "run-summary evidence"
     ],
-    "harnessHookConfig": {
-      "hookSetId": "ed2k.listener.plaintext.inbound.queue-only.fresh.private",
-      "hooks": [
-        "listener_queue_only",
-        "queue_rank_refresh"
-      ]
-    }
+    "requiredAgentEvidence": [
+      "OP_QUEUERANKING",
+      "OP_ACCEPTUPLOADREQ",
+      "duplicate reconnect stales replaced handle",
+      "file switch rank preservation"
+    ],
+    "requiredHarnessHooks": []
+  },
+  "execution": {
+    "command": "ed2k.private.listener-queue"
   }
 }

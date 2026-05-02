@@ -43,6 +43,9 @@ Current deterministic local transfer coverage includes:
   `OP_HASHSETREQUEST2` path
 - `ed2k.server.agent.emule-harness.private.large.v1` for focused local
   agent->harness ED2K server-download evidence
+- `ed2k.cell.listener.plaintext.inbound.queue-only.fresh.private.v1` for
+  plaintext listener queue-rank, late accept-upload, reconnect, and file-switch
+  rank evidence on the native Rust listener
 - `kad.emule-harness.agent.download.private.large.v1` for harness->agent
   Kad-discovered large-file transfer on loopback
 - `kad.agent.emule-harness.download.private.large.v1` for agent->harness

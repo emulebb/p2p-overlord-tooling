@@ -22,14 +22,14 @@ def test_iter_manifests_filters_ed2k_deterministic_private_available(workspace_p
     )
 
     assert "ed2k.server.emule-harness.agent.roundtrip.private.large.v1" in scenario_ids
-    assert "ed2k.cell.listener.plaintext.inbound.queue-only.fresh.private.v1" not in scenario_ids
+    assert "ed2k.cell.listener.plaintext.inbound.queue-only.fresh.private.v1" in scenario_ids
 
 
 def test_manifest_availability_reads_campaign_and_cell_shapes(workspace_paths: WorkspacePaths) -> None:
     campaign = load_manifest(workspace_paths.tooling_root, "kad2.campaign.startup-and-bootstrap.v1")
     planned_cell = load_manifest(
         workspace_paths.tooling_root,
-        "ed2k.cell.listener.plaintext.inbound.queue-only.fresh.private.v1",
+        "ed2k.cell.listener.obfuscated.inbound.queue-only.fresh.private.v1",
     )
 
     assert manifest_availability(campaign) == "available"
