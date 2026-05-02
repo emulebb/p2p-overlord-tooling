@@ -16,6 +16,9 @@
 - Keep source-size policy ratcheted through
   `python -m overlord_tooling guard-source-size --ratchet`; do not add new
   oversized tracked source files or grow baselined oversized files.
+- When touching oversized or locally complex tooling code, opportunistically
+  split or simplify the touched area if the change is behavior-preserving,
+  scoped, and covered by targeted checks.
 - Keep subsystem-specific logic isolated under `subsystems/` when adding new
   platform features.
 - Use `python -m overlord_tooling` for the supported tooling CLI.

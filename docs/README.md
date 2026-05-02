@@ -4,7 +4,8 @@ Supporting notes for the workspace tooling platform.
 
 ## Read First
 
-- [Workspace Policy](./WORKSPACE_POLICY.md)
+- [Workspace Policy](./WORKSPACE_POLICY.md), including the shared quality and
+  opportunistic-refactoring policy.
 
 ## Platform Areas
 
@@ -42,6 +43,8 @@ under the owning package or pytest library.
 
 ## Repo Guards
 
+- Shared quality expectations live in [Workspace Policy](./WORKSPACE_POLICY.md).
+  Keep repo-specific enforceable gates mirrored in each repo's `AGENTS.md`.
 - `python -m overlord_tooling quality-baseline` runs the non-live workspace
   quality baseline by orchestrating the canonical `cargo`, `npm`, `pytest`, and
   guard commands directly. It may write normal build, package, and test caches,

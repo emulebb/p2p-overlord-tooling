@@ -54,6 +54,32 @@ rules, quality gates, or deltas that are not shared across the workspace.
 - Do not store personal information, user-specific filesystem paths, or
   user-identifying data results in tracked source or markdown files.
 
+## Quality And Refactoring Policy
+
+- Treat repo-local `AGENTS.md` files as the enforceable mirror for commands and
+  gates that differ by repo. Shared workspace policy belongs here.
+- Run narrow checks for the area changed first, then run the required
+  repo-local gate before finishing. Use
+  `python -m overlord_tooling quality-baseline` from the tooling repo for the
+  non-live workspace baseline.
+- Keep source-size policy ratcheted while existing oversized files are being
+  split. Do not add new oversized tracked source files or grow baselined
+  oversized files. Shrink or remove baseline entries as files are reduced.
+- When touching source that is already oversized, near a source-size threshold,
+  or locally complex, opportunistically split or simplify only the touched area
+  when the cleanup is behavior-preserving, scoped, and covered by targeted
+  checks. Do not mix broad style churn with feature or bug-fix work.
+- For Rust, treat `rustfmt` output as canonical and keep public-facing items
+  documented with `///` or `//!`. The agents repo promotes
+  `clippy::too_many_arguments`, `clippy::type_complexity`, and
+  `clippy::cognitive_complexity`; keep `clippy::too_many_lines` advisory until
+  the oversized-file inventory is cleared.
+- Keep `#[allow(...)]` attributes narrow and local to the behavior that needs
+  them. Prefer removing stale allowances during nearby refactors.
+- Keep line-ending, tracked-file privacy, and workspace-convention guards clean:
+  UTF-8 text, LF endings, final newline, no local path leaks, and no repo-local
+  shell wrapper launchers.
+
 ## Testing And Runtime Operations
 
 - When testing, refactoring, or investigating issues, attach a debugger when
