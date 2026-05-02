@@ -87,8 +87,9 @@ rules, quality gates, or deltas that are not shared across the workspace.
 - When testing agents on the real network, bind P2P traffic to the VPN
   interface and enable UPnP.
 - Verify UPnP mappings with `C:\bin\overrides\miniupnpc.exe -l`.
-- Use `ubuntu linux` as the canonical search term for live validation unless a
-  scenario requires another value.
+- Use the following canonical live-wire stress search terms for download and
+  network-behavior validation unless a scenario requires another value:
+  `linux`, `ubuntu`, `fedora`, `freebsd`, `debian`, `emule`.
 
 ## eMule Harness Policy
 
