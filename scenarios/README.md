@@ -69,6 +69,8 @@ Current deterministic local transfer coverage includes:
   same downloader resume path through the real ED2K TCP obfuscation transport
 - `ed2k.campaign.resume.v1` for the composed downloader/listener resume gate
   across plaintext and obfuscated transport
+- `ed2k.cell.notes.search.private.v1` for ED2K-labeled notes search over the
+  stock-aligned Kad notes transport with deterministic harness reply shaping
 - `kad.emule-harness.agent.download.private.large.v1` for harness->agent
   Kad-discovered large-file transfer on loopback
 - `kad.agent.emule-harness.download.private.large.v1` for agent->harness

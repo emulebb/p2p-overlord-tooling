@@ -122,6 +122,26 @@ def wait_for_search_event(
     )
 
 
+def wait_for_search_terminal_event(
+    session: SearchCallbackSession,
+    *,
+    job_id: str,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    terminal_statuses = {"completed", "failed", "cancelled"}
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        for event in read_search_events(session):
+            if str(event.get("job_id")) != job_id:
+                continue
+            if str(event.get("status")) in terminal_statuses:
+                return event
+        time.sleep(0.25)
+    raise TimeoutError(
+        f"did not observe terminal search event for job_id={job_id} within {timeout_seconds}s"
+    )
+
+
 def wait_for_result_batch(
     session: SearchCallbackSession,
     *,

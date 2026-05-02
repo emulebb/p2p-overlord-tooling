@@ -26,6 +26,7 @@ from tests.e2e.lib.search_callbacks import (
     start_search_callback_collector,
     stop_search_callback_collector,
     wait_for_search_event,
+    wait_for_search_terminal_event,
 )
 from tests.e2e.lib.waits import wait_path
 
@@ -57,6 +58,7 @@ def run_private_kad_harness_triplet_scenario(
     transport_mode = "obfuscated" if _needs_sender_key_transport(expected_branch) else "plaintext"
     search_cfg = source_manifest.get("search") or {}
     search_kind = str(search_cfg.get("kind") or "keyword")
+    search_protocol = str(search_cfg.get("protocol") or "kad2")
     agent_cfg = source_manifest["agent"]
     manual_publish = agent_cfg.get("manualPublish") or {}
     file_name = str(
@@ -237,9 +239,11 @@ def run_private_kad_harness_triplet_scenario(
                 "sourceScenarioId": source_manifest.get("scenarioId"),
                 "expectedBranch": expected_branch,
                 "searchKind": search_kind,
+                "searchProtocol": search_protocol,
                 "searchJobId": search_job["job_id"] if search_job else None,
                 "searchResultBatchCount": len(result_batches),
                 "searchResultCount": _result_count(result_batches),
+                "searchResultProtocols": _result_protocols(result_batches),
                 "harnessSeeds": _harness_seed_summary(harness_links),
                 "manualPublish": manual_publish or None,
                 "bootstrapStats": _bootstrap_summary(bootstrap_stats),
@@ -291,9 +295,11 @@ def run_private_kad_harness_triplet_scenario(
                     "sourceScenarioId": source_manifest.get("scenarioId"),
                     "expectedBranch": expected_branch,
                     "searchKind": search_kind,
+                    "searchProtocol": search_protocol,
                     "searchJobId": search_job["job_id"] if search_job else None,
                     "searchResultBatchCount": len(result_batches),
                     "searchResultCount": _result_count(result_batches),
+                    "searchResultProtocols": _result_protocols(result_batches),
                     "bootstrapStats": _bootstrap_summary(bootstrap_stats),
                     "failedReason": failed_reason,
                     "finishedAtUtc": utc_now(),
@@ -484,12 +490,16 @@ def _run_search_with_retries(
             status="started",
             timeout_seconds=SEARCH_TIMEOUT_SECONDS,
         )
-        wait_for_search_event(
+        terminal_event = wait_for_search_terminal_event(
             callback_session,
             job_id=job_id,
-            status="completed",
             timeout_seconds=SEARCH_TIMEOUT_SECONDS,
         )
+        if str(terminal_event.get("status")) != "completed":
+            error = terminal_event.get("error")
+            raise AssertionError(
+                f"Kad search job {job_id} ended with status={terminal_event.get('status')!r}: {error}"
+            )
         result_batches = [
             batch
             for batch in read_result_batches(callback_session)
@@ -514,9 +524,11 @@ def _post_search_job(
     harness_links: dict[str, ed2k.Ed2kLink],
 ) -> dict[str, Any]:
     kind = str(search_cfg.get("kind") or "keyword")
+    protocol = str(search_cfg.get("protocol") or "kad2")
     if kind == "keyword":
         return agent.post_search(
             agent_session,
+            protocol=protocol,
             kind="keyword",
             query=str(search_cfg["query"]),
             callback_url=callback_url,
@@ -525,6 +537,7 @@ def _post_search_job(
     target_hash, target_size = _search_target(search_cfg, manual_publish, harness_links)
     return agent.post_search(
         agent_session,
+        protocol=protocol,
         kind=kind,
         file_hash=target_hash,
         file_size=target_size,
@@ -556,6 +569,17 @@ def _assert_search_results(
     if result_count < expected_minimum:
         raise AssertionError(
             f"expected at least {expected_minimum} Kad {search_job['kind']} results, got {result_count}"
+        )
+
+    expected_protocol = str(search_cfg.get("expectedResultProtocol") or search_cfg.get("protocol") or "kad2").lower()
+    unexpected_protocols = [
+        protocol
+        for protocol in _result_protocols(result_batches)
+        if protocol.lower() != expected_protocol
+    ]
+    if unexpected_protocols:
+        raise AssertionError(
+            f"expected {expected_protocol} search result protocol, got {unexpected_protocols}"
         )
 
     file_hash = search_job.get("file_hash")
@@ -714,6 +738,15 @@ def _dump_has_any_state_id(path: Path, *, state_ids: tuple[str, ...]) -> bool:
 
 def _result_count(result_batches: list[dict[str, Any]]) -> int:
     return sum(len(batch.get("files") or []) for batch in result_batches)
+
+
+def _result_protocols(result_batches: list[dict[str, Any]]) -> list[str]:
+    protocols = [
+        str(batch.get("protocol") or "")
+        for batch in result_batches
+        if batch.get("files")
+    ]
+    return sorted({protocol for protocol in protocols if protocol})
 
 
 def _result_batches_have_hash(result_batches: list[dict[str, Any]], expected_hash: str) -> bool:

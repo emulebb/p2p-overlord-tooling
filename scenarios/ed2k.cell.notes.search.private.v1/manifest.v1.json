@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "scenario-manifest/v1",
+  "scenarioId": "ed2k.cell.notes.search.private.v1",
+  "description": "ED2K private notes-search cell proving stock-aligned Kad notes transport for ED2K file hashes with ED2K-labeled result batches.",
+  "scenarioKind": "cell",
+  "protocol": "ed2k",
+  "tier": "broad-private",
+  "parity": {
+    "matrixId": "ed2k",
+    "cellId": "notes.search.private",
+    "availability": "available",
+    "expectedBranch": "notes-search",
+    "comparisonMode": "state-machine-layer",
+    "backlogItem": "ITEM_035",
+    "requiredHarnessHooks": [
+      "notes_search_reply_shape",
+      "timeout_and_retry"
+    ],
+    "requiredAgentEvidence": [
+      "ed2k notes search job",
+      "kad notes search packet",
+      "ed2k result batch protocol"
+    ],
+    "harnessHookConfig": {
+      "hookSetId": "ed2k.notes.search.private",
+      "hooks": [
+        "notes_search_reply_shape",
+        "timeout_and_retry"
+      ]
+    }
+  },
+  "execution": {
+    "command": "kad2.private.harness-triplet",
+    "arguments": [
+      "-ScenarioManifestPath",
+      "p2p-overlord-tooling\\scenarios\\ed2k.harness.triplet.local.notes-search.v1\\manifest.v1.json"
+    ],
+    "summarySourceScenarioId": "ed2k.harness.triplet.local.notes-search.v1"
+  }
+}
