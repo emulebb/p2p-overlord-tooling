@@ -36,17 +36,6 @@
       "name": "p2p-overlord-agents",
       "sourceSizeFindings": [
         {
-          "path": "crates/overlord-kad-net/src/rpc.rs",
-          "severity": "warn",
-          "bytes": 35281,
-          "kib": 34.5,
-          "lines": 770,
-          "reasons": [
-            "bytes>warn",
-            "lines>warn"
-          ]
-        },
-        {
           "path": "crates/overlord-agent-nat/src/provider/rupnp.rs",
           "severity": "warn",
           "bytes": 29726,
