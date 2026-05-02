@@ -48,7 +48,19 @@ under the owning package or pytest library.
   but it must not edit tracked source.
 - `python -m overlord_tooling hygiene-report` prints a JSON report covering repo
   cleanliness, largest tracked source files, Rust `allow` inventory, parity
-  status, required environment variables, and advisory internal API drift.
+  status, required environment variables, advisory source-size findings, and
+  advisory internal API drift.
+- `python -m overlord_tooling guard-source-size` reports tracked source files
+  above the workspace source-size thresholds. It is advisory by default.
+  `quality-baseline` runs ratchet mode against
+  `docs/source-size-baseline.json`, which fails only when oversized files are
+  new or have grown beyond their baseline. Use `--enforce` only when
+  deliberately moving to a hard no-findings gate.
+- `python -m overlord_tooling guard-line-endings` checks that tracked text files
+  in canonical repos are normalized to UTF-8, LF line endings, final newline,
+  and editorconfig trailing-whitespace policy.
+- `python -m overlord_tooling normalize-source --write` applies that
+  normalization policy. Without `--write`, it reports what would change.
 - `python -m overlord_tooling guard-tracked-files` validates that tracked files do
   not contain committed local user-profile paths and do not use configured
   personal-name filenames.
@@ -60,6 +72,12 @@ under the owning package or pytest library.
   policy or environment configuration.
 - Real personal identifiers must not be stored in tracked policy files; use
   local untracked policy or environment configuration for those checks.
+- Source-size enforcement moves in stages: ratchet the current baseline while
+  existing hotspots are being split, shrink or delete baseline entries as files
+  are refactored, then hard-enforce only after current oversized files are
+  reduced or explicitly accepted.
+- LF is canonical for all tracked text files, including PowerShell, CMD, and
+  batch files; `ext-deps` remains out of scope because those are upstream repos.
 
 ## Harness Commands
 

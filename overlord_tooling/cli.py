@@ -13,12 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from overlord_tooling.scenarios import (
-    ScenarioCatalog,
-    default_run_root,
-    load_manifest,
-    parity_status_rows,
-)
+from overlord_tooling.line_endings import run_guard_line_endings, run_normalize_source
+from overlord_tooling.source_size import add_source_size_args, largest_source_files, run_guard_source_size, source_size_findings, source_size_policy_from_args
+from overlord_tooling.scenarios import ScenarioCatalog, default_run_root, load_manifest, parity_status_rows
 
 
 COMMANDS = [
@@ -30,6 +27,9 @@ COMMANDS = [
     ("show-scenario", "Print a scenario manifest"),
     ("show-parity-matrix", "Print parity cell and campaign inventory from scenario manifests"),
     ("parity-status", "Print parity inventory with latest run-summary status"),
+    ("guard-source-size", "Report or enforce tracked source-file size thresholds"),
+    ("guard-line-endings", "Fail when tracked text files are not normalized to LF"),
+    ("normalize-source", "Normalize tracked text files to UTF-8, LF, and editorconfig whitespace"),
     ("guard-tracked-files", "Fail when tracked files contain local path or configured identifier leaks"),
     ("guard-workspace-conventions", "Fail when workspace conventions or no-wrapper rules are violated"),
     ("import-emule-harness-seeds", "Import local nodes.dat and server.met into the untracked seed bundle"),
@@ -46,16 +46,13 @@ class Paths:
     tooling_root: Path
 
     @property
-    def docs_root(self) -> Path:
-        return self.tooling_root / "docs"
+    def docs_root(self) -> Path: return self.tooling_root / "docs"
 
     @property
-    def schemas_root(self) -> Path:
-        return self.tooling_root / "schemas"
+    def schemas_root(self) -> Path: return self.tooling_root / "schemas"
 
     @property
-    def scenarios_root(self) -> Path:
-        return self.tooling_root / "scenarios"
+    def scenarios_root(self) -> Path: return self.tooling_root / "scenarios"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -73,6 +70,9 @@ def main(argv: list[str] | None = None) -> int:
         "show-scenario": command_show_scenario,
         "show-parity-matrix": command_show_parity_matrix,
         "parity-status": command_parity_status,
+        "guard-source-size": command_guard_source_size,
+        "guard-line-endings": command_guard_line_endings,
+        "normalize-source": command_normalize_source,
         "guard-tracked-files": command_guard_tracked_files,
         "guard-workspace-conventions": command_guard_workspace_conventions,
         "import-emule-harness-seeds": command_import_emule_harness_seeds,
@@ -133,18 +133,7 @@ def command_quality_baseline(paths: Paths, argv: list[str]) -> Any:
         quality_command(
             "agents:clippy",
             agents_root,
-            [
-                "cargo",
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--all-features",
-                "--",
-                "-D",
-                "warnings",
-                "-W",
-                "clippy::all",
-            ],
+            ["cargo", "clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings", "-W", "clippy::all", "-W", "clippy::too_many_arguments", "-W", "clippy::type_complexity", "-W", "clippy::cognitive_complexity"],
         ),
         quality_command("backend:check", backend_root, ["npm", "run", "check"]),
         quality_command("backend:prisma-validate", backend_root, ["npm", "run", "prisma:validate"]),
@@ -168,16 +157,19 @@ def command_quality_baseline(paths: Paths, argv: list[str]) -> Any:
 def command_hygiene_report(paths: Paths, argv: list[str]) -> Any:
     parser = argparse.ArgumentParser(prog="python -m overlord_tooling hygiene-report")
     parser.add_argument("--top-files", type=int, default=10)
+    add_source_size_args(parser)
     parsed = parser.parse_args(argv)
 
     repo_roots = canonical_repo_roots(paths.workspace_root)
+    source_size_policy = source_size_policy_from_args(parsed)
     matrix_rows = ScenarioCatalog.load(paths.tooling_root).parity_matrix_rows()
     available_rows = [row for row in matrix_rows if row["availability"] == "available"]
     available_status = parity_status_rows(available_rows, default_run_root())
     return {
         "schemaVersion": "workspace-hygiene-report/v1",
         "workspaceRoot": str(paths.workspace_root),
-        "repos": [repo_hygiene_summary(repo, parsed.top_files) for repo in repo_roots],
+        "sourceSizePolicy": source_size_policy,
+        "repos": [repo_hygiene_summary(repo, parsed.top_files, source_size_policy) for repo in repo_roots],
         "environment": environment_summary(),
         "parity": parity_hygiene_summary(matrix_rows, available_status),
         "apiDrift": internal_api_drift_summary(paths.workspace_root),
@@ -298,6 +290,24 @@ def command_guard_tracked_files(paths: Paths, argv: list[str]) -> Any:
     return summary
 
 
+def command_guard_source_size(paths: Paths, argv: list[str]) -> Any:
+    return run_guard_source_size(
+        paths,
+        argv,
+        canonical_repo_roots=canonical_repo_roots,
+        git_lines=git_lines,
+        write_json=write_json,
+    )
+
+
+def command_guard_line_endings(paths: Paths, argv: list[str]) -> Any:
+    return run_guard_line_endings(paths, argv, canonical_repo_roots=canonical_repo_roots, git_lines=git_lines, write_json=write_json)
+
+
+def command_normalize_source(paths: Paths, argv: list[str]) -> Any:
+    return run_normalize_source(paths, argv, canonical_repo_roots=canonical_repo_roots, git_lines=git_lines, write_json=write_json)
+
+
 def command_guard_workspace_conventions(paths: Paths, argv: list[str]) -> Any:
     parser = argparse.ArgumentParser(prog="python -m overlord_tooling guard-workspace-conventions")
     parser.add_argument("--workspace-root", type=Path, default=paths.workspace_root)
@@ -329,6 +339,12 @@ def quality_guard_commands(paths: Paths) -> list[dict[str, Any]]:
             "guard:workspace-conventions",
             paths.tooling_root,
             [sys.executable, "-m", "overlord_tooling", "guard-workspace-conventions"],
+        ),
+        quality_command("guard:line-endings", paths.tooling_root, [sys.executable, "-m", "overlord_tooling", "guard-line-endings"]),
+        quality_command(
+            "guard:source-size-ratchet",
+            paths.tooling_root,
+            [sys.executable, "-m", "overlord_tooling", "guard-source-size", "--ratchet", "--baseline", str(paths.tooling_root / "docs" / "source-size-baseline.json")],
         )
     ]
     for repo_name in CANONICAL_REPOS:
@@ -357,6 +373,8 @@ def run_quality_command(command: dict[str, Any]) -> dict[str, Any]:
         cwd=command["cwd"],
         check=False,
         capture_output=True,
+        encoding="utf-8",
+        errors="replace",
         text=True,
     )
     return {
@@ -377,12 +395,14 @@ def resolve_command_executable(command: str) -> str:
     return resolved or command
 
 
-def tail_lines(text: str, limit: int = 40) -> list[str]:
+def tail_lines(text: str | None, limit: int = 40) -> list[str]:
+    if text is None:
+        return []
     lines = text.splitlines()
     return lines[-limit:]
 
 
-def repo_hygiene_summary(repo_root: Path, top_files: int) -> dict[str, Any]:
+def repo_hygiene_summary(repo_root: Path, top_files: int, source_size_policy: dict[str, Any]) -> dict[str, Any]:
     tracked_files = git_lines(repo_root, ["ls-files"])
     return {
         "name": repo_root.name,
@@ -391,6 +411,7 @@ def repo_hygiene_summary(repo_root: Path, top_files: int) -> dict[str, Any]:
         "head": git_scalar(repo_root, ["log", "-1", "--oneline"]),
         "status": git_lines(repo_root, ["status", "--short"]),
         "largestSourceFiles": largest_source_files(repo_root, tracked_files, top_files),
+        "sourceSizeFindings": source_size_findings(repo_root, tracked_files, source_size_policy),
         "rustAllowInventory": rust_allow_inventory(repo_root, tracked_files),
     }
 
@@ -398,23 +419,6 @@ def repo_hygiene_summary(repo_root: Path, top_files: int) -> dict[str, Any]:
 def git_scalar(repo_root: Path, args: list[str]) -> str | None:
     lines = git_lines(repo_root, args)
     return lines[0] if lines else None
-
-
-def largest_source_files(repo_root: Path, tracked_files: list[str], limit: int) -> list[dict[str, Any]]:
-    source_suffixes = {".rs", ".ts", ".svelte", ".py", ".mjs", ".js"}
-    files = []
-    for relative_path in tracked_files:
-        path = repo_root / relative_path
-        if path.suffix.lower() not in source_suffixes or not path.is_file():
-            continue
-        files.append(
-            {
-                "path": relative_path,
-                "bytes": path.stat().st_size,
-                "kib": round(path.stat().st_size / 1024, 1),
-            }
-        )
-    return sorted(files, key=lambda item: item["bytes"], reverse=True)[:limit]
 
 
 def rust_allow_inventory(repo_root: Path, tracked_files: list[str]) -> list[dict[str, Any]]:
@@ -691,4 +695,4 @@ def git_lines(repo_root: Path, args: list[str]) -> list[str]:
 
 
 def write_json(value: Any) -> None:
-    sys.stdout.write(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+    sys.stdout.write(json.dumps(value, indent=2, ensure_ascii=True) + "\n")

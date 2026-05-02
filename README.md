@@ -62,6 +62,15 @@ under the owning package or pytest library.
 - `python -m overlord_tooling hygiene-report` prints JSON hygiene metadata for
   repo status, source hotspots, Rust allows, parity status, environment
   readiness, and advisory internal API drift.
+- `python -m overlord_tooling guard-source-size` reports tracked source files
+  above the advisory source-size thresholds. `quality-baseline` runs it with
+  `--ratchet --baseline docs/source-size-baseline.json` so new oversized files
+  and growth in baselined oversized files fail the gate. Use `--enforce` only
+  when the workspace is ready to fail on every remaining finding.
+- `python -m overlord_tooling guard-line-endings` verifies tracked text files in
+  the canonical repos are normalized to UTF-8/LF/editorconfig whitespace.
+- `python -m overlord_tooling normalize-source --write` rewrites tracked text
+  files to the same normalization policy; omit `--write` for a dry-run report.
 - `python -m overlord_tooling guard-tracked-files` scans tracked files for user-profile
   path leaks and configured personal-name filename leaks.
 - `python -m overlord_tooling guard-workspace-conventions` scans the canonical

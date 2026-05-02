@@ -10,6 +10,12 @@
   re-implementing product logic here.
 - Use versioned JSON contracts for manifests, summaries, and machine-readable
   reports.
+- Keep tracked text files normalized to UTF-8 with LF endings; use
+  `python -m overlord_tooling guard-line-endings` to verify and
+  `python -m overlord_tooling normalize-source --write` to repair.
+- Keep source-size policy ratcheted through
+  `python -m overlord_tooling guard-source-size --ratchet`; do not add new
+  oversized tracked source files or grow baselined oversized files.
 - Keep subsystem-specific logic isolated under `subsystems/` when adding new
   platform features.
 - Use `python -m overlord_tooling` for the supported tooling CLI.

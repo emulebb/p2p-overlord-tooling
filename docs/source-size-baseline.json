@@ -1,0 +1,231 @@
+{
+  "schemaVersion": "source-size-baseline/v1",
+  "policy": {
+    "schemaVersion": "source-size-policy/v1",
+    "trackedSuffixes": [
+      ".js",
+      ".mjs",
+      ".py",
+      ".rs",
+      ".svelte",
+      ".ts"
+    ],
+    "warnLines": 700,
+    "warnKiB": 32,
+    "severeLines": 1000,
+    "severeKiB": 48,
+    "mode": "ratchet"
+  },
+  "repos": [
+    {
+      "name": "p2p-overlord-tooling",
+      "sourceSizeFindings": [
+        {
+          "path": "tests/e2e/lib/kad_private.py",
+          "severity": "warn",
+          "bytes": 29334,
+          "kib": 28.6,
+          "lines": 778,
+          "reasons": [
+            "lines>warn"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "p2p-overlord-agents",
+      "sourceSizeFindings": [
+        {
+          "path": "crates/overlord-kad-net/src/rpc.rs",
+          "severity": "severe",
+          "bytes": 55723,
+          "kib": 54.4,
+          "lines": 1339,
+          "reasons": [
+            "bytes>severe",
+            "lines>severe"
+          ]
+        },
+        {
+          "path": "crates/overlord-agent-emule/src/agent.rs",
+          "severity": "severe",
+          "bytes": 43667,
+          "kib": 42.6,
+          "lines": 1060,
+          "reasons": [
+            "bytes>warn",
+            "lines>severe"
+          ]
+        },
+        {
+          "path": "crates/overlord-kad-dht/src/node.rs",
+          "severity": "severe",
+          "bytes": 38223,
+          "kib": 37.3,
+          "lines": 1101,
+          "reasons": [
+            "bytes>warn",
+            "lines>severe"
+          ]
+        },
+        {
+          "path": "crates/overlord-kad-proto/src/packet.rs",
+          "severity": "warn",
+          "bytes": 31778,
+          "kib": 31.0,
+          "lines": 829,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-agent-nat/src/provider/rupnp.rs",
+          "severity": "warn",
+          "bytes": 29726,
+          "kib": 29.0,
+          "lines": 893,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-kad-net/src/obfuscation.rs",
+          "severity": "warn",
+          "bytes": 28223,
+          "kib": 27.6,
+          "lines": 722,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-agent-emule/src/ed2k_transfer/tests.rs",
+          "severity": "warn",
+          "bytes": 27736,
+          "kib": 27.1,
+          "lines": 799,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-agent-nat/src/manager.rs",
+          "severity": "warn",
+          "bytes": 26938,
+          "kib": 26.3,
+          "lines": 807,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-agent-emule/src/agent/ed2k_search.rs",
+          "severity": "warn",
+          "bytes": 25810,
+          "kib": 25.2,
+          "lines": 743,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-kad-dht/src/traversal.rs",
+          "severity": "warn",
+          "bytes": 25500,
+          "kib": 24.9,
+          "lines": 744,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-kad-net/src/rpc/tests.rs",
+          "severity": "warn",
+          "bytes": 24329,
+          "kib": 23.8,
+          "lines": 715,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-kad-dht/src/publish.rs",
+          "severity": "warn",
+          "bytes": 24224,
+          "kib": 23.7,
+          "lines": 708,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/miniupnpc/src/lib.rs",
+          "severity": "warn",
+          "bytes": 23809,
+          "kib": 23.3,
+          "lines": 768,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-agent-emule/src/kad_store.rs",
+          "severity": "warn",
+          "bytes": 21545,
+          "kib": 21.0,
+          "lines": 704,
+          "reasons": [
+            "lines>warn"
+          ]
+        },
+        {
+          "path": "crates/overlord-agent-emule/src/snoop_queue/tests.rs",
+          "severity": "warn",
+          "bytes": 20197,
+          "kib": 19.7,
+          "lines": 731,
+          "reasons": [
+            "lines>warn"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "p2p-overlord-be",
+      "sourceSizeFindings": [
+        {
+          "path": "overlord-be-coordinator/src/routes/+page.svelte",
+          "severity": "severe",
+          "bytes": 38926,
+          "kib": 38.0,
+          "lines": 1253,
+          "reasons": [
+            "bytes>warn",
+            "lines>severe"
+          ]
+        },
+        {
+          "path": "overlord-be-coordinator/src/lib/server/search-store.ts",
+          "severity": "severe",
+          "bytes": 33491,
+          "kib": 32.7,
+          "lines": 1283,
+          "reasons": [
+            "bytes>warn",
+            "lines>severe"
+          ]
+        },
+        {
+          "path": "overlord-be-db/scripts/windows/db_common.mjs",
+          "severity": "warn",
+          "bytes": 25424,
+          "kib": 24.8,
+          "lines": 946,
+          "reasons": [
+            "lines>warn"
+          ]
+        }
+      ]
+    }
+  ]
+}
