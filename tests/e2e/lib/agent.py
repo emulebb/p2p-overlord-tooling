@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from tests.e2e.lib import http
 from tests.e2e.lib.artifacts import latest_file
+from tests.e2e.lib.live_search_terms import DEFAULT_LIVE_WIRE_STRESS_SEARCH_TERM
 from tests.e2e.lib.paths import WorkspacePaths
 from tests.e2e.lib.processes import kill_processes_by_name, run_checked, start_process, stop_process_tree
 
@@ -91,7 +92,7 @@ class AgentRuntime:
         server_connect_timeout_seconds: int = 8,
         server_reconnect_interval_seconds: int = 5,
         server_session_rotation_seconds: int = 45,
-        probe_search_term: str = "ubuntu linux",
+        probe_search_term: str = DEFAULT_LIVE_WIRE_STRESS_SEARCH_TERM,
         enable_obfuscation: bool = False,
         enable_kad_notes_publish: bool = False,
         kad_republish_interval_secs: int = 18_000,
@@ -279,7 +280,7 @@ max_files = 7
         server_port: int = 0,
         server_entries: list[dict[str, Any]] | None = None,
         server_connect_timeout_seconds: int = 8,
-        probe_search_term: str = "ubuntu linux",
+        probe_search_term: str = DEFAULT_LIVE_WIRE_STRESS_SEARCH_TERM,
         nodes_dat_seed_path: Path | None = None,
         enable_obfuscation: bool = False,
         kad_republish_interval_secs: int = 18_000,

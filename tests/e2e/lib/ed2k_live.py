@@ -21,6 +21,7 @@ from tests.e2e.lib.ed2k_private import (
 )
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleProfile, EmuleSession
 from tests.e2e.lib.live_runtime import LiveScenarioPrerequisites, resolve_live_scenario_prerequisites
+from tests.e2e.lib.live_search_terms import DEFAULT_LIVE_WIRE_STRESS_SEARCH_TERM
 from overlord_tooling.scenarios import write_json
 from tests.e2e.lib.payloads import write_deterministic_binary
 from tests.e2e.lib.paths import WorkspacePaths
@@ -121,7 +122,7 @@ def start_live_agent_session(
     *,
     reset_runtime_root: bool,
     disable_kad: bool = True,
-    probe_search_term: str = "ubuntu linux",
+    probe_search_term: str = DEFAULT_LIVE_WIRE_STRESS_SEARCH_TERM,
 ) -> AgentSession:
     server_selection = manifest.get("serverSelection")
     connect_timeout_milliseconds = 8_000
