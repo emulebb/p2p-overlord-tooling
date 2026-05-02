@@ -90,8 +90,6 @@ def run_private_ed2k_downloader_queue_scenario(
 ) -> Path:
     selected_transport = str(pytestconfig.getoption("--transport"))
     scenario_transport = transport_mode or "plaintext"
-    if scenario_transport != "plaintext":
-        pytest.skip(f"{scenario_id} does not have obfuscated downloader queue coverage yet")
     if selected_transport not in {"both", scenario_transport}:
         pytest.skip(
             f"{scenario_id} is {scenario_transport}, selected --transport={selected_transport}"

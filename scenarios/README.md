@@ -45,6 +45,10 @@ Current deterministic local transfer coverage includes:
   agent->harness ED2K server-download evidence
 - `ed2k.cell.downloader.plaintext.direct.queue-only.fresh.private.v1` for
   downloader queue-only and late accept-upload handling
+- `ed2k.cell.downloader.obfuscated.direct.queue-only.fresh.private.v1` for the
+  same downloader queue path through the real ED2K TCP obfuscation transport
+- `ed2k.campaign.queue-and-slot.v1` for the composed downloader/listener
+  queue-only gate across plaintext and obfuscated transport
 - `ed2k.cell.listener.plaintext.inbound.queue-only.fresh.private.v1` for
   plaintext listener queue-rank, late accept-upload, reconnect, and file-switch
   rank evidence on the native Rust listener

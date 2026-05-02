@@ -1,28 +1,29 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.cell.downloader.obfuscated.direct.queue-only.fresh.private.v1",
-  "description": "Planned ED2K downloader obfuscated queue-only private cell.",
+  "description": "ED2K downloader obfuscated queue-only private cell covering queue-only late accept-upload promotion through the real ED2K TCP obfuscation transport.",
   "scenarioKind": "cell",
   "protocol": "ed2k",
   "tier": "deterministic-private",
   "parity": {
     "matrixId": "ed2k",
     "cellId": "downloader.obfuscated.direct.queue-only.fresh.private",
-    "availability": "planned",
+    "availability": "available",
     "expectedBranch": "queue-only.obfuscated",
     "comparisonMode": "state-machine-layer",
-    "requiredHarnessHooks": [
-      "queue_only",
-      "late_slot_grant",
-      "obfuscated_handshake"
+    "backlogItem": "ITEM_033",
+    "requiredArtifacts": [
+      "run-summary evidence"
     ],
-    "harnessHookConfig": {
-      "hookSetId": "ed2k.downloader.obfuscated.direct.queue-only.fresh.private",
-      "hooks": [
-        "queue_only",
-        "late_slot_grant",
-        "obfuscated_handshake"
-      ]
-    }
+    "requiredAgentEvidence": [
+      "obfuscated ED2K TCP transport",
+      "OP_QUEUERANKING",
+      "late OP_ACCEPTUPLOADREQ",
+      "completed download after late slot grant"
+    ],
+    "requiredHarnessHooks": []
+  },
+  "execution": {
+    "command": "ed2k.private.downloader-queue"
   }
 }
