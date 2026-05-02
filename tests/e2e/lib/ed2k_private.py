@@ -49,6 +49,7 @@ class HarnessSeederResult:
     profile: EmuleProfile
     session: EmuleSession
     parsed_link: ed2k.Ed2kLink
+    connected_server: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

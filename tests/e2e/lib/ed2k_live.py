@@ -19,6 +19,14 @@ from tests.e2e.lib.ed2k_private import (
     run_harness_to_agent_stage,
     utc_now,
 )
+from tests.e2e.lib.ed2k_live_same_server import (
+    extract_harness_server_evidence,
+    live_server_entry_for_agent,
+    prioritized_live_server_entries,
+    same_server_mode_summary,
+    summarize_same_server_source_discovery,
+    wait_harness_connected_server,
+)
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleProfile, EmuleSession
 from tests.e2e.lib.live_runtime import LiveScenarioPrerequisites, resolve_live_scenario_prerequisites
 from tests.e2e.lib.live_search_terms import DEFAULT_LIVE_WIRE_STRESS_SEARCH_TERM
@@ -110,7 +118,64 @@ def start_live_harness_seeder(
     parsed_link = ed2k.parse_ed2k_link_file(seed_link_path)
     if not parsed_link.aich_root:
         raise AssertionError("seeder export link did not include AICH")
-    return HarnessSeederResult(profile=profile, session=session, parsed_link=parsed_link)
+    connected_server = wait_harness_connected_server(
+        session,
+        timeout_seconds=min(30, max(1, int(timeouts_cfg["harnessReadySeconds"]))),
+    )
+    if connected_server is None:
+        profile, session, connected_server = restart_live_harness_seeder_after_log_flush(
+            emule,
+            run=run,
+            prerequisites=prerequisites,
+            seeder_cfg=seeder_cfg,
+            session=session,
+            seed_link_path=seed_link_path,
+        )
+    return HarnessSeederResult(
+        profile=profile,
+        session=session,
+        parsed_link=parsed_link,
+        connected_server=connected_server,
+    )
+
+
+def restart_live_harness_seeder_after_log_flush(
+    emule: EmuleHarnessRuntime,
+    *,
+    run: PrivateEd2kRun,
+    prerequisites: LiveScenarioPrerequisites,
+    seeder_cfg: dict[str, Any],
+    session: EmuleSession,
+    seed_link_path: Path,
+) -> tuple[EmuleProfile, EmuleSession, dict[str, Any] | None]:
+    stopped_session = emule.stop(session)
+    established, connected = extract_harness_server_evidence(stopped_session)
+    connected_server = established or connected
+    profile = materialize_live_harness_profile(
+        emule,
+        profile_root=run.artifact_root / "seed-same-server",
+        prerequisites=prerequisites,
+        harness_cfg=seeder_cfg,
+        enable_obfuscation=run.enable_obfuscation,
+    )
+    if connected_server is not None:
+        ed2k.write_server_met(
+            profile.profile_root / "config" / "server.met",
+            server_ip=str(connected_server["host"]),
+            server_port=int(connected_server["port"]),
+        )
+    seed_file_path = profile.incoming_root / run.file_name
+    write_deterministic_binary(seed_file_path, size_bytes=run.file_size, pattern=run.file_pattern)
+    restarted_session = emule.start_private_ed2k_session(
+        profile=profile,
+        seed_file_path=seed_file_path,
+        export_link_path=seed_link_path,
+        export_source_ip=prerequisites.interface_binding.bind_ip,
+        skip_build=True,
+    )
+    wait_path(seed_link_path, timeout_seconds=60)
+    refreshed = wait_harness_connected_server(restarted_session, timeout_seconds=30)
+    return profile, restarted_session, refreshed or connected_server
 
 
 def start_live_agent_session(
@@ -121,6 +186,7 @@ def start_live_agent_session(
     manifest: dict[str, Any],
     *,
     reset_runtime_root: bool,
+    preferred_server: dict[str, Any] | None = None,
     disable_kad: bool = True,
     probe_search_term: str = DEFAULT_LIVE_WIRE_STRESS_SEARCH_TERM,
 ) -> AgentSession:
@@ -129,6 +195,7 @@ def start_live_agent_session(
     if isinstance(server_selection, dict) and server_selection.get("connectTimeoutMilliseconds") is not None:
         connect_timeout_milliseconds = int(server_selection["connectTimeoutMilliseconds"])
     connect_timeout_seconds = max(1, (connect_timeout_milliseconds + 999) // 1000)
+    server_entries = prioritized_live_server_entries(prerequisites, preferred_server)
     session = agent.start_private_ed2k_session(
         scenario_root=run.artifact_root / "agt",
         control_port=int(agent_cfg["controlPort"]),
@@ -137,20 +204,7 @@ def start_live_agent_session(
         p2p_bind_ip=None,
         p2p_bind_iface=prerequisites.interface_binding.interface_alias,
         disable_kad=disable_kad,
-        server_entries=[
-            {
-                "host": entry.host,
-                "port": entry.port,
-                "name": entry.name or "",
-                "description": entry.description or "",
-                "udp_flags": entry.udp_flags,
-                "udp_key": entry.udp_key,
-                "udp_key_ip": entry.udp_key_ip,
-                "obfuscation_port_tcp": entry.obfuscation_port_tcp,
-                "obfuscation_port_udp": entry.obfuscation_port_udp,
-            }
-            for entry in prerequisites.server_entries
-        ],
+        server_entries=[live_server_entry_for_agent(entry) for entry in server_entries],
         server_connect_timeout_seconds=connect_timeout_seconds,
         probe_search_term=probe_search_term,
         nodes_dat_seed_path=prerequisites.seed_bundle.nodes_dat_path,
@@ -251,6 +305,7 @@ def run_live_ed2k_server_roundtrip_scenario(
             manifest["agent"],
             manifest,
             reset_runtime_root=True,
+            preferred_server=seeder_result.connected_server,
         )
         pseudo_server_cfg = {"host": prerequisites.interface_binding.bind_ip}
         stage1_result = run_harness_to_agent_stage(
@@ -282,6 +337,7 @@ def run_live_ed2k_server_roundtrip_scenario(
             manifest["agent"],
             manifest,
             reset_runtime_root=False,
+            preferred_server=seeder_result.connected_server,
         )
         stage2_result = run_agent_to_harness_stage(
             emule,
@@ -339,12 +395,16 @@ def run_live_ed2k_server_roundtrip_scenario(
                     }
                     for entry in prerequisites.server_entries
                 ],
-                "sameHostTransferMode": {
-                    "enabled": False,
-                    "rationale": "realnet_server_only_source_discovery",
-                    "agentSourceHint": False,
-                    "harnessDownloadLink": stage2_result.harness_download_link,
-                },
+                "sameHostTransferMode": same_server_mode_summary(
+                    seeder_result.connected_server,
+                    stage2_harness_download_link=stage2_result.harness_download_link,
+                ),
+                "sameServerSourceDiscovery": summarize_same_server_source_discovery(
+                    agent_stage1_session,
+                    run,
+                    file_hash=seeder_result.parsed_link.file_hash,
+                    connected_server=seeder_result.connected_server,
+                ),
                 "evidence": {
                     "exportedLinkHasAich": bool(seeder_result.parsed_link.aich_root),
                     "agentManifestAichAcquired": bool(stage1_result.transfer_manifest.get("aich_hashset_acquired")),
@@ -359,6 +419,12 @@ def run_live_ed2k_server_roundtrip_scenario(
                     "stage2TransportModes": stage2_result.transport_modes,
                     "stage2EvidenceSource": stage2_result.evidence_source,
                     "harnessVerifierAichOk": True,
+                    "sameServerSourceDiscoveryStatus": summarize_same_server_source_discovery(
+                        agent_stage1_session,
+                        run,
+                        file_hash=seeder_result.parsed_link.file_hash,
+                        connected_server=seeder_result.connected_server,
+                    )["status"],
                     "agentStage1Ed2kDumpPresent": stage1_result.agent_dump_path is not None,
                     "agentStage2Ed2kDumpPresent": stage2_result.agent_dump_path is not None,
                 },
@@ -390,6 +456,15 @@ def run_live_ed2k_server_roundtrip_scenario(
                     "fileHash": seeder_result.parsed_link.file_hash if seeder_result else None,
                     "fileName": seeder_result.parsed_link.file_name if seeder_result else str(manifest["file"]["name"]),
                     "fileSize": seeder_result.parsed_link.file_size if seeder_result else file_size,
+                    "sameHostTransferMode": same_server_mode_summary(
+                        seeder_result.connected_server if seeder_result else None,
+                    ),
+                    "sameServerSourceDiscovery": summarize_same_server_source_discovery(
+                        agent_stage1_session,
+                        run,
+                        file_hash=seeder_result.parsed_link.file_hash if seeder_result else None,
+                        connected_server=seeder_result.connected_server if seeder_result else None,
+                    ),
                     "failedReason": failed_reason,
                     "finishedAtUtc": utc_now(),
                 },
