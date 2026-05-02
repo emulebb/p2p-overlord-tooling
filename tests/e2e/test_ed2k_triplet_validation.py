@@ -52,6 +52,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
     artifact_scenario_id: str | None = None,
     run_slug: str | None = None,
     metadata: dict[str, object] | None = None,
+    transport_mode: str = "plaintext",
 ) -> None:
     manifest = load_manifest(workspace_paths.tooling_root, SCENARIO_ID)
     runtime_manifest = load_manifest(workspace_paths.tooling_root, RUNTIME_CONFIG_SCENARIO_ID)
@@ -62,7 +63,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
     run = create_private_ed2k_run(
         workspace_paths,
         scenario_id=scenario_id,
-        transport_mode="plaintext",
+        transport_mode=transport_mode,
         file_name=file_name,
         file_size=file_size,
         file_pattern="ed2k-triplet-callback-only",
@@ -103,7 +104,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
             udp_port_offset=int(server_cfg["udpPortOffset"]),
             admin_token=str(server_cfg["adminToken"]),
             source_catalog_path=source_catalog_path,
-            enable_obfuscation=False,
+            enable_obfuscation=run.enable_obfuscation,
             skip_build=run.skip_build,
         )
         agent_session = start_private_agent_session(
@@ -146,7 +147,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
         )
         assert file_contains_text(
             agent_session.agent_log_path,
-            "native ED2K download source filtering left no direct-dialable sources",
+            "native ED2K download filtered callback-only sources",
         )
 
         transfer_dir = agent_session.transfer_root / file_hash.lower()
@@ -192,6 +193,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
                     "callbackRequestIssued": True,
                     "callbackOnlySourceObserved": True,
                     "directDialSuppressed": True,
+                    "obfuscatedFoundSources": run.enable_obfuscation,
                 },
                 "finishedAtUtc": utc_now(),
             },

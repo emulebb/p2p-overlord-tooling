@@ -87,6 +87,7 @@ def _run_ed2k_private_callback_source_acquisition(context: ScenarioContext) -> N
         artifact_scenario_id=context.artifact_scenario_id,
         run_slug=context.run_slug,
         metadata=context.metadata,
+        transport_mode=context.transport_mode or "plaintext",
     )
 
 

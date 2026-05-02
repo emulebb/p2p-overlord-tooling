@@ -1,7 +1,7 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.campaign.callback.v1",
-  "description": "ED2K callback campaign over the currently available callback-issued private cell.",
+  "description": "ED2K callback campaign over plaintext and obfuscated callback-issued private cells.",
   "scenarioKind": "campaign",
   "protocol": "ed2k",
   "tier": "deterministic-private",
@@ -13,6 +13,10 @@
     "members": [
       {
         "scenarioId": "ed2k.cell.downloader.plaintext.callback.callback-issued.fresh.private.v1",
+        "required": true
+      },
+      {
+        "scenarioId": "ed2k.cell.downloader.obfuscated.callback.callback-issued.fresh.private.v1",
         "required": true
       }
     ]

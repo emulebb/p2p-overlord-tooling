@@ -248,6 +248,21 @@ def start_private_agent_session(
         reset_agent_runtime_root(scenario_root)
     server_host = str(server_cfg["host"]) if server_cfg is not None else None
     server_port = int(server_cfg["tcpPort"]) if server_cfg is not None else 0
+    server_entries = None
+    if server_host is not None and server_port > 0 and run.enable_obfuscation:
+        server_entries = [
+            {
+                "host": server_host,
+                "port": server_port,
+                "name": "",
+                "description": "",
+                "udp_flags": 0,
+                "udp_key": 0,
+                "udp_key_ip": 0,
+                "obfuscation_port_tcp": server_port,
+                "obfuscation_port_udp": 0,
+            }
+        ]
     session = agent.start_private_ed2k_session(
         scenario_root=scenario_root,
         control_port=int(agent_cfg["controlPort"]),
@@ -258,6 +273,7 @@ def start_private_agent_session(
         kad_bootstrap_ready_contacts=kad_bootstrap_ready_contacts,
         server_host=server_host,
         server_port=server_port,
+        server_entries=server_entries,
         enable_obfuscation=run.enable_obfuscation,
         skip_build=run.skip_build,
     )

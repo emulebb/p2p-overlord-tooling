@@ -1,26 +1,31 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.cell.downloader.obfuscated.callback.callback-issued.fresh.private.v1",
-  "description": "Planned ED2K downloader obfuscated callback-issued private cell.",
+  "description": "ED2K downloader obfuscated callback-issued private cell covering callback-only source acquisition with obfuscated found-sources metadata.",
   "scenarioKind": "cell",
   "protocol": "ed2k",
   "tier": "deterministic-private",
   "parity": {
     "matrixId": "ed2k",
     "cellId": "downloader.obfuscated.callback.callback-issued.fresh.private",
-    "availability": "planned",
+    "availability": "available",
     "expectedBranch": "callback-request-issued.obfuscated",
     "comparisonMode": "state-machine-layer",
+    "backlogItem": "ITEM_034",
+    "requiredArtifacts": [
+      "delegatedRunSummaryPath"
+    ],
     "requiredHarnessHooks": [
       "callback_request_shape",
-      "obfuscated_callback_connect"
+      "obfuscated_found_sources"
     ],
-    "harnessHookConfig": {
-      "hookSetId": "ed2k.downloader.obfuscated.callback.callback-issued.fresh.private",
-      "hooks": [
-        "callback_request_shape",
-        "obfuscated_callback_connect"
-      ]
-    }
+    "requiredAgentEvidence": [
+      "callback counters",
+      "obfuscated found-sources metadata"
+    ]
+  },
+  "execution": {
+    "command": "ed2k.private.callback-source-acquisition",
+    "summarySourceScenarioId": "ed2k.server.triplet.validation.v1"
   }
 }
