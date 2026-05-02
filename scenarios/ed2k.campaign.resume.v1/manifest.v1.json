@@ -1,7 +1,7 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.campaign.resume.v1",
-  "description": "Planned ED2K resume campaign over downloader and listener resume cells in plaintext and obfuscated modes.",
+  "description": "ED2K resume campaign over downloader and listener resume cells in plaintext and obfuscated modes.",
   "scenarioKind": "campaign",
   "protocol": "ed2k",
   "tier": "deterministic-private",
@@ -9,7 +9,7 @@
     "matrixId": "ed2k"
   },
   "campaign": {
-    "availability": "planned",
+    "availability": "available",
     "members": [
       {
         "scenarioId": "ed2k.cell.downloader.plaintext.direct.serving.resume.private.v1",

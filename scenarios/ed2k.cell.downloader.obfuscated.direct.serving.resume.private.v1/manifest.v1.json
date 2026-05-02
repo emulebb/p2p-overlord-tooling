@@ -1,28 +1,28 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.cell.downloader.obfuscated.direct.serving.resume.private.v1",
-  "description": "Planned ED2K downloader obfuscated resume private cell.",
+  "description": "ED2K downloader obfuscated resume private cell covering partial piece persistence and reconnect completion through ED2K TCP obfuscation.",
   "scenarioKind": "cell",
   "protocol": "ed2k",
   "tier": "deterministic-private",
   "parity": {
     "matrixId": "ed2k",
     "cellId": "downloader.obfuscated.direct.serving.resume.private",
-    "availability": "planned",
+    "availability": "available",
     "expectedBranch": "resume-reconnected.obfuscated",
     "comparisonMode": "state-machine-layer",
-    "requiredHarnessHooks": [
-      "resume_manifest",
-      "reconnect_after_partial",
-      "obfuscated_handshake"
+    "backlogItem": "ITEM_033",
+    "requiredArtifacts": [
+      "run-summary evidence"
     ],
-    "harnessHookConfig": {
-      "hookSetId": "ed2k.downloader.obfuscated.direct.serving.resume.private",
-      "hooks": [
-        "resume_manifest",
-        "reconnect_after_partial",
-        "obfuscated_handshake"
-      ]
-    }
+    "requiredAgentEvidence": [
+      "resume manifest",
+      "partial piece persisted",
+      "obfuscated reconnect requested remaining range"
+    ],
+    "requiredHarnessHooks": []
+  },
+  "execution": {
+    "command": "ed2k.private.downloader-resume"
   }
 }

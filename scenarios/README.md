@@ -59,6 +59,14 @@ Current deterministic local transfer coverage includes:
   obfuscation transport
 - `ed2k.cell.listener.plaintext.inbound.serving.resume.private.v1` for
   partial upload reconnect and resumed byte-range serving by peer hello identity
+- `ed2k.cell.listener.obfuscated.inbound.serving.resume.private.v1` for the
+  same listener resume path through the real ED2K TCP obfuscation transport
+- `ed2k.cell.downloader.plaintext.direct.serving.resume.private.v1` for
+  persisted partial-piece download resume and remaining-range reconnect
+- `ed2k.cell.downloader.obfuscated.direct.serving.resume.private.v1` for the
+  same downloader resume path through the real ED2K TCP obfuscation transport
+- `ed2k.campaign.resume.v1` for the composed downloader/listener resume gate
+  across plaintext and obfuscated transport
 - `kad.emule-harness.agent.download.private.large.v1` for harness->agent
   Kad-discovered large-file transfer on loopback
 - `kad.agent.emule-harness.download.private.large.v1` for agent->harness

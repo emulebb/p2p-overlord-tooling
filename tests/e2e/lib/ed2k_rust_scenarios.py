@@ -184,8 +184,6 @@ def run_private_ed2k_listener_resume_scenario(
     transport_mode: str | None = None,
 ) -> Path:
     scenario_transport = transport_mode or "plaintext"
-    if scenario_transport != "plaintext":
-        pytest.skip(f"{scenario_id} does not have obfuscated listener resume coverage yet")
     return _run_rust_e2e_module(
         workspace_paths,
         pytestconfig,
@@ -200,8 +198,40 @@ def run_private_ed2k_listener_resume_scenario(
             "listenerResumeRustTests": True,
             "partialDownloadReconnectCovered": True,
             "helloIdentityReconnectCovered": True,
+            "obfuscatedTransportCovered": scenario_transport == "obfuscated",
         },
         failure_reason="listener_resume_rust_tests_failed",
+    )
+
+
+def run_private_ed2k_downloader_resume_scenario(
+    workspace_paths: WorkspacePaths,
+    pytestconfig: pytest.Config,
+    *,
+    scenario_id: str,
+    artifact_scenario_id: str | None = None,
+    run_slug: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    transport_mode: str | None = None,
+) -> Path:
+    scenario_transport = transport_mode or "plaintext"
+    return _run_rust_e2e_module(
+        workspace_paths,
+        pytestconfig,
+        scenario_id=scenario_id,
+        artifact_scenario_id=artifact_scenario_id,
+        run_slug=run_slug,
+        metadata=metadata,
+        transport_mode=scenario_transport,
+        module_filter="ed2k_tcp::tests::download::resume_reconnect",
+        schema_version="ed2k-downloader-resume-summary/v1",
+        evidence={
+            "downloaderResumeRustTests": True,
+            "partialPieceResumeCovered": True,
+            "resumeManifestCovered": True,
+            "obfuscatedTransportCovered": scenario_transport == "obfuscated",
+        },
+        failure_reason="downloader_resume_rust_tests_failed",
     )
 
 

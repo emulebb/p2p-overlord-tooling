@@ -25,8 +25,12 @@ def test_manifest_driven_cases_include_native_runner_backed_cells_and_campaigns(
     assert "ed2k.cell.listener.plaintext.inbound.queue-only.fresh.private.v1" in case_ids
     assert "ed2k.cell.listener.obfuscated.inbound.queue-only.fresh.private.v1" in case_ids
     assert "ed2k.cell.listener.obfuscated.inbound.serving.fresh.private.v1" in case_ids
+    assert "ed2k.cell.downloader.plaintext.direct.serving.resume.private.v1" in case_ids
+    assert "ed2k.cell.downloader.obfuscated.direct.serving.resume.private.v1" in case_ids
     assert "ed2k.cell.listener.plaintext.inbound.serving.resume.private.v1" in case_ids
+    assert "ed2k.cell.listener.obfuscated.inbound.serving.resume.private.v1" in case_ids
     assert "ed2k.campaign.queue-and-slot.v1" in case_ids
+    assert "ed2k.campaign.resume.v1" in case_ids
     assert "ed2k.cell.live-wire.stress.search-download.realnet.v1" in case_ids
     assert "ed2k.campaign.realnet-confidence.v1" in case_ids
     assert "kad2.cell.keyword.search.obfuscated.realnet.v1" in case_ids

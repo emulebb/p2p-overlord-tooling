@@ -1,28 +1,28 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.cell.listener.obfuscated.inbound.serving.resume.private.v1",
-  "description": "Planned ED2K listener obfuscated inbound resume private cell.",
+  "description": "ED2K listener obfuscated inbound resume private cell covering partial upload reconnect by peer hello identity through ED2K TCP obfuscation.",
   "scenarioKind": "cell",
   "protocol": "ed2k",
   "tier": "deterministic-private",
   "parity": {
     "matrixId": "ed2k",
     "cellId": "listener.obfuscated.inbound.serving.resume.private",
-    "availability": "planned",
+    "availability": "available",
     "expectedBranch": "listener-resume-reconnected.obfuscated",
     "comparisonMode": "state-machine-layer",
-    "requiredHarnessHooks": [
-      "resume_manifest",
-      "reconnect_by_hello_identity",
-      "obfuscated_handshake"
+    "backlogItem": "ITEM_033",
+    "requiredArtifacts": [
+      "run-summary evidence"
     ],
-    "harnessHookConfig": {
-      "hookSetId": "ed2k.listener.obfuscated.inbound.serving.resume.private",
-      "hooks": [
-        "resume_manifest",
-        "reconnect_by_hello_identity",
-        "obfuscated_handshake"
-      ]
-    }
+    "requiredAgentEvidence": [
+      "partial upload request",
+      "obfuscated reconnect by hello identity",
+      "resumed byte range served"
+    ],
+    "requiredHarnessHooks": []
+  },
+  "execution": {
+    "command": "ed2k.private.listener-resume"
   }
 }
