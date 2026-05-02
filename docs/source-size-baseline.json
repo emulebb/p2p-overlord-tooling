@@ -47,17 +47,6 @@
           ]
         },
         {
-          "path": "crates/overlord-agent-emule/src/agent.rs",
-          "severity": "warn",
-          "bytes": 36984,
-          "kib": 36.1,
-          "lines": 872,
-          "reasons": [
-            "bytes>warn",
-            "lines>warn"
-          ]
-        },
-        {
           "path": "crates/overlord-agent-nat/src/provider/rupnp.rs",
           "severity": "warn",
           "bytes": 29726,
