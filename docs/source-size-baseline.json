@@ -37,35 +37,35 @@
       "sourceSizeFindings": [
         {
           "path": "crates/overlord-kad-net/src/rpc.rs",
-          "severity": "severe",
-          "bytes": 55723,
-          "kib": 54.4,
-          "lines": 1339,
+          "severity": "warn",
+          "bytes": 35281,
+          "kib": 34.5,
+          "lines": 770,
           "reasons": [
-            "bytes>severe",
-            "lines>severe"
+            "bytes>warn",
+            "lines>warn"
           ]
         },
         {
           "path": "crates/overlord-agent-emule/src/agent.rs",
-          "severity": "severe",
-          "bytes": 43667,
-          "kib": 42.6,
-          "lines": 1060,
+          "severity": "warn",
+          "bytes": 36984,
+          "kib": 36.1,
+          "lines": 872,
           "reasons": [
             "bytes>warn",
-            "lines>severe"
+            "lines>warn"
           ]
         },
         {
           "path": "crates/overlord-kad-dht/src/node.rs",
-          "severity": "severe",
-          "bytes": 38223,
-          "kib": 37.3,
-          "lines": 1101,
+          "severity": "warn",
+          "bytes": 33991,
+          "kib": 33.2,
+          "lines": 983,
           "reasons": [
             "bytes>warn",
-            "lines>severe"
+            "lines>warn"
           ]
         },
         {
