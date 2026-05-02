@@ -19,10 +19,14 @@ def run_private_ed2k_listener_queue_scenario(
     artifact_scenario_id: str | None = None,
     run_slug: str | None = None,
     metadata: dict[str, Any] | None = None,
+    transport_mode: str | None = None,
 ) -> Path:
     selected_transport = str(pytestconfig.getoption("--transport"))
-    if selected_transport not in {"both", "plaintext"}:
-        pytest.skip(f"{scenario_id} is plaintext-only, selected --transport={selected_transport}")
+    scenario_transport = transport_mode or "plaintext"
+    if selected_transport not in {"both", scenario_transport}:
+        pytest.skip(
+            f"{scenario_id} is {scenario_transport}, selected --transport={selected_transport}"
+        )
 
     run_id = f"{run_slug or scenario_id}-{_run_timestamp()}"
     artifact_root = workspace_paths.run_root(artifact_scenario_id or scenario_id, run_id)
@@ -49,7 +53,7 @@ def run_private_ed2k_listener_queue_scenario(
         "artifactScenarioId": artifact_scenario_id or scenario_id,
         "runId": run_id,
         "completed": result.returncode == 0,
-        "transport": "plaintext",
+        "transport": scenario_transport,
         "command": command,
         "evidence": {
             "listenerQueueRustTests": result.returncode == 0,

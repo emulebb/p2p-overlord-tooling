@@ -27,10 +27,10 @@ def test_iter_manifests_filters_ed2k_deterministic_private_available(workspace_p
 
 def test_manifest_availability_reads_campaign_and_cell_shapes(workspace_paths: WorkspacePaths) -> None:
     campaign = load_manifest(workspace_paths.tooling_root, "kad2.campaign.startup-and-bootstrap.v1")
-    planned_cell = load_manifest(
+    available_cell = load_manifest(
         workspace_paths.tooling_root,
         "ed2k.cell.listener.obfuscated.inbound.queue-only.fresh.private.v1",
     )
 
     assert manifest_availability(campaign) == "available"
-    assert manifest_availability(planned_cell) == "planned"
+    assert manifest_availability(available_cell) == "available"

@@ -46,6 +46,8 @@ Current deterministic local transfer coverage includes:
 - `ed2k.cell.listener.plaintext.inbound.queue-only.fresh.private.v1` for
   plaintext listener queue-rank, late accept-upload, reconnect, and file-switch
   rank evidence on the native Rust listener
+- `ed2k.cell.listener.obfuscated.inbound.queue-only.fresh.private.v1` for the
+  same listener queue path through the real ED2K TCP obfuscation transport
 - `kad.emule-harness.agent.download.private.large.v1` for harness->agent
   Kad-discovered large-file transfer on loopback
 - `kad.agent.emule-harness.download.private.large.v1` for agent->harness

@@ -71,6 +71,7 @@ def _run_ed2k_private_kad_assisted_download(context: ScenarioContext) -> None:
         artifact_scenario_id=context.artifact_scenario_id,
         run_slug=context.run_slug,
         metadata=context.metadata,
+        transport_mode=context.transport_mode,
     )
 
 
