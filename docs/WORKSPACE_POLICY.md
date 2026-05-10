@@ -17,11 +17,14 @@ rules, quality gates, or deltas that are not shared across the workspace.
   reachability, or harvest yield.
 - Prefer Overlord-specific behavior when it increases harvest throughput or
   stability without breaking wire compatibility.
-- Current ED2K agent work is the active exception where stock eMule `v0.72a`
-  parity is the tactical target for every still-advertised, non-obsolete ED2K
-  behavior. Use that parity target to keep capability adverts truthful and peer
-  behavior acceptable, while still prioritizing live acceptance and harvest
-  evidence over cosmetic behavior matching.
+- Current Kad and ED2K work targets full stock eMule `v0.72a` parity,
+  including deprecated legacy compatibility behavior when stock eMule still
+  implements or advertises it. The only standing ED2K protocol exception is
+  defunct PeerCache support: do not advertise or implement `OP_PEERCACHE_*`
+  behavior unless the user explicitly re-scopes it. Use the parity target to
+  keep capability adverts truthful and peer behavior acceptable, while still
+  prioritizing live acceptance and harvest evidence over cosmetic behavior
+  matching.
 
 ## Canonical Locations
 

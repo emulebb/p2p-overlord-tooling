@@ -3,6 +3,9 @@
 - Follow the shared workspace policy in `docs/WORKSPACE_POLICY.md`.
 - Use `docs/README.md` as the canonical tooling docs home.
 - Use `../p2p-overlord-be/BACKLOG.md` as the canonical active backlog.
+- Target full stock eMule `v0.72a` Kad and ED2K parity, including deprecated
+  legacy compatibility behavior. The only standing protocol exception is
+  defunct ED2K PeerCache support.
 - Keep a stable top-level CLI surface and put reusable logic in structured
   platform directories.
 - Add short header comments so purpose and expected inputs are obvious.
