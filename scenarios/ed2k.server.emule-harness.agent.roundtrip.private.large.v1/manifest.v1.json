@@ -1,7 +1,7 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.server.emule-harness.agent.roundtrip.private.large.v1",
-  "description": "Private local ED2K server roundtrip with a large deterministic file so the harness and agent exercise the modern HASHSETREQUEST2/HASHSETANSWER2 plus AICH path entirely on loopback through a local goed2k-server.",
+  "description": "Private local ED2K server roundtrip with a large deterministic file so the harness and agent exercise the modern HASHSETREQUEST2/HASHSETANSWER2 plus AICH path entirely on loopback through a local Overlord ED2K server.",
   "scenarioKind": "legacy",
   "protocol": "ed2k",
   "tier": "deterministic-private",
@@ -17,7 +17,7 @@
     "tcpPort": 42161,
     "adminPort": 42180,
     "udpPortOffset": 4,
-    "adminToken": "local-goed2k-token",
+    "adminToken": "local-ed2k-server-token",
     "enableObfuscation": false
   },
   "harnessSeeder": {

@@ -19,7 +19,7 @@ from tests.e2e.lib.ed2k_private import (
     utc_now,
 )
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleSession
-from tests.e2e.lib.goed2k import Goed2kRuntime, Goed2kSession
+from tests.e2e.lib.ed2k_server import Ed2kServerRuntime, Ed2kServerSession
 from overlord_tooling.scenarios import load_manifest, write_json
 from tests.e2e.lib.paths import WorkspacePaths
 
@@ -59,9 +59,9 @@ def test_private_ed2k_agent_seed_to_harness_download(
 
     emule = EmuleHarnessRuntime(workspace_paths)
     agent = AgentRuntime(workspace_paths)
-    goed2k = Goed2kRuntime(workspace_paths)
+    ed2k_server = Ed2kServerRuntime(workspace_paths)
 
-    server_session: Goed2kSession | None = None
+    server_session: Ed2kServerSession | None = None
     agent_session: AgentSession | None = None
     downloader_session: EmuleSession | None = None
     seed_result: AgentSeedResult | None = None
@@ -75,7 +75,7 @@ def test_private_ed2k_agent_seed_to_harness_download(
 
         server = manifest["server"]
         agent_cfg = manifest["agent"]
-        server_session = start_private_server(goed2k, run, server)
+        server_session = start_private_server(ed2k_server, run, server)
         agent_session = start_private_agent_session(
             agent,
             run,
@@ -90,7 +90,7 @@ def test_private_ed2k_agent_seed_to_harness_download(
             destination_root=run.agent_stage2_artifacts,
         )
 
-        published = goed2k.wait_file_available(
+        published = ed2k_server.wait_file_available(
             server_session,
             file_hash=seed_result.parsed_link.file_hash,
             timeout_seconds=int(manifest["timeouts"]["serverPublishSeconds"]),
@@ -156,7 +156,7 @@ def test_private_ed2k_agent_seed_to_harness_download(
             if agent_session is not None:
                 agent.stop(agent_session)
             if server_session is not None:
-                goed2k.stop(server_session)
+                ed2k_server.stop(server_session)
         if not run.run_summary_path.exists():
             write_json(
                 run.run_summary_path,

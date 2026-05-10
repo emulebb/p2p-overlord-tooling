@@ -8,6 +8,7 @@ Product runtime logic remains in:
 
 - `../p2p-overlord-agents`
 - `../p2p-overlord-be`
+- `../p2p-overlord-ed2k-server`
 
 Use the shared workspace policy from `docs/WORKSPACE_POLICY.md` and the
 tooling-repo notes in `./AGENTS.md`.
@@ -30,6 +31,10 @@ tooling-repo notes in `./AGENTS.md`.
 Operator-facing entrypoints are:
 
 - `python -m overlord_tooling`
+- `python -m overlord_tooling materialize` to create or repair the canonical
+  workspace and persist Overlord workspace environment variables
+- `python -m overlord_tooling validate` to inspect workspace repos, tools, and
+  environment readiness
 - `python -m pytest tests/e2e ...` for parity E2E scenarios
 - `scenarios/` manifest contracts
 

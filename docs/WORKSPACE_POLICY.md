@@ -22,6 +22,8 @@ rules, quality gates, or deltas that are not shared across the workspace.
 
 - `%OVERLORD_PROJECT_DIR%\p2p-overlord-agents` is the Rust agents repo.
 - `%OVERLORD_PROJECT_DIR%\p2p-overlord-be` is the backend repo.
+- `%OVERLORD_PROJECT_DIR%\p2p-overlord-ed2k-server` is the active local ED2K
+  server repo.
 - `%OVERLORD_PROJECT_DIR%\p2p-overlord-tooling` is the shared tooling repo.
 - `%OVERLORD_PROJECT_DIR%\p2p-overlord-be\docs\README.md` is the canonical
   workspace/spec docs home.
@@ -40,6 +42,8 @@ rules, quality gates, or deltas that are not shared across the workspace.
 - Use `%EMULE_WORKSPACE_ROOT%` for eMule workspace, build, and runtime paths.
 - Use `%OVERLORD_TMP_DIR%` for temporary run roots and sample simulations.
 - Use `%OVERLORD_LOG_DIR%` for coordinator and agent log discovery.
+- Do not add a separate ED2K server path environment variable; derive the
+  active server checkout from `%OVERLORD_PROJECT_DIR%`.
 
 ## Code And Repo Hygiene
 

@@ -14,7 +14,7 @@ from tests.e2e.lib.waits import wait_tcp
 
 
 @dataclass
-class Goed2kSession:
+class Ed2kServerSession:
     session_dir: Path
     session_name: str
     repo_root: Path
@@ -41,19 +41,19 @@ class Goed2kSession:
         for key, value in list(payload.items()):
             if isinstance(value, Path):
                 payload[key] = str(value)
-        (self.session_dir / "goed2k-session.json").write_text(
+        (self.session_dir / "ed2k-server-session.json").write_text(
             json.dumps(payload, indent=2) + "\n",
             encoding="utf-8",
         )
 
 
-class Goed2kRuntime:
+class Ed2kServerRuntime:
     def __init__(self, paths: WorkspacePaths) -> None:
         self.paths = paths
 
     @property
     def repo_root(self) -> Path:
-        return self.paths.project_root / "ext-deps" / "goed2k-server"
+        return self.paths.ed2k_server_root
 
     def write_private_config(
         self,
@@ -67,13 +67,13 @@ class Goed2kRuntime:
         source_catalog_path: Path | None,
         enable_obfuscation: bool,
     ) -> dict[str, Any]:
-        runtime_root = scenario_root / "goed2k-server"
+        runtime_root = scenario_root / "overlord-ed2k-server"
         log_root = runtime_root / "logs"
         config_path = runtime_root / "config.json"
         catalog_path = runtime_root / "catalog.json"
         source_catalog = source_catalog_path or self.repo_root / "testdata" / "catalog.json"
         if not source_catalog.is_file():
-            raise FileNotFoundError(f"goed2k source catalog not found at {source_catalog}")
+            raise FileNotFoundError(f"ED2K server source catalog not found at {source_catalog}")
         runtime_root.mkdir(parents=True, exist_ok=True)
         log_root.mkdir(parents=True, exist_ok=True)
         catalog_path.write_bytes(source_catalog.read_bytes())
@@ -83,9 +83,9 @@ class Goed2kRuntime:
             "listen_address": f"{listen_host}:{tcp_port}",
             "admin_listen_address": f"{listen_host}:{admin_port}",
             "admin_token": admin_token,
-            "server_name": "overlord-local-goed2k",
+            "server_name": "overlord-local-ed2k-server",
             "server_description": "Local Overlord ED2K test server",
-            "message": "Welcome to local goed2k-server",
+            "message": "Welcome to local Overlord ED2K server",
             "storage_backend": "json",
             "catalog_path": str(catalog_path),
             "database_dsn": "",
@@ -116,13 +116,13 @@ class Goed2kRuntime:
         tcp_port: int = 42161,
         admin_port: int = 42180,
         udp_port_offset: int = 4,
-        admin_token: str = "local-goed2k-token",
+        admin_token: str = "local-ed2k-server-token",
         source_catalog_path: Path | None = None,
         enable_obfuscation: bool = False,
         skip_build: bool = False,
         launch_timeout_seconds: int = 120,
-    ) -> Goed2kSession:
-        kill_processes_by_name(["goed2k-server"])
+    ) -> Ed2kServerSession:
+        kill_processes_by_name(["goed2k-server", "overlord-ed2k-server"])
         config = self.write_private_config(
             scenario_root=scenario_root,
             listen_host=listen_host,
@@ -133,15 +133,15 @@ class Goed2kRuntime:
             source_catalog_path=source_catalog_path,
             enable_obfuscation=enable_obfuscation,
         )
-        binary_path = Path(config["runtime_root"]) / "goed2k-server.exe"
+        binary_path = Path(config["runtime_root"]) / "overlord-ed2k-server.exe"
         if not skip_build or not binary_path.is_file():
-            run_checked(["go", "build", "-o", binary_path, ".\\cmd\\goed2k-server"], cwd=self.repo_root)
+            run_checked(["go", "build", "-o", binary_path, ".\\cmd\\overlord-ed2k-server"], cwd=self.repo_root)
 
-        session_name = f"private-goed2k-{_stamp()}"
+        session_name = f"private-ed2k-server-{_stamp()}"
         session_dir = self.paths.tmp_dir / session_name
         session_dir.mkdir(parents=True, exist_ok=True)
-        stdout_path = Path(config["log_root"]) / "goed2k-server.stdout.log"
-        stderr_path = Path(config["log_root"]) / "goed2k-server.stderr.log"
+        stdout_path = Path(config["log_root"]) / "overlord-ed2k-server.stdout.log"
+        stderr_path = Path(config["log_root"]) / "overlord-ed2k-server.stderr.log"
         process = start_process(
             [binary_path, "-config", Path(config["config_path"])],
             cwd=self.repo_root,
@@ -152,7 +152,7 @@ class Goed2kRuntime:
         health_url = f"http://{listen_host}:{admin_port}/healthz"
         http.wait_json(health_url, timeout_seconds=launch_timeout_seconds, poll_seconds=0.5)
 
-        session = Goed2kSession(
+        session = Ed2kServerSession(
             session_dir=session_dir,
             session_name=session_name,
             repo_root=self.repo_root,
@@ -177,13 +177,13 @@ class Goed2kRuntime:
         session.write_metadata()
         return session
 
-    def stop(self, session: Goed2kSession, *, flush_wait_seconds: int = 5) -> None:
+    def stop(self, session: Ed2kServerSession, *, flush_wait_seconds: int = 5) -> None:
         stop_process_tree(session.pid)
         time.sleep(max(flush_wait_seconds, 1))
 
     def wait_file_available(
         self,
-        session: Goed2kSession,
+        session: Ed2kServerSession,
         *,
         file_hash: str,
         timeout_seconds: int,
@@ -199,7 +199,7 @@ class Goed2kRuntime:
             except Exception as exc:  # noqa: BLE001 - admin readiness polling records any failure.
                 last_error = exc
             time.sleep(2)
-        raise TimeoutError(f"goed2k-server did not expose file {file_hash}") from last_error
+        raise TimeoutError(f"Overlord ED2K server did not expose file {file_hash}") from last_error
 
 
 def _stamp() -> str:

@@ -11,7 +11,7 @@ from tests.e2e.lib import ed2k
 from tests.e2e.lib.agent import AgentRuntime, AgentSession
 from tests.e2e.lib.artifacts import copy_if_exists, copy_if_small
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleProfile, EmuleSession
-from tests.e2e.lib.goed2k import Goed2kRuntime, Goed2kSession
+from tests.e2e.lib.ed2k_server import Ed2kServerRuntime, Ed2kServerSession
 from overlord_tooling.scenarios import write_json
 from tests.e2e.lib.paths import WorkspacePaths
 from tests.e2e.lib.payloads import write_deterministic_binary
@@ -182,11 +182,11 @@ def run_identity(run: PrivateEd2kRun) -> dict[str, Any]:
 
 
 def start_private_server(
-    goed2k: Goed2kRuntime,
+    ed2k_server: Ed2kServerRuntime,
     run: PrivateEd2kRun,
     server_cfg: dict[str, Any],
-) -> Goed2kSession:
-    return goed2k.start_private_session(
+) -> Ed2kServerSession:
+    return ed2k_server.start_private_session(
         scenario_root=run.artifact_root / "srv",
         listen_host=str(server_cfg["host"]),
         tcp_port=int(server_cfg["tcpPort"]),
@@ -544,7 +544,7 @@ def copy_harness_artifacts(session: EmuleSession | None, destination: Path) -> N
         copy_if_exists(path, destination)
 
 
-def copy_server_artifacts(session: Goed2kSession, destination: Path) -> None:
+def copy_server_artifacts(session: Ed2kServerSession, destination: Path) -> None:
     for path in (session.stdout_path, session.stderr_path, session.config_path, session.catalog_path):
         copy_if_exists(path, destination)
 

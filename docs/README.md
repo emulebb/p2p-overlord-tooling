@@ -25,6 +25,8 @@ Supporting notes for the workspace tooling platform.
 Treat these as the supported operator-facing surface:
 
 - `python -m overlord_tooling`
+- `python -m overlord_tooling materialize`
+- `python -m overlord_tooling validate`
 - `python -m pytest tests/e2e ...` parity E2E scenarios
 - scenario manifests under `../scenarios/`
 
@@ -81,6 +83,7 @@ under the owning package or pytest library.
   reduced or explicitly accepted.
 - LF is canonical for all tracked text files, including PowerShell, CMD, and
   batch files; `ext-deps` remains out of scope because those are upstream repos.
+  The active ED2K server is no longer under `ext-deps`.
 
 ## Harness Commands
 

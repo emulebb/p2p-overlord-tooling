@@ -34,6 +34,10 @@ class WorkspacePaths:
             emule_workspace_root=Path(emule_workspace).resolve() if emule_workspace else None,
         )
 
+    @property
+    def ed2k_server_root(self) -> Path:
+        return self.project_root / "p2p-overlord-ed2k-server"
+
     def require_emule_workspace(self) -> Path:
         if self.emule_workspace_root is None:
             raise RuntimeError("EMULE_WORKSPACE_ROOT is not set")

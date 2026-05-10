@@ -1,7 +1,7 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.server.agent.emule-harness.private.large.v1",
-  "description": "Private local ED2K server download where the agent ingests a deterministic large file, reconnects to a local goed2k-server, and a fresh eMule harness profile downloads it with modern AICH evidence on loopback.",
+  "description": "Private local ED2K server download where the agent ingests a deterministic large file, reconnects to a local Overlord ED2K server, and a fresh eMule harness profile downloads it with modern AICH evidence on loopback.",
   "scenarioKind": "legacy",
   "protocol": "ed2k",
   "tier": "deterministic-private",
@@ -17,7 +17,7 @@
     "tcpPort": 42261,
     "adminPort": 42280,
     "udpPortOffset": 4,
-    "adminToken": "local-goed2k-token",
+    "adminToken": "local-ed2k-server-token",
     "enableObfuscation": false
   },
   "harnessDownloader": {

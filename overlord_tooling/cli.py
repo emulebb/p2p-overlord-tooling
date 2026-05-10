@@ -16,12 +16,16 @@ from typing import Any
 from overlord_tooling.line_endings import run_guard_line_endings, run_normalize_source
 from overlord_tooling.source_size import add_source_size_args, largest_source_files, run_guard_source_size, source_size_findings, source_size_policy_from_args
 from overlord_tooling.scenarios import ScenarioCatalog, default_run_root, load_manifest, parity_status_rows
+from overlord_tooling.workspace_materialize import handle_materialize, handle_sync, handle_validate
 
 
 COMMANDS = [
     ("help", "Show CLI help"),
     ("layout", "Show the platform directory layout"),
     ("paths", "Show canonical workspace and repo paths"),
+    ("materialize", "Materialize the canonical Overlord workspace and persist workspace environment variables"),
+    ("sync", "Synchronize canonical Overlord workspace repository remotes and missing clones"),
+    ("validate", "Validate Overlord workspace paths, repositories, environment, and tools"),
     ("quality-baseline", "Run the non-live workspace quality baseline"),
     ("hygiene-report", "Print workspace hygiene, source hotspot, and parity status summary"),
     ("show-scenario", "Print a scenario manifest"),
@@ -35,7 +39,7 @@ COMMANDS = [
     ("import-emule-harness-seeds", "Import local nodes.dat and server.met into the untracked seed bundle"),
 ]
 
-CANONICAL_REPOS = ("p2p-overlord-tooling", "p2p-overlord-agents", "p2p-overlord-be")
+CANONICAL_REPOS = ("p2p-overlord-tooling", "p2p-overlord-agents", "p2p-overlord-be", "p2p-overlord-ed2k-server")
 FORBIDDEN_WRAPPER_SUFFIXES = (".ps1", ".psm1", ".psd1", ".cmd")
 SKIP_DIRS = {".git", ".local", ".pytest_cache", "__pycache__", "node_modules", "target"}
 
@@ -50,7 +54,6 @@ class Paths:
 
     @property
     def schemas_root(self) -> Path: return self.tooling_root / "schemas"
-
     @property
     def scenarios_root(self) -> Path: return self.tooling_root / "scenarios"
 
@@ -65,6 +68,9 @@ def main(argv: list[str] | None = None) -> int:
         "help": command_help,
         "layout": command_layout,
         "paths": command_paths,
+        "materialize": lambda current_paths, argv: handle_materialize(current_paths.workspace_root, argv),
+        "sync": lambda current_paths, argv: handle_sync(current_paths.workspace_root, argv),
+        "validate": lambda current_paths, argv: handle_validate(current_paths.workspace_root, argv),
         "quality-baseline": command_quality_baseline,
         "hygiene-report": command_hygiene_report,
         "show-scenario": command_show_scenario,
@@ -92,7 +98,6 @@ def command_help(paths: Paths, argv: list[str]) -> Any:
     parser.parse_args(argv)
     return [{"name": name, "kind": "builtin", "description": description} for name, description in COMMANDS]
 
-
 def command_layout(paths: Paths, argv: list[str]) -> Any:
     parser = argparse.ArgumentParser(prog="python -m overlord_tooling layout")
     parser.parse_args(argv)
@@ -109,18 +114,15 @@ def command_layout(paths: Paths, argv: list[str]) -> Any:
     ]
     return [{"name": name, "exists": (paths.tooling_root / name).exists(), "path": str(paths.tooling_root / name)} for name in names]
 
-
 def command_paths(paths: Paths, argv: list[str]) -> Any:
     parser = argparse.ArgumentParser(prog="python -m overlord_tooling paths")
     parser.parse_args(argv)
     return {
-        "workspaceRoot": str(paths.workspace_root),
-        "toolingRepoRoot": str(paths.tooling_root),
-        "docsRoot": str(paths.docs_root),
-        "schemasRoot": str(paths.schemas_root),
-        "scenariosRoot": str(paths.scenarios_root),
+        "workspaceRoot": str(paths.workspace_root), "toolingRepoRoot": str(paths.tooling_root),
+        "agentsRepoRoot": str(paths.workspace_root / "p2p-overlord-agents"), "backendRepoRoot": str(paths.workspace_root / "p2p-overlord-be"),
+        "ed2kServerRepoRoot": str(paths.workspace_root / "p2p-overlord-ed2k-server"), "docsRoot": str(paths.docs_root),
+        "schemasRoot": str(paths.schemas_root), "scenariosRoot": str(paths.scenarios_root),
     }
-
 
 def command_quality_baseline(paths: Paths, argv: list[str]) -> Any:
     parser = argparse.ArgumentParser(prog="python -m overlord_tooling quality-baseline")

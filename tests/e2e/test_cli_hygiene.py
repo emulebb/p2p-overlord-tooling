@@ -3,6 +3,7 @@ from __future__ import annotations
 from overlord_tooling import cli
 from overlord_tooling.line_endings import source_normalization_summary
 from overlord_tooling.source_size import source_size_guard_summary, source_size_policy_from_args
+from overlord_tooling.workspace_materialize import validate_workspace
 from tests.e2e.lib.paths import WorkspacePaths
 
 
@@ -15,6 +16,9 @@ def test_help_lists_quality_and_hygiene_commands(workspace_paths: WorkspacePaths
     assert "guard-source-size" in names
     assert "guard-line-endings" in names
     assert "normalize-source" in names
+    assert "materialize" in names
+    assert "sync" in names
+    assert "validate" in names
 
 
 def test_hygiene_report_summarizes_workspace(workspace_paths: WorkspacePaths) -> None:
@@ -25,9 +29,29 @@ def test_hygiene_report_summarizes_workspace(workspace_paths: WorkspacePaths) ->
     assert report["schemaVersion"] == "workspace-hygiene-report/v1"
     assert report["sourceSizePolicy"]["mode"] == "advisory"
     assert report["parity"]["totalRows"] >= report["parity"]["availableRows"]
-    assert len(report["repos"]) == 3
+    assert len(report["repos"]) == 4
     assert all(len(repo["largestSourceFiles"]) <= 2 for repo in report["repos"])
     assert all("sourceSizeFindings" in repo for repo in report["repos"])
+
+
+def test_paths_report_includes_ed2k_server_root(workspace_paths: WorkspacePaths) -> None:
+    paths = cli.Paths(workspace_paths.project_root, workspace_paths.tooling_root)
+
+    report = cli.command_paths(paths, [])
+
+    assert report["ed2kServerRepoRoot"].endswith("p2p-overlord-ed2k-server")
+
+
+def test_validate_reports_emule_workspace_root_as_harness_only(workspace_paths: WorkspacePaths) -> None:
+    report = validate_workspace(workspace_paths.project_root)
+
+    assert set(report["environment"]) == {
+        "OVERLORD_PROJECT_DIR",
+        "OVERLORD_TMP_DIR",
+        "OVERLORD_LOG_DIR",
+        "EMULE_WORKSPACE_ROOT",
+    }
+    assert report["environment"]["EMULE_WORKSPACE_ROOT"]["requiredFor"] == "emule-harness scenarios"
 
 
 def test_source_size_guard_is_advisory_by_default(workspace_paths: WorkspacePaths) -> None:

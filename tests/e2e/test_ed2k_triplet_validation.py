@@ -15,7 +15,7 @@ from tests.e2e.lib.ed2k_private import (
     start_private_agent_session,
     utc_now,
 )
-from tests.e2e.lib.goed2k import Goed2kRuntime, Goed2kSession
+from tests.e2e.lib.ed2k_server import Ed2kServerRuntime, Ed2kServerSession
 from overlord_tooling.scenarios import load_manifest, write_json
 from tests.e2e.lib.paths import WorkspacePaths
 
@@ -75,7 +75,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
     )
 
     agent = AgentRuntime(workspace_paths)
-    goed2k = Goed2kRuntime(workspace_paths)
+    ed2k_server = Ed2kServerRuntime(workspace_paths)
 
     server_cfg = runtime_manifest["server"]
     agent_cfg = runtime_manifest["agent"]
@@ -86,7 +86,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
         file_size=file_size,
     )
 
-    server_session: Goed2kSession | None = None
+    server_session: Ed2kServerSession | None = None
     agent_session: AgentSession | None = None
     transfer_manifest: dict | None = None
     server_stats: dict | None = None
@@ -96,7 +96,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
         if not run.skip_build:
             agent.build()
 
-        server_session = goed2k.start_private_session(
+        server_session = ed2k_server.start_private_session(
             scenario_root=run.artifact_root / "srv",
             listen_host=str(server_cfg["host"]),
             tcp_port=int(server_cfg["tcpPort"]),
@@ -206,7 +206,7 @@ def run_private_ed2k_server_triplet_callback_limit_scenario(
             if agent_session is not None:
                 agent.stop(agent_session)
             if server_session is not None:
-                goed2k.stop(server_session)
+                ed2k_server.stop(server_session)
         if not run.run_summary_path.exists():
             write_json(
                 run.run_summary_path,

@@ -18,7 +18,7 @@ from tests.e2e.lib.ed2k_private import (
     utc_now,
 )
 from tests.e2e.lib.emule_harness import EmuleHarnessRuntime, EmuleSession
-from tests.e2e.lib.goed2k import Goed2kRuntime, Goed2kSession
+from tests.e2e.lib.ed2k_server import Ed2kServerRuntime, Ed2kServerSession
 from overlord_tooling.scenarios import load_manifest, write_json
 from tests.e2e.lib.paths import WorkspacePaths
 
@@ -66,9 +66,9 @@ def run_private_ed2k_server_download_to_agent_scenario(
 
     emule = EmuleHarnessRuntime(workspace_paths)
     agent = AgentRuntime(workspace_paths)
-    goed2k = Goed2kRuntime(workspace_paths)
+    ed2k_server = Ed2kServerRuntime(workspace_paths)
 
-    server_session: Goed2kSession | None = None
+    server_session: Ed2kServerSession | None = None
     seeder_session: EmuleSession | None = None
     agent_session: AgentSession | None = None
     seeder_result: HarnessSeederResult | None = None
@@ -82,10 +82,10 @@ def run_private_ed2k_server_download_to_agent_scenario(
 
         server = manifest["server"]
         agent_cfg = manifest["agent"]
-        server_session = start_private_server(goed2k, run, server)
+        server_session = start_private_server(ed2k_server, run, server)
         seeder_result = start_private_harness_seeder(emule, run, server, harness_cfg, timeouts_cfg)
         seeder_session = seeder_result.session
-        published = goed2k.wait_file_available(
+        published = ed2k_server.wait_file_available(
             server_session,
             file_hash=seeder_result.parsed_link.file_hash,
             timeout_seconds=DEFAULT_SERVER_PUBLISH_SECONDS,
@@ -161,7 +161,7 @@ def run_private_ed2k_server_download_to_agent_scenario(
             if agent_session is not None:
                 agent.stop(agent_session)
             if server_session is not None:
-                goed2k.stop(server_session)
+                ed2k_server.stop(server_session)
         if not run.run_summary_path.exists():
             write_json(
                 run.run_summary_path,

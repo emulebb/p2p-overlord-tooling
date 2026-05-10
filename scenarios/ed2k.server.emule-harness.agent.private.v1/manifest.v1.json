@@ -1,7 +1,7 @@
 {
   "schemaVersion": "scenario-manifest/v1",
   "scenarioId": "ed2k.server.emule-harness.agent.private.v1",
-  "description": "Private local eMule harness and agent ED2K download routed through a local goed2k-server.",
+  "description": "Private local eMule harness and agent ED2K download routed through a local Overlord ED2K server.",
   "scenarioKind": "legacy",
   "protocol": "ed2k",
   "tier": "deterministic-private",
@@ -17,7 +17,7 @@
     "tcpPort": 42161,
     "adminPort": 42180,
     "udpPortOffset": 4,
-    "adminToken": "local-goed2k-token",
+    "adminToken": "local-ed2k-server-token",
     "enableObfuscation": false
   },
   "emuleHarness": {
