@@ -3,6 +3,9 @@
 - Follow the shared workspace policy in `docs/WORKSPACE_POLICY.md`.
 - Use `docs/README.md` as the canonical tooling docs home.
 - Use `../p2p-overlord-be/BACKLOG.md` as the canonical active backlog.
+- Implement only latest/current Kad and ED2K protocol behavior by default.
+  Do not add legacy variants, obsolete fallbacks, or compatibility branches
+  unless explicitly re-scoped by the user.
 - Keep a stable top-level CLI surface and put reusable logic in structured
   platform directories.
 - Add short header comments so purpose and expected inputs are obvious.
