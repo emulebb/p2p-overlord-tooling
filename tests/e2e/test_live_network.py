@@ -77,6 +77,7 @@ def test_resolve_live_interface_binding_honors_interface_alias_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OVERLORD_LIVE_INTERFACE_ALIAS", "Wi-Fi")
+    monkeypatch.delenv("EMULEBB_TEST_VPN_IP_RESOLVED", raising=False)
 
     class _Completed:
         def __init__(self, stdout: str) -> None:
@@ -101,8 +102,36 @@ def test_resolve_live_interface_binding_honors_interface_alias_override(
     assert binding.bind_ip == "10.8.0.45"
 
 
+def test_resolve_live_interface_binding_uses_workspace_resolved_vpn_ip(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("EMULEBB_TEST_VPN_INTERFACE", "hide.me")
+    monkeypatch.setenv("EMULEBB_TEST_VPN_IP_RESOLVED", "10.9.0.77")
+    calls: list[object] = []
+
+    binding = resolve_live_interface_binding(
+        WorkspacePaths(
+            project_root=tmp_path,
+            tooling_root=tmp_path / "tooling",
+            agents_root=tmp_path / "agents",
+            be_root=tmp_path / "be",
+            tmp_dir=tmp_path / "tmp",
+            log_dir=tmp_path / "logs",
+            emule_workspace_root=None,
+        ),
+        command_runner=lambda *args, **kwargs: calls.append(args) or None,
+    )
+
+    assert binding.interface_alias == "hide.me"
+    assert binding.bind_ip == "10.9.0.77"
+    assert calls == []
+
+
 def test_resolve_live_interface_binding_reads_powershell_candidates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OVERLORD_LIVE_INTERFACE_ALIAS", raising=False)
+    monkeypatch.delenv("EMULEBB_TEST_VPN_INTERFACE", raising=False)
+    monkeypatch.delenv("EMULEBB_TEST_VPN_IP_RESOLVED", raising=False)
 
     class _Completed:
         def __init__(self, stdout: str) -> None:

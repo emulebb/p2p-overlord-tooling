@@ -10,7 +10,9 @@ from tests.e2e.lib.paths import WorkspacePaths
 
 def test_resolve_live_scenario_prerequisites_reads_manifest_defaults(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    monkeypatch.delenv("EMULEBB_TEST_VPN_IP_RESOLVED", raising=False)
     tooling_root = tmp_path / "tooling"
     seed_root = tooling_root / ".local" / "emule-harness-seeds" / "canonical"
     seed_root.mkdir(parents=True, exist_ok=True)
@@ -58,7 +60,9 @@ def test_resolve_live_scenario_prerequisites_reads_manifest_defaults(
 
 def test_resolve_live_scenario_prerequisites_uses_fallback_defaults(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    monkeypatch.delenv("EMULEBB_TEST_VPN_IP_RESOLVED", raising=False)
     tooling_root = tmp_path / "tooling"
     seed_root = tooling_root / ".local" / "emule-harness-seeds" / "canonical"
     seed_root.mkdir(parents=True, exist_ok=True)

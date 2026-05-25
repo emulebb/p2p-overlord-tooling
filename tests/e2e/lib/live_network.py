@@ -15,6 +15,10 @@ WINDOWS_IPV4_QUERY = (
     "| Select-Object InterfaceAlias,IPAddress,SkipAsSource,AddressState "
     "| ConvertTo-Json -Compress"
 )
+WORKSPACE_VPN_INTERFACE_ENV = "EMULEBB_TEST_VPN_INTERFACE"
+WORKSPACE_VPN_IP_RESOLVED_ENV = "EMULEBB_TEST_VPN_IP_RESOLVED"
+WORKSPACE_NETWORK_CONTEXT_JSON_ENV = "EMULEBB_TEST_NETWORK_CONTEXT_JSON"
+OVERLORD_LIVE_INTERFACE_ALIAS_ENV = "OVERLORD_LIVE_INTERFACE_ALIAS"
 
 
 @dataclass(frozen=True)
@@ -29,9 +33,17 @@ def resolve_live_interface_binding(
     interface_alias: str = "hide.me",
     command_runner: Callable[..., Any] | None = None,
 ) -> LiveInterfaceBinding:
-    override_alias = os.environ.get("OVERLORD_LIVE_INTERFACE_ALIAS", "").strip()
+    workspace_bind_ip = os.environ.get(WORKSPACE_VPN_IP_RESOLVED_ENV, "").strip()
+    override_alias = os.environ.get(OVERLORD_LIVE_INTERFACE_ALIAS_ENV, "").strip()
     if override_alias:
         interface_alias = override_alias
+    workspace_alias = os.environ.get(WORKSPACE_VPN_INTERFACE_ENV, "").strip()
+    if workspace_bind_ip:
+        _validate_ipv4(workspace_bind_ip)
+        return LiveInterfaceBinding(
+            interface_alias=workspace_alias or interface_alias,
+            bind_ip=workspace_bind_ip,
+        )
 
     runner = command_runner or run_checked
     completed = runner(
@@ -110,3 +122,5 @@ def _validate_ipv4(value: str) -> None:
     parsed = ipaddress.ip_address(value)
     if parsed.version != 4:
         raise ValueError(f"{value!r} is not an IPv4 address")
+    if parsed.is_loopback or parsed.is_link_local or parsed.is_unspecified:
+        raise ValueError(f"{value!r} is not usable for a live interface bind")
