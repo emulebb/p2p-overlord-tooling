@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 from overlord_tooling import cli
 from overlord_tooling.line_endings import source_normalization_summary
 from overlord_tooling.source_size import source_size_guard_summary, source_size_policy_from_args
@@ -19,6 +22,13 @@ def test_help_lists_quality_and_hygiene_commands(workspace_paths: WorkspacePaths
     assert "materialize" in names
     assert "sync" in names
     assert "validate" in names
+
+
+def test_cli_keeps_line_ending_dependency_lazy() -> None:
+    module = ast.parse(Path(cli.__file__).read_text(encoding="utf-8"))
+    top_level_imports = [node for node in module.body if isinstance(node, ast.ImportFrom)]
+
+    assert all(node.module != "overlord_tooling.line_endings" for node in top_level_imports)
 
 
 def test_hygiene_report_summarizes_workspace(workspace_paths: WorkspacePaths) -> None:

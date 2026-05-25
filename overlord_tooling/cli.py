@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from overlord_tooling.line_endings import run_guard_line_endings, run_normalize_source
 from overlord_tooling.source_size import add_source_size_args, largest_source_files, run_guard_source_size, source_size_findings, source_size_policy_from_args
 from overlord_tooling.scenarios import ScenarioCatalog, default_run_root, load_manifest, parity_status_rows
 from overlord_tooling.workspace_materialize import handle_materialize, handle_sync, handle_validate
@@ -51,7 +50,6 @@ class Paths:
 
     @property
     def docs_root(self) -> Path: return self.tooling_root / "docs"
-
     @property
     def schemas_root(self) -> Path: return self.tooling_root / "schemas"
     @property
@@ -303,10 +301,12 @@ def command_guard_source_size(paths: Paths, argv: list[str]) -> Any:
 
 
 def command_guard_line_endings(paths: Paths, argv: list[str]) -> Any:
+    from overlord_tooling.line_endings import run_guard_line_endings
     return run_guard_line_endings(paths, argv, canonical_repo_roots=canonical_repo_roots, git_lines=git_lines, write_json=write_json)
 
 
 def command_normalize_source(paths: Paths, argv: list[str]) -> Any:
+    from overlord_tooling.line_endings import run_normalize_source
     return run_normalize_source(paths, argv, canonical_repo_roots=canonical_repo_roots, git_lines=git_lines, write_json=write_json)
 
 
