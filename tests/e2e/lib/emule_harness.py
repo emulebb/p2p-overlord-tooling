@@ -3,13 +3,16 @@ from __future__ import annotations
 import json
 import os
 import shlex
-import sys
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from tests.e2e.lib.artifacts import latest_file
+from tests.e2e.lib.emulebb_shared import (
+    load_emulebb_live_profiles,
+    resolve_emulebb_live_profile_seed_config_dir,
+)
 from tests.e2e.lib.paths import WorkspacePaths
 from tests.e2e.lib.processes import (
     kill_processes_by_name,
@@ -31,8 +34,6 @@ _RUNTIME_EXE_CANDIDATES = (
     "eMule_v072a_parity.exe",
     "emule.exe",
 )
-_EMULEBB_TESTS_REPO_KEY = "tests"
-_EMULEBB_SEED_CONFIG_RELATIVE = Path("manifests") / "live-profile-seed" / "config"
 
 
 @dataclass
@@ -160,10 +161,10 @@ class EmuleHarnessRuntime:
         enable_upnp: bool = False,
         reset_transient_state: bool = True,
     ) -> EmuleProfile:
-        shared_profiles = _load_shared_live_profiles(self.paths)
+        shared_profiles = load_emulebb_live_profiles(self.paths)
         profile = shared_profiles.materialize_private_harness_profile(
             shared_profiles.PrivateHarnessProfileSpec(
-                seed_config_dir=_shared_seed_config_dir(self.paths),
+                seed_config_dir=resolve_emulebb_live_profile_seed_config_dir(self.paths),
                 profile_root=profile_root,
                 bind_addr=bind_addr,
                 tcp_port=tcp_port,
@@ -187,7 +188,7 @@ class EmuleHarnessRuntime:
         )
 
     def set_obfuscation_mode(self, profile: EmuleProfile, *, obfuscated_preferred: bool) -> None:
-        shared_profiles = _load_shared_live_profiles(self.paths)
+        shared_profiles = load_emulebb_live_profiles(self.paths)
         shared_profiles.apply_private_harness_obfuscation(
             profile.profile_root / "config",
             obfuscated_preferred,
@@ -315,43 +316,6 @@ class EmuleHarnessRuntime:
             f"timed out waiting for eMule harness ready file {ready_file}; "
             f"last_state={last_state}"
         )
-
-
-def _shared_tests_root(paths: WorkspacePaths) -> Path:
-    workspace = paths.emule_workspace_root
-    if workspace is not None:
-        deps_path = workspace / "workspaces" / "workspace" / "deps.json"
-        if deps_path.is_file():
-            deps = json.loads(deps_path.read_text(encoding="utf-8"))
-            repo_path = deps.get("workspace", {}).get("repos", {}).get(_EMULEBB_TESTS_REPO_KEY)
-            if repo_path:
-                deps_candidate = (deps_path.parent / str(repo_path)).resolve()
-                if deps_candidate.is_dir():
-                    return deps_candidate
-        workspace_candidate = workspace / "repos" / "emulebb-build-tests"
-        if workspace_candidate.is_dir():
-            return workspace_candidate.resolve()
-
-    sibling_candidate = paths.tooling_root.parent / "emulebb-build-tests"
-    if sibling_candidate.is_dir():
-        return sibling_candidate.resolve()
-    raise RuntimeError("could not resolve emulebb-build-tests from workspace deps or repo siblings")
-
-
-def _shared_seed_config_dir(paths: WorkspacePaths) -> Path:
-    seed_config_dir = _shared_tests_root(paths) / _EMULEBB_SEED_CONFIG_RELATIVE
-    if not seed_config_dir.is_dir():
-        raise RuntimeError(f"eMule live-profile seed config not found at {seed_config_dir}")
-    return seed_config_dir
-
-
-def _load_shared_live_profiles(paths: WorkspacePaths):
-    tests_root = _shared_tests_root(paths)
-    if str(tests_root) not in sys.path:
-        sys.path.insert(0, str(tests_root))
-    from emule_test_harness import live_profiles
-
-    return live_profiles
 
 
 def _read_ready_file(path: Path) -> dict[str, str]:

@@ -42,6 +42,12 @@ Legacy wrapper scripts were removed. Do not add compatibility shims for them.
 - eMule profile and preference materialization is shared from
   `emulebb-build-tests` via the workspace `deps.json`; p2p-overlord owns only
   scenario manifests, launch orchestration, and parity evidence shaping.
+- p2p-overlord test code should not hand-write eMule `preferences.ini` files.
+  Use the shared profile builder through `tests/e2e/lib/emulebb_shared.py`,
+  then keep p2p-specific server, agent, and campaign setup in this repo.
+- Generated eMule harness profiles are disposable run state. Retain full
+  profiles only through explicit debug flags such as `--keep-sessions-running`;
+  summaries and copied evidence stay as the normal diagnostic surface.
 
 Do not add wrapper scripts. New reusable automation should be Python modules
 under the owning package or pytest library.

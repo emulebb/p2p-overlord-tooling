@@ -6,8 +6,8 @@ from tests.e2e.lib.emule_harness import (
     EmuleHarnessRuntime,
     PRIVATE_HARNESS_RATE_LIMIT_BITS_PER_SEC,
     PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC,
-    _load_shared_live_profiles,
 )
+from tests.e2e.lib.emulebb_shared import load_emulebb_live_profiles, resolve_emulebb_tests_root
 from tests.e2e.lib.paths import WorkspacePaths
 
 
@@ -32,7 +32,7 @@ def _section_text(text: str, section: str) -> str:
 
 
 def test_private_harness_rate_cap_matches_shared_builder(tmp_path: Path) -> None:
-    shared_profiles = _load_shared_live_profiles(_workspace_paths(tmp_path))
+    shared_profiles = load_emulebb_live_profiles(_workspace_paths(tmp_path))
 
     assert PRIVATE_HARNESS_RATE_LIMIT_BITS_PER_SEC == 10_000_000_000
     assert PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC == (
@@ -64,7 +64,7 @@ def test_private_harness_profile_uses_shared_materializer(tmp_path: Path) -> Non
         enable_upnp=False,
     )
 
-    shared_profiles = _load_shared_live_profiles(paths)
+    shared_profiles = load_emulebb_live_profiles(paths)
     content = shared_profiles.read_ini_text(profile.preferences_path)
     emule_section = _section_text(content, "eMule")
     upnp_section = _section_text(content, "UPnP")
@@ -92,12 +92,21 @@ def test_private_harness_obfuscation_uses_shared_ini_mutation(tmp_path: Path) ->
 
     runtime.set_obfuscation_mode(profile, obfuscated_preferred=True)
 
-    shared_profiles = _load_shared_live_profiles(paths)
+    shared_profiles = load_emulebb_live_profiles(paths)
     content = shared_profiles.read_ini_text(profile.preferences_path)
     emule_section = _section_text(content, "eMule")
     assert emule_section.count("CryptLayerRequested=1") == 1
     assert emule_section.count("CryptLayerRequired=0") == 1
     assert emule_section.count("CryptLayerSupported=1") == 1
+
+
+def test_emule_harness_does_not_reintroduce_local_preferences_writer() -> None:
+    harness_source = (Path(__file__).parent / "lib" / "emule_harness.py").read_text(encoding="utf-8")
+
+    assert "_preferences_content" not in harness_source
+    assert "preferences_path.write_text" not in harness_source
+    assert "preferences_path.write_bytes" not in harness_source
+    assert "materialize_private_harness_profile" in harness_source
 
 
 def test_runtime_resolves_community_harness_emule_exe(tmp_path: Path) -> None:
@@ -119,3 +128,25 @@ def test_runtime_resolves_community_harness_emule_exe(tmp_path: Path) -> None:
 
     assert runtime.resolve_debug_dir() == debug_dir
     assert runtime.runtime_exe_path() == runtime_exe
+
+
+def test_emulebb_tests_root_resolves_from_workspace_deps_json(tmp_path: Path) -> None:
+    workspace = tmp_path / "emule-workspace"
+    deps_dir = workspace / "workspaces" / "workspace"
+    shared_tests_root = workspace / "repos" / "custom-build-tests"
+    deps_dir.mkdir(parents=True)
+    shared_tests_root.mkdir(parents=True)
+    (deps_dir / "deps.json").write_text(
+        '{\n'
+        '  "workspace": {\n'
+        '    "repos": {\n'
+        '      "tests": "..\\\\..\\\\repos\\\\custom-build-tests"\n'
+        "    }\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    paths = _workspace_paths(tmp_path, emule_workspace_root=workspace)
+
+    assert resolve_emulebb_tests_root(paths) == shared_tests_root.resolve()
