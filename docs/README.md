@@ -39,6 +39,9 @@ Legacy wrapper scripts were removed. Do not add compatibility shims for them.
 - `../orchestration/` keeps scenario orchestration notes
 - runtime-owned parity logic stays in `../tests/e2e/lib/`
 - result shaping stays in `../normalizers/` and `../reports/`
+- eMule profile and preference materialization is shared from
+  `emulebb-build-tests` via the workspace `deps.json`; p2p-overlord owns only
+  scenario manifests, launch orchestration, and parity evidence shaping.
 
 Do not add wrapper scripts. New reusable automation should be Python modules
 under the owning package or pytest library.

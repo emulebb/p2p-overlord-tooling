@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shlex
-import shutil
+import sys
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -32,6 +31,8 @@ _RUNTIME_EXE_CANDIDATES = (
     "eMule_v072a_parity.exe",
     "emule.exe",
 )
+_EMULEBB_TESTS_REPO_KEY = "tests"
+_EMULEBB_SEED_CONFIG_RELATIVE = Path("manifests") / "live-profile-seed" / "config"
 
 
 @dataclass
@@ -159,16 +160,11 @@ class EmuleHarnessRuntime:
         enable_upnp: bool = False,
         reset_transient_state: bool = True,
     ) -> EmuleProfile:
-        config_root = profile_root / "config"
-        logs_root = profile_root / "logs"
-        incoming_root = profile_root / "Incoming"
-        temp_root = profile_root / "Temp"
-        for path in (profile_root, config_root, logs_root, incoming_root, temp_root):
-            path.mkdir(parents=True, exist_ok=True)
-
-        preferences_path = config_root / "preferences.ini"
-        preferences_path.write_text(
-            _preferences_content(
+        shared_profiles = _load_shared_live_profiles(self.paths)
+        profile = shared_profiles.materialize_private_harness_profile(
+            shared_profiles.PrivateHarnessProfileSpec(
+                seed_config_dir=_shared_seed_config_dir(self.paths),
+                profile_root=profile_root,
                 bind_addr=bind_addr,
                 tcp_port=tcp_port,
                 udp_port=udp_port,
@@ -178,55 +174,24 @@ class EmuleHarnessRuntime:
                 enable_kademlia=enable_kademlia,
                 enable_ed2k=enable_ed2k,
                 enable_upnp=enable_upnp,
-            ),
-            encoding="ascii",
-            newline="\n",
+                reset_transient_state=reset_transient_state,
+            )
         )
 
-        if reset_transient_state:
-            for path in (logs_root, incoming_root, temp_root):
-                if path.exists():
-                    shutil.rmtree(path)
-                path.mkdir(parents=True, exist_ok=True)
-            for item in config_root.iterdir():
-                if item.name in {
-                    "preferences.ini",
-                    "preferences.dat",
-                    "preferencesKad.dat",
-                    "cryptkey.dat",
-                    "collectioncryptkey.dat",
-                }:
-                    continue
-                if item.is_dir():
-                    shutil.rmtree(item)
-                else:
-                    item.unlink(missing_ok=True)
-            for marker in ("harness.ready", "status.log", "seed.ed2k"):
-                (profile_root / marker).unlink(missing_ok=True)
-
         return EmuleProfile(
-            profile_root=profile_root.resolve(),
-            preferences_path=preferences_path.resolve(),
-            logs_root=logs_root.resolve(),
-            incoming_root=incoming_root.resolve(),
-            temp_root=temp_root.resolve(),
+            profile_root=Path(profile["profile_root"]).resolve(),
+            preferences_path=Path(profile["preferences_path"]).resolve(),
+            logs_root=Path(profile["logs_root"]).resolve(),
+            incoming_root=Path(profile["incoming_root"]).resolve(),
+            temp_root=Path(profile["temp_root"]).resolve(),
         )
 
     def set_obfuscation_mode(self, profile: EmuleProfile, *, obfuscated_preferred: bool) -> None:
-        desired = {
-            "CryptLayerRequested": "1" if obfuscated_preferred else "0",
-            "CryptLayerRequired": "0",
-            "CryptLayerSupported": "1" if obfuscated_preferred else "0",
-        }
-        content = profile.preferences_path.read_text(encoding="ascii")
-        for key, value in desired.items():
-            pattern = re.compile(rf"(?m)^{re.escape(key)}=.*$")
-            replacement = f"{key}={value}"
-            if pattern.search(content):
-                content = pattern.sub(replacement, content)
-            else:
-                content = content.rstrip("\r\n") + f"\n{replacement}\n"
-        profile.preferences_path.write_text(content, encoding="ascii", newline="\n")
+        shared_profiles = _load_shared_live_profiles(self.paths)
+        shared_profiles.apply_private_harness_obfuscation(
+            profile.profile_root / "config",
+            obfuscated_preferred,
+        )
 
     def start_private_ed2k_session(
         self,
@@ -352,62 +317,41 @@ class EmuleHarnessRuntime:
         )
 
 
-def _preferences_content(
-    *,
-    bind_addr: str,
-    tcp_port: int,
-    udp_port: int,
-    server_udp_port: int,
-    web_port: int,
-    kad_udp_key: int,
-    enable_kademlia: bool,
-    enable_ed2k: bool,
-    enable_upnp: bool,
-) -> str:
-    return f"""[eMule]
-AppVersion=0.72a
-Port={tcp_port}
-UDPPort={udp_port}
-ServerUDPPort={server_udp_port}
-BindAddr={bind_addr}
-AllowLocalHostIP=1
-FilterBadIPs=0
-Autoconnect=1
-StartupMinimized=1
-MinToTray=1
-BringToFront=0
-Splashscreen=0
-SaveLogToDisk=1
-SaveDebugToDisk=1
-Verbose=1
-OnlineSignature=0
-AutoTakeED2KLinks=0
-AutoConnectStaticOnly=0
-Serverlist=0
-AddServersFromServer=0
-AddServersFromClient=0
-NetworkKademlia={1 if enable_kademlia else 0}
-NetworkED2K={1 if enable_ed2k else 0}
-OpenPortsOnStartUp={1 if enable_upnp else 0}
-EnableScheduler=0
-KadUDPKey={kad_udp_key}
-MaxDownload={PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC}
-MaxUpload={PRIVATE_HARNESS_RATE_LIMIT_KIB_PER_SEC}
-CreateCrashDump=0
-Nick=eMule harness
-CryptLayerRequested=0
-CryptLayerRequired=0
-CryptLayerSupported=0
+def _shared_tests_root(paths: WorkspacePaths) -> Path:
+    workspace = paths.emule_workspace_root
+    if workspace is not None:
+        deps_path = workspace / "workspaces" / "workspace" / "deps.json"
+        if deps_path.is_file():
+            deps = json.loads(deps_path.read_text(encoding="utf-8"))
+            repo_path = deps.get("workspace", {}).get("repos", {}).get(_EMULEBB_TESTS_REPO_KEY)
+            if repo_path:
+                deps_candidate = (deps_path.parent / str(repo_path)).resolve()
+                if deps_candidate.is_dir():
+                    return deps_candidate
+        workspace_candidate = workspace / "repos" / "emulebb-build-tests"
+        if workspace_candidate.is_dir():
+            return workspace_candidate.resolve()
 
-[WebServer]
-Enabled=0
-Port={web_port}
-WebUseUPnP={1 if enable_upnp else 0}
+    sibling_candidate = paths.tooling_root.parent / "emulebb-build-tests"
+    if sibling_candidate.is_dir():
+        return sibling_candidate.resolve()
+    raise RuntimeError("could not resolve emulebb-build-tests from workspace deps or repo siblings")
 
-[UPnP]
-EnableUPnP={1 if enable_upnp else 0}
-CloseUPnPOnExit={1 if enable_upnp else 0}
-"""
+
+def _shared_seed_config_dir(paths: WorkspacePaths) -> Path:
+    seed_config_dir = _shared_tests_root(paths) / _EMULEBB_SEED_CONFIG_RELATIVE
+    if not seed_config_dir.is_dir():
+        raise RuntimeError(f"eMule live-profile seed config not found at {seed_config_dir}")
+    return seed_config_dir
+
+
+def _load_shared_live_profiles(paths: WorkspacePaths):
+    tests_root = _shared_tests_root(paths)
+    if str(tests_root) not in sys.path:
+        sys.path.insert(0, str(tests_root))
+    from emule_test_harness import live_profiles
+
+    return live_profiles
 
 
 def _read_ready_file(path: Path) -> dict[str, str]:
