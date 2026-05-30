@@ -52,16 +52,16 @@ def test_paths_report_includes_ed2k_server_root(workspace_paths: WorkspacePaths)
     assert report["ed2kServerRepoRoot"].endswith("p2p-overlord-ed2k-server")
 
 
-def test_validate_reports_emule_workspace_root_as_harness_only(workspace_paths: WorkspacePaths) -> None:
+def test_validate_reports_emulebb_workspace_root_as_harness_only(workspace_paths: WorkspacePaths) -> None:
     report = validate_workspace(workspace_paths.project_root)
 
     assert set(report["environment"]) == {
         "OVERLORD_PROJECT_DIR",
         "OVERLORD_TMP_DIR",
         "OVERLORD_LOG_DIR",
-        "EMULE_WORKSPACE_ROOT",
+        "EMULEBB_WORKSPACE_ROOT",
     }
-    assert report["environment"]["EMULE_WORKSPACE_ROOT"]["requiredFor"] == "emule-harness scenarios"
+    assert report["environment"]["EMULEBB_WORKSPACE_ROOT"]["requiredFor"] == "emule-harness scenarios"
 
 
 def test_source_size_guard_is_advisory_by_default(workspace_paths: WorkspacePaths) -> None:

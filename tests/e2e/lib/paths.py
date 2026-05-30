@@ -14,7 +14,7 @@ class WorkspacePaths:
     be_root: Path
     tmp_dir: Path
     log_dir: Path
-    emule_workspace_root: Path | None
+    emulebb_workspace_root: Path | None
 
     @classmethod
     def discover(cls) -> "WorkspacePaths":
@@ -22,7 +22,7 @@ class WorkspacePaths:
         project_root = Path(os.environ.get("OVERLORD_PROJECT_DIR", tooling_root.parent)).resolve()
         tmp_dir = Path(os.environ.get("OVERLORD_TMP_DIR", Path(tempfile.gettempdir()) / "p2p-overlord")).resolve()
         log_dir = Path(os.environ.get("OVERLORD_LOG_DIR", tmp_dir / "logs")).resolve()
-        emule_workspace = os.environ.get("EMULE_WORKSPACE_ROOT")
+        emule_workspace = os.environ.get("EMULEBB_WORKSPACE_ROOT")
 
         return cls(
             project_root=project_root,
@@ -31,7 +31,7 @@ class WorkspacePaths:
             be_root=project_root / "p2p-overlord-be",
             tmp_dir=tmp_dir,
             log_dir=log_dir,
-            emule_workspace_root=Path(emule_workspace).resolve() if emule_workspace else None,
+            emulebb_workspace_root=Path(emule_workspace).resolve() if emule_workspace else None,
         )
 
     @property
@@ -39,9 +39,9 @@ class WorkspacePaths:
         return self.project_root / "p2p-overlord-ed2k-server"
 
     def require_emule_workspace(self) -> Path:
-        if self.emule_workspace_root is None:
-            raise RuntimeError("EMULE_WORKSPACE_ROOT is not set")
-        return self.emule_workspace_root
+        if self.emulebb_workspace_root is None:
+            raise RuntimeError("EMULEBB_WORKSPACE_ROOT is not set")
+        return self.emulebb_workspace_root
 
     def run_root(self, scenario_id: str, run_id: str) -> Path:
         return self.tmp_dir / "overlord-tooling" / "runs" / scenario_id / run_id

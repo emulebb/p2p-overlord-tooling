@@ -100,9 +100,9 @@ def validate_workspace(workspace_root: Path) -> dict[str, Any]:
             "OVERLORD_PROJECT_DIR": env_status("OVERLORD_PROJECT_DIR", str(root)),
             "OVERLORD_TMP_DIR": env_status("OVERLORD_TMP_DIR", str(tmp_dir)),
             "OVERLORD_LOG_DIR": env_status("OVERLORD_LOG_DIR", str(log_dir)),
-            "EMULE_WORKSPACE_ROOT": {
-                "present": bool(os.environ.get("EMULE_WORKSPACE_ROOT")),
-                "value": os.environ.get("EMULE_WORKSPACE_ROOT"),
+            "EMULEBB_WORKSPACE_ROOT": {
+                "present": bool(os.environ.get("EMULEBB_WORKSPACE_ROOT")),
+                "value": os.environ.get("EMULEBB_WORKSPACE_ROOT"),
                 "requiredFor": "emule-harness scenarios",
             },
         },

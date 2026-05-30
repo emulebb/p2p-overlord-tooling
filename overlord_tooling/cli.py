@@ -442,7 +442,7 @@ def environment_summary() -> dict[str, dict[str, Any]]:
         "OVERLORD_PROJECT_DIR",
         "OVERLORD_TMP_DIR",
         "OVERLORD_LOG_DIR",
-        "EMULE_WORKSPACE_ROOT",
+        "EMULEBB_WORKSPACE_ROOT",
     ]
     return {name: {"present": bool(os.environ.get(name)), "value": os.environ.get(name)} for name in names}
 
