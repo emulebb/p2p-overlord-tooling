@@ -6,6 +6,9 @@ Supporting notes for the workspace tooling platform.
 
 - [Workspace Policy](./WORKSPACE_POLICY.md), including the shared quality and
   opportunistic-refactoring policy.
+- [p2p-overlord Release Policy](https://github.com/emulebb/p2p-overlord-be/blob/develop/docs/RELEASE_POLICY.md),
+  owned by `p2p-overlord-be`. In a combined workspace, the same file is
+  `../../p2p-overlord-be/docs/RELEASE_POLICY.md`.
 
 ## Platform Areas
 

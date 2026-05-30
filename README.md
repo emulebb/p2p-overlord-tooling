@@ -13,6 +13,16 @@ Product runtime logic remains in:
 Use the shared workspace policy from `docs/WORKSPACE_POLICY.md` and the
 tooling-repo notes in `./AGENTS.md`.
 
+## Release Naming
+
+The shared p2p-overlord release policy is owned by
+[`p2p-overlord-be/docs/RELEASE_POLICY.md`](https://github.com/emulebb/p2p-overlord-be/blob/develop/docs/RELEASE_POLICY.md).
+In a combined workspace, read it at
+`../p2p-overlord-be/docs/RELEASE_POLICY.md`. The first planned release
+candidate is `0.1.1-rc.1`; keep tooling package metadata on dev versions until
+release mode explicitly starts and the agents, backend, and tooling versions
+are bumped together.
+
 ## Layout
 
 - `overlord_tooling/` Python command surface

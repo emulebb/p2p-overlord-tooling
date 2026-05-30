@@ -47,7 +47,7 @@ rules, quality gates, or deltas that are not shared across the workspace.
 - Do not hardcode local absolute workspace paths in shared docs, scripts, or
   tracked config.
 - Use `%OVERLORD_PROJECT_DIR%` for workspace repo paths.
-- Use `%EMULE_WORKSPACE_ROOT%` for eMule workspace, build, and runtime paths.
+- Use `%EMULEBB_WORKSPACE_ROOT%` for eMule workspace, build, and runtime paths.
 - Use `%OVERLORD_TMP_DIR%` for temporary run roots and sample simulations.
 - Use `%OVERLORD_LOG_DIR%` for coordinator and agent log discovery.
 - Do not add a separate ED2K server path environment variable; derive the
@@ -108,7 +108,7 @@ rules, quality gates, or deltas that are not shared across the workspace.
 - The runnable eMule reference build is called `emule-harness` in shared docs,
   tooling, scenarios, and artifacts.
 - The only mutable app variant for parity work is the tracing harness at
-  `%EMULE_WORKSPACE_ROOT%\workspaces\v0.72a\app\eMule-v0.72a-tracing-harness`.
+  `%EMULEBB_WORKSPACE_ROOT%\workspaces\v0.72a\app\eMule-v0.72a-tracing-harness`.
   Do not patch other app variants for this workspace program.
 - p2p-overlord tooling consumes the existing `tracing-harness` debug output
   from the canonical workspace path. Build orchestration for the external
