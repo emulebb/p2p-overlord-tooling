@@ -1,6 +1,10 @@
 # Tooling Repo Rules
 
-- Follow the shared workspace policy in `docs/WORKSPACE_POLICY.md`.
+- Follow the eMuleBB workspace policy in
+  `../emulebb-tooling/docs/WORKSPACE-POLICY.md` when this repo is checked out
+  under `EMULEBB_WORKSPACE_ROOT\repos`.
+- If the standalone p2p-overlord workspace is in use, also follow
+  `docs/WORKSPACE_POLICY.md`.
 - Use `docs/README.md` as the canonical tooling docs home.
 - Use `../p2p-overlord-be/BACKLOG.md` as the canonical active backlog.
 - Target full stock eMule `v0.72a` Kad and ED2K parity, including deprecated
