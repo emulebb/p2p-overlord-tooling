@@ -108,7 +108,7 @@ rules, quality gates, or deltas that are not shared across the workspace.
 - The runnable eMule reference build is called `emule-harness` in shared docs,
   tooling, scenarios, and artifacts.
 - The only mutable app variant for parity work is the tracing harness at
-  `%EMULEBB_WORKSPACE_ROOT%\workspaces\v0.72a\app\eMule-v0.72a-tracing-harness`.
+  `%EMULEBB_WORKSPACE_ROOT%\workspaces\workspace\app\emulebb-community-tracing-harness`.
   Do not patch other app variants for this workspace program.
 - p2p-overlord tooling consumes the existing `tracing-harness` debug output
   from the canonical workspace path. Build orchestration for the external
